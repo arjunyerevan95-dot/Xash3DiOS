@@ -35,6 +35,15 @@ index 35f3ff8..1ccab8d 100644
 +	if( !g_fRenderInitialized )
 +		return;
 +
+@@ -2336,0 +2340,8 @@ int HUD_GetRenderInterface( int version, render_api_t *renderfuncs, render_inter
++	if( RENDER_GET_PARM( PARM_GL_CONTEXT_TYPE, 0 ) != CONTEXT_TYPE_GL )
++	{
++		g_fRenderInitialized = false;
++		ConPrintf( "^3Warning:^7 custom renderer interface disabled for GLES/OpenGL Core; using the engine renderer.\n" );
++		return false;
++	}
++
++	// Only expose callbacks after the custom renderer is known to be usable.
 diff --git a/client/render/r_misc.cpp b/client/render/r_misc.cpp
 index fe0b1fb..fa86eed 100644
 --- a/client/render/r_misc.cpp
