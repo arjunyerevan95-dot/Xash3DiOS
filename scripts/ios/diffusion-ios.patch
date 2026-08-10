@@ -19,3 +19,48 @@ diff --git a/client/render/r_opengl.cpp b/client/render/r_opengl.cpp
 @@ -586 +586 @@
 -		HOST_ERROR( "This game requires the OpenGL renderer.\nGLES and OpenGL Core contexts are not supported.\n" );
 +		ConPrintf( "^3Warning:^7 custom renderer unavailable on GLES/OpenGL Core; using the engine renderer.\n" );
+diff --git a/client/cdll_int.cpp b/client/cdll_int.cpp
+index 0dd03f2..74e7831 100644
+--- a/client/cdll_int.cpp
++++ b/client/cdll_int.cpp
+@@ -217,0 +218,3 @@ int HUD_Redraw(float time, int intermission)
++	if( !g_fRenderInitialized )
++		return 0;
++
+diff --git a/client/render/r_main.cpp b/client/render/r_main.cpp
+index 35f3ff8..1ccab8d 100644
+--- a/client/render/r_main.cpp
++++ b/client/render/r_main.cpp
+@@ -2279,0 +2280,3 @@ void HUD_ProcessEntData( qboolean allocate )
++	if( !g_fRenderInitialized )
++		return;
++
+diff --git a/client/render/r_misc.cpp b/client/render/r_misc.cpp
+index fe0b1fb..fa86eed 100644
+--- a/client/render/r_misc.cpp
++++ b/client/render/r_misc.cpp
+@@ -1441,0 +1442,3 @@ void HUD_StudioEvent( const struct mstudioevent_s* event, const struct cl_entity
++	if( !g_fRenderInitialized )
++		return;
++
+diff --git a/client/render/tri.cpp b/client/render/tri.cpp
+index 713e34b..9ce3993 100644
+--- a/client/render/tri.cpp
++++ b/client/render/tri.cpp
+@@ -40,0 +41,3 @@ void HUD_DrawNormalTriangles( void )
++	if( !g_fRenderInitialized )
++		return;
++
+@@ -75,5 +78 @@ void HUD_DrawTransparentTriangles( void )
+-	{
+-		gEngfuncs.GetViewAngles( (float *)RI->viewangles );
+-		tr.time = GET_CLIENT_TIME();
+-		tr.oldtime = GET_CLIENT_OLDTIME();
+-	}
++		return;
+diff --git a/3rd-party/mainui_cpp/wscript b/3rd-party/mainui_cpp/wscript
+index ed1105a..2c28638 100644
+--- a/3rd-party/mainui_cpp/wscript
++++ b/3rd-party/mainui_cpp/wscript
+@@ -83,0 +84 @@ def build(bld):
++		name     = 'menu',

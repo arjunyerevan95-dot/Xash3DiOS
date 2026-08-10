@@ -70,17 +70,19 @@ export LDFLAGS="$IOS_TARGET_FLAGS"
 
 cd "$SOURCE_DIR"
 
-# Configure every declared subproject so Diffusion's Waf graph is complete,
-# but build/install only the two modules requested by gameinfo.txt. MainUI and
-# the desktop launcher are intentionally excluded from this first device gate.
+# Configure every declared subproject so Diffusion's Waf graph is complete.
+# The game-specific MainUI is required as well: without it Xash falls back to
+# the generic menu and combines that layout with Diffusion's high-resolution
+# button artwork.
 python3 ./waf configure -T debug --disable-werror
-python3 ./waf build --targets=client,server
-python3 ./waf install --targets=client,server --destdir="$STAGE_DIR"
+python3 ./waf build --targets=client,server,menu
+python3 ./waf install --targets=client,server,menu --destdir="$STAGE_DIR"
 
 CLIENT_DYLIB="$STAGE_DIR/diffusion/bin/client_arm64.dylib"
 SERVER_DYLIB="$STAGE_DIR/diffusion/bin/server_arm64.dylib"
+MENU_DYLIB="$STAGE_DIR/diffusion/bin/menu_arm64.dylib"
 
-for required_dylib in "$CLIENT_DYLIB" "$SERVER_DYLIB"; do
+for required_dylib in "$CLIENT_DYLIB" "$SERVER_DYLIB" "$MENU_DYLIB"; do
 	if [ ! -f "$required_dylib" ]; then
 		echo "Diffusion iOS build did not produce $required_dylib" >&2
 		exit 1
@@ -99,11 +101,23 @@ done
 mkdir -p "$APP_LIBS_DIR/bin"
 cp "$CLIENT_DYLIB" "$APP_LIBS_DIR/bin/client_arm64.dylib"
 cp "$SERVER_DYLIB" "$APP_LIBS_DIR/bin/server_arm64.dylib"
+cp "$MENU_DYLIB" "$APP_LIBS_DIR/bin/menu_arm64.dylib"
+
+# Keep Diffusion's menu data game-scoped so regular Half-Life continues to use
+# its own localization and keyboard descriptions.
+mkdir -p "$APP_LIBS_DIR/diffusion/resource"
+cp "$SOURCE_DIR/3rd-party/mainui_cpp/translations/gameui_english.txt" \
+	"$APP_LIBS_DIR/diffusion/resource/gameui_english.txt"
+cp "$SOURCE_DIR/3rd-party/mainui_cpp/gamedir_data/kb_act.lst" \
+	"$APP_LIBS_DIR/diffusion/kb_act.lst"
+cp "$SOURCE_DIR/3rd-party/mainui_cpp/gamedir_data/kb_def.lst" \
+	"$APP_LIBS_DIR/diffusion/kb_def.lst"
 
 echo "Diffusion iOS modules staged from:"
 echo "  Diffusion:            $DIFFUSION_REF"
 echo "  Diffusion-MainUI:     $DIFFUSION_MAINUI_REF"
 echo "  Diffusion-executable: $DIFFUSION_EXECUTABLE_REF"
-file "$APP_LIBS_DIR/bin/client_arm64.dylib" "$APP_LIBS_DIR/bin/server_arm64.dylib"
+file "$APP_LIBS_DIR/bin/client_arm64.dylib" "$APP_LIBS_DIR/bin/server_arm64.dylib" "$APP_LIBS_DIR/bin/menu_arm64.dylib"
 xcrun vtool -show-build "$APP_LIBS_DIR/bin/client_arm64.dylib"
 xcrun vtool -show-build "$APP_LIBS_DIR/bin/server_arm64.dylib"
+xcrun vtool -show-build "$APP_LIBS_DIR/bin/menu_arm64.dylib"
