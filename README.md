@@ -1,3 +1,8 @@
+> [!NOTE]
+> This repository is the **Xash3DiOS** porting fork. Its scope, legal-data
+> policy, proof-of-life gates, and Diffusion plan are documented in
+> [Documentation/xash3d-ios-project.md](Documentation/xash3d-ios-project.md).
+
 > [!CAUTION]
 > **Only download Xash3D FWGS from official sources.** Third-party builds, "modded launchers", "optimized" repacks and random mirrors are frequently bundled with malware, miners, spyware and credential stealers. We cannot vouch for anything we did not build. Get official binaries only from the [releases page](https://github.com/FWGS/xash3d-fwgs/releases/tag/continuous).
 

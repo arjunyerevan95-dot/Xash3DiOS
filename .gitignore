@@ -129,6 +129,13 @@ dlldata.c
 project.lock.json
 artifacts/
 
+# User-supplied commercial game data must never enter the repository.
+/valve/
+/diffusion/
+/game-data/
+/staging/
+*.ipa
+
 *_i.c
 *_p.c
 *_i.h

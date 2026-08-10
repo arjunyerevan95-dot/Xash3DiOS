@@ -7,6 +7,9 @@ jobs:
 #    - name: Cleanup
 #      run: rm -rf .* || true
   build:
+    # This is FWGS's full upstream release matrix. Forks use their own focused
+    # workflows and must not publish upstream-style releases on every push.
+    if: github.repository == 'FWGS/xash3d-fwgs'
     runs-on: ${{ matrix.os }}
     continue-on-error: true
     strategy:
@@ -91,6 +94,7 @@ jobs:
         name: artifact-${{ matrix.targetos }}-${{ matrix.targetarch }}
         path: artifacts/*
   flatpak:
+    if: github.repository == 'FWGS/xash3d-fwgs'
     runs-on: ubuntu-latest
     continue-on-error: true
     strategy:
@@ -114,7 +118,7 @@ jobs:
     name: "Upload releases"
     runs-on: ubuntu-latest
     needs: [build, flatpak]
-    if: ${{ github.event_name == 'push' }}
+    if: ${{ github.repository == 'FWGS/xash3d-fwgs' && github.event_name == 'push' }}
     steps:
     - name: Checkout
       uses: actions/checkout@v6
