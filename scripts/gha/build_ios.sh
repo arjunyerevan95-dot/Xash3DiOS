@@ -4,6 +4,17 @@
 
 cd "$GITHUB_WORKSPACE" || die
 
+git -C 3rdparty/nanogl apply --check --unidiff-zero "$GITHUB_WORKSPACE/scripts/ios/nanogl-large-primitive.patch" || die
+git -C 3rdparty/nanogl apply --unidiff-zero "$GITHUB_WORKSPACE/scripts/ios/nanogl-large-primitive.patch" || die
+mkdir -p build || die
+cc -std=gnu11 -DNANOGL_MANGLE_PREPEND=1 -DREF_DLL=1 \
+	-I3rdparty/nanogl -I3rdparty/nanogl/GL \
+	3rdparty/nanogl/tests/test_batch.c \
+	3rdparty/nanogl/nanogl.c \
+	3rdparty/nanogl/nanoWrap.c \
+	-o build/nanogl-batch-test || die
+./build/nanogl-batch-test || die
+
 ./waf configure --enable-lto --ios build install --destdir=build/ios || die_configure
 
 cp -vr /Library/Frameworks/SDL2.framework ./build
