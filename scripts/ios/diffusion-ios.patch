@@ -6,3 +6,10 @@ diff --git a/game_shared/utlmemory.h b/game_shared/utlmemory.h
 -#include <malloc.h>
 +#include <stdlib.h>
  #ifdef _MSC_VER
+diff --git a/phys_shared/NxSimpleTypes.h b/phys_shared/NxSimpleTypes.h
+--- a/phys_shared/NxSimpleTypes.h
++++ b/phys_shared/NxSimpleTypes.h
+@@ -39,2 +39,2 @@ union NxU32F32
+-#if __APPLE__
++#if defined(__APPLE__) && (defined(__ppc__) || defined(__ppc64__))
+     NX_COMPILE_TIME_ASSERT(sizeof(bool)==4);    // PPC has 4 byte bools
