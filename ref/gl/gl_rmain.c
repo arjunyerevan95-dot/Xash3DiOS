@@ -25,6 +25,11 @@ GNU General Public License for more details.
 float		gldepthmin, gldepthmax;
 ref_instance_t	RI;
 
+#if XASH_APPLE
+static string ios_renderer_trace_map;
+static int ios_renderer_trace_frames;
+#endif
+
 static int R_RankForRenderMode( int rendermode )
 {
 	switch( rendermode )
@@ -958,6 +963,18 @@ void R_RenderScene( void )
 
 	R_SetupFrustum();
 	R_SetupFrame();
+#if XASH_APPLE
+	if( ios_renderer_trace_frames > 0 )
+	{
+		int leaf_index = RI.viewleaf && WORLDMODEL->leafs ? (int)( RI.viewleaf - WORLDMODEL->leafs ) : -1;
+		int leaf_contents = RI.viewleaf ? RI.viewleaf->contents : 0;
+		gEngfuncs.Con_Printf( "iOS GLES trace: frame=%d origin=(%.2f %.2f %.2f) angles=(%.2f %.2f %.2f) leaf=%d contents=%d flags=0x%x\n",
+			4 - ios_renderer_trace_frames,
+			RI.rvp.vieworigin[0], RI.rvp.vieworigin[1], RI.rvp.vieworigin[2],
+			RI.rvp.viewangles[0], RI.rvp.viewangles[1], RI.rvp.viewangles[2],
+			leaf_index, leaf_contents, RI.rvp.flags );
+	}
+#endif
 	R_SetupGL( true );
 	R_Clear( ~0 );
 
@@ -968,6 +985,13 @@ void R_RenderScene( void )
 
 	R_CheckGLFog();
 	R_DrawWorld();
+#if XASH_APPLE
+	if( ios_renderer_trace_frames > 0 )
+		gEngfuncs.Con_Printf( "iOS GLES trace: world draw polys=%u leafs=%u solid=%u trans=%u beams=%u\n",
+			r_stats.c_world_polys, r_stats.c_world_leafs,
+			tr.draw_list->num_solid_entities, tr.draw_list->num_trans_entities,
+			tr.draw_list->num_beam_entities );
+#endif
 	R_CheckFog();
 
 	gEngfuncs.CL_ExtraUpdate ();	// don't let sound get messed up if going slow
@@ -975,6 +999,27 @@ void R_RenderScene( void )
 	R_DrawEntitiesOnList();
 
 	R_DrawWaterSurfaces();
+
+#if XASH_APPLE
+	if( ios_renderer_trace_frames > 0 )
+	{
+		byte pixels[5][4];
+		int x = RI.rvp.viewport[0];
+		int y = RI.rvp.viewport[1];
+		int w = RI.rvp.viewport[2];
+		int h = RI.rvp.viewport[3];
+		const int sample_x[5] = { x + w / 2, x + w / 4, x + ( 3 * w ) / 4, x + w / 2, x + w / 2 };
+		const int sample_y[5] = { y + h / 2, y + h / 2, y + h / 2, y + h / 4, y + ( 3 * h ) / 4 };
+
+		for( int i = 0; i < 5; i++ )
+			pglReadPixels( sample_x[i], sample_y[i], 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixels[i] );
+
+		gEngfuncs.Con_Printf( "iOS GLES trace: pixels center=%u,%u,%u left=%u,%u,%u right=%u,%u,%u low=%u,%u,%u high=%u,%u,%u glerr=0x%x\n",
+			pixels[0][0], pixels[0][1], pixels[0][2], pixels[1][0], pixels[1][1], pixels[1][2],
+			pixels[2][0], pixels[2][1], pixels[2][2], pixels[3][0], pixels[3][1], pixels[3][2],
+			pixels[4][0], pixels[4][1], pixels[4][2], pglGetError() );
+	}
+#endif
 }
 
 void R_GammaChanged( qboolean do_reset_gamma )
@@ -1075,8 +1120,30 @@ R_RenderFrame
 */
 void R_RenderFrame( const ref_viewpass_t *rvp )
 {
+#if XASH_APPLE
+	const char *world_name = WORLDMODEL ? WORLDMODEL->name : "<none>";
+	if( Q_stricmp( ios_renderer_trace_map, world_name ))
+	{
+		Q_strncpy( ios_renderer_trace_map, world_name, sizeof( ios_renderer_trace_map ));
+		ios_renderer_trace_frames = 3;
+		gEngfuncs.Con_Printf( "iOS GLES map: %s surfaces=%d leafs=%d nodes=%d entities=%u norefresh=%.0f custom=%d\n",
+			ios_renderer_trace_map,
+			WORLDMODEL ? WORLDMODEL->numsurfaces : 0,
+			WORLDMODEL ? WORLDMODEL->numleafs : 0,
+			WORLDMODEL ? WORLDMODEL->numnodes : 0,
+			tr.draw_list ? r_numEntities : 0, r_norefresh->value,
+			gEngfuncs.drawFuncs->GL_RenderFrame != NULL );
+	}
+#endif
+
 	if( r_norefresh->value )
+	{
+#if XASH_APPLE
+		if( ios_renderer_trace_frames > 0 )
+			ios_renderer_trace_frames--;
+#endif
 		return;
+	}
 
 	// setup the initial render params
 	R_SetupRefParams( rvp );
@@ -1094,6 +1161,10 @@ void R_RenderFrame( const ref_viewpass_t *rvp )
 			R_GatherPlayerLight( tr.viewent );
 			tr.realframecount++;
 			tr.fResetVis = true;
+#if XASH_APPLE
+			if( ios_renderer_trace_frames > 0 )
+				ios_renderer_trace_frames--;
+#endif
 			return;
 		}
 	}
@@ -1104,6 +1175,11 @@ void R_RenderFrame( const ref_viewpass_t *rvp )
 
 	tr.realframecount++; // right called after viewmodel events
 	R_RenderScene();
+
+#if XASH_APPLE
+	if( ios_renderer_trace_frames > 0 )
+		ios_renderer_trace_frames--;
+#endif
 
 	return;
 }
