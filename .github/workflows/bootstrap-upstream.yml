@@ -1,0 +1,54 @@
+name: Seed FWGS history
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  seed:
+    name: Import current FWGS baseline
+    if: github.repository == 'arjunyerevan95-dot/Xash3DiOS'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout bootstrap commit
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Merge FWGS history and retire this workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          seed_commit=$(git rev-parse HEAD)
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream https://github.com/FWGS/xash3d-fwgs.git
+          git fetch --no-tags upstream master
+          git checkout -B imported upstream/master
+
+          set +e
+          git merge --allow-unrelated-histories --no-commit "$seed_commit"
+          merge_status=$?
+          set -e
+
+          if [ "$merge_status" -ne 0 ]; then
+            unexpected_conflicts=$(git diff --name-only --diff-filter=U | grep -Ev '^(\.github/workflows/c-cpp\.yml|\.gitignore|README\.md)$' || true)
+            if [ -n "$unexpected_conflicts" ]; then
+              echo "Unexpected merge conflicts:"
+              echo "$unexpected_conflicts"
+              exit 1
+            fi
+
+            git checkout --theirs -- .github/workflows/c-cpp.yml .gitignore README.md
+            git add .github/workflows/c-cpp.yml .gitignore README.md
+          fi
+
+          git rm --ignore-unmatch .github/workflows/bootstrap-upstream.yml
+          git commit -m "bootstrap arm64 iOS proof of life"
+          git push origin HEAD:main
