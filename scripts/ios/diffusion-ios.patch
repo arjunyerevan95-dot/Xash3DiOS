@@ -13,3 +13,9 @@ diff --git a/phys_shared/NxSimpleTypes.h b/phys_shared/NxSimpleTypes.h
 -#if __APPLE__
 +#if defined(__APPLE__) && (defined(__ppc__) || defined(__ppc64__))
      NX_COMPILE_TIME_ASSERT(sizeof(bool)==4);    // PPC has 4 byte bools
+diff --git a/client/render/r_opengl.cpp b/client/render/r_opengl.cpp
+--- a/client/render/r_opengl.cpp
++++ b/client/render/r_opengl.cpp
+@@ -586 +586 @@
+-		HOST_ERROR( "This game requires the OpenGL renderer.\nGLES and OpenGL Core contexts are not supported.\n" );
++		ConPrintf( "^3Warning:^7 custom renderer unavailable on GLES/OpenGL Core; using the engine renderer.\n" );

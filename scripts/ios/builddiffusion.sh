@@ -48,7 +48,7 @@ checkout_revision https://github.com/Aynekko/Diffusion-executable.git "$DIFFUSIO
 
 # Diffusion inherits a Linux-only malloc header from its Source SDK utility
 # layer. The iPhoneOS SDK exposes the same allocation APIs through stdlib.h.
-git -C "$SOURCE_DIR" apply "$ROOT_DIR/scripts/ios/diffusion-ios.patch"
+git -C "$SOURCE_DIR" apply --unidiff-zero "$ROOT_DIR/scripts/ios/diffusion-ios.patch"
 
 IOS_SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
 IOS_CLANG=$(xcrun --sdk iphoneos --find clang)
