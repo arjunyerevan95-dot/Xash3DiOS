@@ -391,6 +391,13 @@ void V_RenderView( void )
 	static ref_params_t	rp;
 	ref_viewpass_t	rvp;
 	int		viewnum = 0;
+#if XASH_APPLE
+	static qboolean trace_first_active_frame = true;
+#define IOS_FIRST_FRAME_TRACE( stage ) \
+	do { if( trace_first_active_frame ) Con_Printf( "iOS first active frame: %s\n", stage ); } while( 0 )
+#else
+#define IOS_FIRST_FRAME_TRACE( stage ) ((void)0)
+#endif
 
 	if( !cl.video_prepped || ( !ui_renderworld.value && UI_IsVisible() && !cl.background ))
 		return; // still loading
@@ -404,10 +411,15 @@ void V_RenderView( void )
 
 	do
 	{
+		IOS_FIRST_FRAME_TRACE( "before client view" );
 		clgame.dllFuncs.pfnCalcRefdef( &rp );
+		IOS_FIRST_FRAME_TRACE( "after client view" );
 		V_GetRefParams( &rp, &rvp );
+		IOS_FIRST_FRAME_TRACE( "after ref params" );
 		V_RefApplyOverview( &rvp );
+		IOS_FIRST_FRAME_TRACE( "after overview" );
 		V_ApplyRefUnderwater( &rvp );
+		IOS_FIRST_FRAME_TRACE( "before renderer" );
 
 		if( viewnum == 0 && FBitSet( rvp.flags, RF_ONLY_CLIENTDRAW ))
 		{
@@ -415,14 +427,22 @@ void V_RenderView( void )
 		}
 
 		GL_RenderFrame( &rvp );
+		IOS_FIRST_FRAME_TRACE( "after renderer" );
 		S_UpdateFrame( &rvp );
+		IOS_FIRST_FRAME_TRACE( "after audio" );
 		viewnum++;
 
 	} while( rp.nextView );
 
 	// draw debug triangles on a server
 	SV_DrawDebugTriangles ();
+	IOS_FIRST_FRAME_TRACE( "after debug triangles" );
 	ref.dllFuncs.GL_BackendEndFrame ();
+	IOS_FIRST_FRAME_TRACE( "frame complete" );
+#if XASH_APPLE
+	trace_first_active_frame = false;
+#endif
+#undef IOS_FIRST_FRAME_TRACE
 }
 
 #define POINT_SIZE		16.0f
