@@ -51,6 +51,6 @@ jobs:
             git add .github/workflows/c-cpp.yml .gitignore README.md
           fi
 
-          git rm --ignore-unmatch .github/workflows/bootstrap-upstream.yml
+          git rm -f --ignore-unmatch .github/workflows/bootstrap-upstream.yml
           git commit -m "bootstrap arm64 iOS proof of life"
           git push origin HEAD:main
