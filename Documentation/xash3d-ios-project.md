@@ -40,6 +40,25 @@ device-testing service must re-sign it with an appropriate Apple identity.
    entry points to the client renderer, port GLSL 1.30 shaders to GLSL ES 3.00,
    and restore effects incrementally.
 
+## Diffusion device test
+
+The iOS artifact pins and cross-compiles Diffusion's client and server source
+for arm64. The resulting modules are bundled at `bin/client_arm64.dylib` and
+`bin/server_arm64.dylib`, matching the paths requested by Diffusion 1.21's
+`gameinfo.txt`.
+
+Copy only the user-supplied `diffusion` data directory beside `valve` in the
+app's Files-visible Documents directory, then launch with:
+
+```text
+-game diffusion -dev 2 -log
+```
+
+Do not copy or rename the Windows or Linux client/server binaries from the
+standalone release. They are not executable on iOS. Until Gate 5 passes on a
+physical device, the custom renderer remains disabled in favor of the engine's
+GLES compatibility path.
+
 Each gate should produce a device log and a short pass/fail checklist. Renderer
 work must not begin based solely on a successful compile or menu launch.
 

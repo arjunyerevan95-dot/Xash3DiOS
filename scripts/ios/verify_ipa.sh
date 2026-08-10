@@ -27,8 +27,15 @@ fi
 INFO_PLIST="$APP_PATH/Info.plist"
 ENGINE_PATH="$APP_PATH/xash"
 SDL_PATH="$APP_PATH/SDL2.framework/SDL2"
+DIFFUSION_CLIENT_PATH="$APP_PATH/bin/client_arm64.dylib"
+DIFFUSION_SERVER_PATH="$APP_PATH/bin/server_arm64.dylib"
 
-for required_path in "$INFO_PLIST" "$ENGINE_PATH" "$SDL_PATH"; do
+for required_path in \
+	"$INFO_PLIST" \
+	"$ENGINE_PATH" \
+	"$SDL_PATH" \
+	"$DIFFUSION_CLIENT_PATH" \
+	"$DIFFUSION_SERVER_PATH"; do
 	if [ ! -e "$required_path" ]; then
 		echo "Required bundle item is missing: $required_path" >&2
 		exit 1
@@ -85,8 +92,8 @@ if [ "$MACHO_COUNT" -lt 3 ]; then
 	exit 1
 fi
 
-if [ "$DYLIB_COUNT" -lt 2 ]; then
-	echo "Expected portable HLSDK client and server dylibs; found $DYLIB_COUNT" >&2
+if [ "$DYLIB_COUNT" -lt 9 ]; then
+	echo "Expected engine, Half-Life, and Diffusion dylibs; found $DYLIB_COUNT" >&2
 	exit 1
 fi
 

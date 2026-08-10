@@ -14,6 +14,8 @@ cmake -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0 -DCMAKE_INSTALL
 cmake --build build --target install || die
 popd || die
 
+./scripts/ios/builddiffusion.sh || die
+
 ./scripts/ios/createipa.sh
 
 mkdir -p artifacts/

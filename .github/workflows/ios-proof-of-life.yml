@@ -41,7 +41,7 @@ jobs:
       - name: Install iOS dependencies
         run: bash scripts/gha/deps_ios.sh
 
-      - name: Build engine and portable HLSDK
+      - name: Build engine, Half-Life, and Diffusion modules
         run: bash scripts/gha/build_ios.sh
 
       - name: Verify IPA contract
