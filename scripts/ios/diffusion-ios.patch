@@ -64,3 +64,51 @@ index ed1105a..2c28638 100644
 +++ b/3rd-party/mainui_cpp/wscript
 @@ -83,0 +84 @@ def build(bld):
 +		name     = 'menu',
+diff --git a/client/render/view.cpp b/client/render/view.cpp
+--- a/client/render/view.cpp
++++ b/client/render/view.cpp
+@@ -2419,0 +2420,44 @@ void V_CalcRefdef( struct ref_params_s *pparams )
++	if( !g_fRenderInitialized )
++	{
++		static bool fallback_announced;
++		cl_entity_t *view = GET_VIEWMODEL();
++
++		if( !fallback_announced )
++		{
++			gEngfuncs.Con_Printf( "Using engine-safe view calculation.\n" );
++			fallback_announced = true;
++		}
++
++		g_fFrametime = pparams->frametime;
++		pause = pparams->paused;
++
++		pparams->vieworg.x = pparams->simorg.x + pparams->viewheight.x + 0.03125f;
++		pparams->vieworg.y = pparams->simorg.y + pparams->viewheight.y + 0.03125f;
++		pparams->vieworg.z = pparams->simorg.z + pparams->viewheight.z + 0.03125f;
++		pparams->viewangles.x = pparams->cl_viewangles.x + pparams->punchangle.x;
++		pparams->viewangles.y = pparams->cl_viewangles.y + pparams->punchangle.y;
++		pparams->viewangles.z = pparams->cl_viewangles.z + pparams->punchangle.z;
++
++		AngleVectors( pparams->cl_viewangles, pparams->forward, pparams->right, pparams->up );
++
++		if( view )
++		{
++			view->origin.x = pparams->vieworg.x;
++			view->origin.y = pparams->vieworg.y;
++			view->origin.z = pparams->vieworg.z;
++			view->angles.x = pparams->cl_viewangles.x;
++			view->angles.y = pparams->cl_viewangles.y;
++			view->angles.z = pparams->cl_viewangles.z;
++		}
++
++		v_origin.x = pparams->vieworg.x;
++		v_origin.y = pparams->vieworg.y;
++		v_origin.z = pparams->vieworg.z;
++		v_angles.x = pparams->viewangles.x;
++		v_angles.y = pparams->viewangles.y;
++		v_angles.z = pparams->viewangles.z;
++		v_cl_angles.x = pparams->cl_viewangles.x;
++		v_cl_angles.y = pparams->cl_viewangles.y;
++		v_cl_angles.z = pparams->cl_viewangles.z;
++		return;
++	}
