@@ -1,0 +1,8 @@
+diff --git a/game_shared/utlmemory.h b/game_shared/utlmemory.h
+--- a/game_shared/utlmemory.h
++++ b/game_shared/utlmemory.h
+@@ -17,3 +17,3 @@
+ #include <string.h>
+-#include <malloc.h>
++#include <stdlib.h>
+ #ifdef _MSC_VER
