@@ -23,32 +23,8 @@ GNU General Public License for more details.
 #include "platform/platform.h" // GL_UpdateSwapInterval
 
 #if XASH_APPLE
-typedef void (*ios_gl_read_pixels_fn)( int x, int y, int width, int height, unsigned int format, unsigned int type, void *pixels );
-
 static int ios_post_trace_frames;
 static string ios_post_trace_map;
-static ios_gl_read_pixels_fn ios_gl_read_pixels;
-
-static void V_IOSPostTraceBegin( void )
-{
-	const char *world_name = cl.worldmodel ? cl.worldmodel->name : "<none>";
-
-	if( Q_stricmp( ios_post_trace_map, world_name ))
-	{
-		Q_strncpy( ios_post_trace_map, world_name, sizeof( ios_post_trace_map ));
-		ios_post_trace_frames = cl.worldmodel ? 3 : 0;
-	}
-
-	if( ios_post_trace_frames > 0 && !ios_gl_read_pixels )
-	{
-		ios_gl_read_pixels = (ios_gl_read_pixels_fn)GL_GetProcAddress( "glReadPixels" );
-		if( !ios_gl_read_pixels )
-		{
-			Con_Printf( "iOS post trace: glReadPixels is unavailable\n" );
-			ios_post_trace_frames = 0;
-		}
-	}
-}
 
 static void V_IOSPostTrace( const char *stage )
 {
@@ -60,11 +36,18 @@ static void V_IOSPostTrace( const char *stage )
 	const int sample_x[3] = { x + w / 2, x + w / 4, x + ( 3 * w ) / 4 };
 	const int sample_y = y + h / 2;
 
-	if( ios_post_trace_frames <= 0 || !ios_gl_read_pixels || w <= 0 || h <= 0 )
+	if( ios_post_trace_frames <= 0 || w <= 0 || h <= 0 )
 		return;
 
 	for( int i = 0; i < 3; i++ )
-		ios_gl_read_pixels( sample_x[i], sample_y, 1, 1, 0x1908, 0x1401, pixels[i] ); // GL_RGBA, GL_UNSIGNED_BYTE
+	{
+		uint32_t packed = (uint32_t)REF_GET_PARM( PARM_DEBUG_FRAMEBUFFER_RGBA,
+			( sample_x[i] & 0xFFFF ) | (( sample_y & 0xFFFF ) << 16));
+		pixels[i][0] = packed & 0xFF;
+		pixels[i][1] = ( packed >> 8 ) & 0xFF;
+		pixels[i][2] = ( packed >> 16 ) & 0xFF;
+		pixels[i][3] = ( packed >> 24 ) & 0xFF;
+	}
 
 	Con_Printf( "iOS post trace[%d] %-18s center=%u,%u,%u,%u left=%u,%u,%u,%u right=%u,%u,%u,%u\n",
 		4 - ios_post_trace_frames, stage,
@@ -81,7 +64,6 @@ static void V_IOSPostTraceEnd( void )
 
 #define IOS_POST_TRACE( stage ) V_IOSPostTrace( stage )
 #else
-#define V_IOSPostTraceBegin() ((void)0)
 #define IOS_POST_TRACE( stage ) ((void)0)
 #define V_IOSPostTraceEnd() ((void)0)
 #endif
@@ -513,6 +495,16 @@ void V_RenderView( void )
 		return; // still loading
 	}
 
+#if XASH_APPLE
+	// Arm only after the view is actually ready to render. V_PostRender can run
+	// during loading, which consumed the previous trace before the first 3D frame.
+	if( Q_stricmp( ios_post_trace_map, ios_world_name ))
+	{
+		Q_strncpy( ios_post_trace_map, ios_world_name, sizeof( ios_post_trace_map ));
+		ios_post_trace_frames = 3;
+	}
+#endif
+
 	V_CalcViewRect ();	// compute viewport rectangle
 	V_SetRefParams( &rp );
 	V_SetupViewModel ();
@@ -553,8 +545,10 @@ void V_RenderView( void )
 
 		GL_RenderFrame( &rvp );
 		IOS_MAP_TRACE( "after renderer" );
+		IOS_POST_TRACE( "after-renderframe" );
 		S_UpdateFrame( &rvp );
 		IOS_MAP_TRACE( "after audio" );
+		IOS_POST_TRACE( "after-audio" );
 		viewnum++;
 
 	} while( rp.nextView );
@@ -562,8 +556,10 @@ void V_RenderView( void )
 	// draw debug triangles on a server
 	SV_DrawDebugTriangles ();
 	IOS_MAP_TRACE( "after debug triangles" );
+	IOS_POST_TRACE( "after-debug-tris" );
 	ref.dllFuncs.GL_BackendEndFrame ();
 	IOS_MAP_TRACE( "frame complete" );
+	IOS_POST_TRACE( "after-backend-end" );
 #if XASH_APPLE
 	if( ios_trace_frames > 0 )
 		ios_trace_frames--;
@@ -672,7 +668,6 @@ void V_PostRender( void )
 {
 	qboolean		draw_2d = false;
 
-	V_IOSPostTraceBegin();
 	IOS_POST_TRACE( "post-enter" );
 	ref.dllFuncs.R_AllowFog( false );
 	IOS_POST_TRACE( "allow-fog-off" );
