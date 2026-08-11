@@ -68,8 +68,13 @@ fi
 
 DIFFUSION_MENU_STRINGS="$VERIFY_ROOT/diffusion-menu.strings"
 strings "$DIFFUSION_MENU_PATH" > "$DIFFUSION_MENU_STRINGS"
-if ! grep -q 'iOS mobile menu policy: skipping 3D background map' "$DIFFUSION_MENU_STRINGS"; then
+if ! grep -q 'iOS mobile menu policy: decorative background map disabled; UI callbacks remain active' "$DIFFUSION_MENU_STRINGS"; then
 	echo "Diffusion menu was built without the mobile background-map policy" >&2
+	exit 1
+fi
+
+if ! grep -q 'Diffusion menu action: starting chapter' "$DIFFUSION_MENU_STRINGS"; then
+	echo "Diffusion menu was built without actionable mobile menu diagnostics" >&2
 	exit 1
 fi
 
