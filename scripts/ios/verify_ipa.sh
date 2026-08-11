@@ -66,6 +66,13 @@ if ! grep -q 'iOS mobile renderer profile' "$DIFFUSION_CLIENT_STRINGS"; then
 	exit 1
 fi
 
+DIFFUSION_MENU_STRINGS="$VERIFY_ROOT/diffusion-menu.strings"
+strings "$DIFFUSION_MENU_PATH" > "$DIFFUSION_MENU_STRINGS"
+if ! grep -q 'iOS mobile menu policy: skipping 3D background map' "$DIFFUSION_MENU_STRINGS"; then
+	echo "Diffusion menu was built without the mobile background-map policy" >&2
+	exit 1
+fi
+
 GL4ES_RENDERER_STRINGS="$VERIFY_ROOT/gl4es-renderer.strings"
 strings "$GL4ES_RENDERER_PATH" > "$GL4ES_RENDERER_STRINGS"
 
