@@ -4,6 +4,10 @@
 
 cd "$GITHUB_WORKSPACE" || die
 
+IOS_BUNDLE_VERSION=${GITHUB_RUN_NUMBER:-2}
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $IOS_BUNDLE_VERSION" \
+	engine/platform/ios/bundle/Info.plist || die
+
 git -C 3rdparty/nanogl apply --check --unidiff-zero "$GITHUB_WORKSPACE/scripts/ios/nanogl-large-primitive.patch" || die
 git -C 3rdparty/nanogl apply --unidiff-zero "$GITHUB_WORKSPACE/scripts/ios/nanogl-large-primitive.patch" || die
 mkdir -p build || die

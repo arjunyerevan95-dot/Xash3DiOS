@@ -50,9 +50,22 @@ plutil -lint "$INFO_PLIST"
 
 MINIMUM_OS=$(/usr/libexec/PlistBuddy -c 'Print :MinimumOSVersion' "$INFO_PLIST")
 FILE_SHARING=$(/usr/libexec/PlistBuddy -c 'Print :UIFileSharingEnabled' "$INFO_PLIST")
+BUNDLE_VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$INFO_PLIST")
 
 if [ "$FILE_SHARING" != "true" ]; then
 	echo "UIFileSharingEnabled must remain enabled for user-supplied game data" >&2
+	exit 1
+fi
+
+case "$BUNDLE_VERSION" in
+	''|*[!0-9]*)
+		echo "CFBundleVersion must be a positive integer, got: $BUNDLE_VERSION" >&2
+		exit 1
+		;;
+esac
+
+if [ "$BUNDLE_VERSION" -le 1 ]; then
+	echo "CFBundleVersion must increase beyond the legacy value 1" >&2
 	exit 1
 fi
 
@@ -105,6 +118,7 @@ codesign -dv "$APP_PATH" >/dev/null 2>&1
 
 echo "Verified: $IPA_PATH"
 echo "Application: $(basename "$APP_PATH")"
+echo "Bundle version: $BUNDLE_VERSION"
 echo "Minimum iOS: $MINIMUM_OS"
 echo "Mach-O files: $MACHO_COUNT"
 echo "Game dylibs: $DYLIB_COUNT"
