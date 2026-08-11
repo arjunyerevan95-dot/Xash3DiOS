@@ -61,7 +61,7 @@ IOS_CLANGXX=$(xcrun --sdk iphoneos --find clang++)
 IOS_AR=$(xcrun --sdk iphoneos --find ar)
 IOS_STRIP=$(xcrun --sdk iphoneos --find strip)
 IOS_RANLIB=$(xcrun --sdk iphoneos --find ranlib)
-IOS_TARGET_FLAGS="--target=aarch64-apple-ios -isysroot$IOS_SDK_PATH -mios-version-min=$IOS_DEPLOYMENT_TARGET"
+IOS_TARGET_FLAGS="--target=aarch64-apple-ios -isysroot$IOS_SDK_PATH -mios-version-min=$IOS_DEPLOYMENT_TARGET -DXASH_IOS=1"
 
 export CC="$IOS_CLANG $IOS_TARGET_FLAGS"
 export CXX="$IOS_CLANGXX $IOS_TARGET_FLAGS"
