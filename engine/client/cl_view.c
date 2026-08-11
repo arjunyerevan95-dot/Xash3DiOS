@@ -22,6 +22,70 @@ GNU General Public License for more details.
 #include "input.h" // touch
 #include "platform/platform.h" // GL_UpdateSwapInterval
 
+#if XASH_APPLE
+typedef void (*ios_gl_read_pixels_fn)( int x, int y, int width, int height, unsigned int format, unsigned int type, void *pixels );
+
+static int ios_post_trace_frames;
+static string ios_post_trace_map;
+static ios_gl_read_pixels_fn ios_gl_read_pixels;
+
+static void V_IOSPostTraceBegin( void )
+{
+	const char *world_name = cl.worldmodel ? cl.worldmodel->name : "<none>";
+
+	if( Q_stricmp( ios_post_trace_map, world_name ))
+	{
+		Q_strncpy( ios_post_trace_map, world_name, sizeof( ios_post_trace_map ));
+		ios_post_trace_frames = cl.worldmodel ? 3 : 0;
+	}
+
+	if( ios_post_trace_frames > 0 && !ios_gl_read_pixels )
+	{
+		ios_gl_read_pixels = (ios_gl_read_pixels_fn)GL_GetProcAddress( "glReadPixels" );
+		if( !ios_gl_read_pixels )
+		{
+			Con_Printf( "iOS post trace: glReadPixels is unavailable\n" );
+			ios_post_trace_frames = 0;
+		}
+	}
+}
+
+static void V_IOSPostTrace( const char *stage )
+{
+	byte pixels[3][4];
+	int x = clgame.viewport[0];
+	int y = clgame.viewport[1];
+	int w = clgame.viewport[2];
+	int h = clgame.viewport[3];
+	const int sample_x[3] = { x + w / 2, x + w / 4, x + ( 3 * w ) / 4 };
+	const int sample_y = y + h / 2;
+
+	if( ios_post_trace_frames <= 0 || !ios_gl_read_pixels || w <= 0 || h <= 0 )
+		return;
+
+	for( int i = 0; i < 3; i++ )
+		ios_gl_read_pixels( sample_x[i], sample_y, 1, 1, 0x1908, 0x1401, pixels[i] ); // GL_RGBA, GL_UNSIGNED_BYTE
+
+	Con_Printf( "iOS post trace[%d] %-18s center=%u,%u,%u,%u left=%u,%u,%u,%u right=%u,%u,%u,%u\n",
+		4 - ios_post_trace_frames, stage,
+		pixels[0][0], pixels[0][1], pixels[0][2], pixels[0][3],
+		pixels[1][0], pixels[1][1], pixels[1][2], pixels[1][3],
+		pixels[2][0], pixels[2][1], pixels[2][2], pixels[2][3] );
+}
+
+static void V_IOSPostTraceEnd( void )
+{
+	if( ios_post_trace_frames > 0 )
+		ios_post_trace_frames--;
+}
+
+#define IOS_POST_TRACE( stage ) V_IOSPostTrace( stage )
+#else
+#define V_IOSPostTraceBegin() ((void)0)
+#define IOS_POST_TRACE( stage ) ((void)0)
+#define V_IOSPostTraceEnd() ((void)0)
+#endif
+
 /*
 ===============
 V_CalcViewRect
@@ -608,14 +672,21 @@ void V_PostRender( void )
 {
 	qboolean		draw_2d = false;
 
+	V_IOSPostTraceBegin();
+	IOS_POST_TRACE( "post-enter" );
 	ref.dllFuncs.R_AllowFog( false );
+	IOS_POST_TRACE( "allow-fog-off" );
 	ref.dllFuncs.R_Set2DMode( true );
+	IOS_POST_TRACE( "set-2d" );
 
 	if( cls.state == ca_active && cls.signon == SIGNONS && cls.scrshot_action != scrshot_mapshot )
 	{
 		SCR_TileClear();
+		IOS_POST_TRACE( "tile-clear" );
 		CL_DrawHUD( CL_ACTIVE );
+		IOS_POST_TRACE( "hud-active" );
 		VGui_Paint();
+		IOS_POST_TRACE( "vgui" );
 	}
 
 	switch( cls.scrshot_action )
@@ -630,32 +701,56 @@ void V_PostRender( void )
 	if( draw_2d )
 	{
 		SCR_RSpeeds();
+		IOS_POST_TRACE( "r-speeds" );
 		SCR_NetSpeeds();
+		IOS_POST_TRACE( "net-speeds" );
 		SCR_DrawPos();
+		IOS_POST_TRACE( "draw-pos" );
 		SCR_DrawEnts();
+		IOS_POST_TRACE( "draw-ents" );
 		SCR_DrawNetGraph();
+		IOS_POST_TRACE( "net-graph" );
 		SCR_DrawUserCmd();
+		IOS_POST_TRACE( "user-cmd" );
 		Joy_DrawDebug();
+		IOS_POST_TRACE( "joy-debug" );
 		IN_GyroDrawDebug();
+		IOS_POST_TRACE( "gyro-debug" );
 		SV_DrawOrthoTriangles();
+		IOS_POST_TRACE( "server-ortho" );
 		CL_DrawDemoRecording();
+		IOS_POST_TRACE( "demo-recording" );
 		CL_DrawHUD( CL_CHANGELEVEL );
+		IOS_POST_TRACE( "hud-changelevel" );
 		ref.dllFuncs.R_ShowTextures();
+		IOS_POST_TRACE( "show-textures" );
 		R_ShowTree();
+		IOS_POST_TRACE( "show-tree" );
 		Con_DrawConsole();
+		IOS_POST_TRACE( "console" );
 		UI_UpdateMenu( host.realtime );
+		IOS_POST_TRACE( "menu" );
 		Con_DrawVersion();
+		IOS_POST_TRACE( "version" );
 		Con_DrawDebug(); // must be last
+		IOS_POST_TRACE( "debug" );
 		Touch_Draw();
+		IOS_POST_TRACE( "touch" );
 		OSK_Draw();
+		IOS_POST_TRACE( "osk" );
 
 		S_ExtraUpdate();
+		IOS_POST_TRACE( "extra-audio" );
 	}
 
 	SCR_MakeScreenShot();
+	IOS_POST_TRACE( "screenshot" );
 	ref.dllFuncs.R_AllowFog( true );
+	IOS_POST_TRACE( "allow-fog-on" );
 	Platform_SetTimer( 0.0f );
+	IOS_POST_TRACE( "before-endframe" );
 	ref.dllFuncs.R_EndFrame();
+	V_IOSPostTraceEnd();
 
 	V_CheckGammaEnd();
 }
