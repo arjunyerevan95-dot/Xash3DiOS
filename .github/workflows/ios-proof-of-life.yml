@@ -39,7 +39,9 @@ jobs:
           xcrun --sdk iphoneos --show-sdk-version
 
       - name: Install iOS dependencies
-        run: bash scripts/gha/deps_ios.sh
+        run: |
+          brew install glslang
+          bash scripts/gha/deps_ios.sh
 
       - name: Build engine, Half-Life, and Diffusion modules
         run: bash scripts/gha/build_ios.sh

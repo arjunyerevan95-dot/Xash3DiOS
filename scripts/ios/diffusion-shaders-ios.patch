@@ -1,9 +1,22 @@
 diff --git a/glsl/alpha2coverage.h b/glsl/alpha2coverage.h
 --- a/glsl/alpha2coverage.h
 +++ b/glsl/alpha2coverage.h
-@@ -40 +40 @@ float AlphaRescaling(sampler2D tex, in vec2 texCoords, in float alpha)
+@@ -17,0 +18,8 @@ GNU General Public License for more details.
++#if defined( XASH_MOBILE_GLES )
++float AlphaRescaling(sampler2D tex, in vec2 texCoords, in float alpha)
++{
++    // textureSize() is unavailable in GL4ES' ES 1.00 shader target. Retain
++    // alpha testing while omitting only the mip-aware coverage refinement.
++    return alpha;
++}
++#else
+@@ -40,2 +48,3 @@ float AlphaRescaling(sampler2D tex, in vec2 texCoords, in float alpha)
 -    return alpha * (1.0 + CalcMipLevel(tex, texCoords * textureSize(tex, 0)) * mipScale);
+-}
+\ No newline at end of file
 +    return alpha * (1.0 + CalcMipLevel(tex, texCoords * vec2(textureSize(tex, 0))) * mipScale);
++}
++#endif
 diff --git a/glsl/bilateralblur_fp.glsl b/glsl/bilateralblur_fp.glsl
 --- a/glsl/bilateralblur_fp.glsl
 +++ b/glsl/bilateralblur_fp.glsl

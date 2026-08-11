@@ -121,3 +121,66 @@ diff --git a/client/render/view.cpp b/client/render/view.cpp
 +		v_cl_angles.z = pparams->cl_viewangles.z;
 +		return;
 +	}
+diff --git a/client/render/r_shader.cpp b/client/render/r_shader.cpp
+--- a/client/render/r_shader.cpp
++++ b/client/render/r_shader.cpp
+@@ -271,0 +272,3 @@ static bool GL_ProcessShader( const char *filename, CVirtualFS *out, bool compat
++	#if XASH_IOS
++	out->Printf( "#define XASH_MOBILE_GLES 1\n" );
++	#endif
+@@ -286 +289,24 @@ static bool GL_ProcessShader( const char *filename, CVirtualFS *out, bool compat
+-	if( defines ) out->Print( defines );
++	if( defines )
++	{
++	#if XASH_IOS
++		char mobileDefines[MAX_OPTIONS_LENGTH];
++		char *line, *next;
++
++		Q_strncpy( mobileDefines, defines, sizeof( mobileDefines ) );
++		for( line = mobileDefines; line && *line; line = next )
++		{
++			next = Q_strchr( line, '\n' );
++			if( next ) *next++ = '\0';
++
++			if( Q_stristr( line, "MULTI_LAYERS" ) ||
++				Q_stristr( line, "EMBOSS" ) ||
++				Q_stristr( line, "HAS_SHADOWS" ) ||
++				Q_stristr( line, "INTERIOR" ) )
++				continue;
++
++			out->Printf( "%s\n", line );
++		}
++	#else
++		out->Print( defines );
++	#endif
++	}
+@@ -2977,0 +3004,5 @@ void GL_InitGPUShaders( void )
++	#if !XASH_IOS
++	// Desktop post-processing requires GLSL features that GL4ES currently
++	// translates to an ES 1.00 target on iOS. Keep the mobile renderer profile
++	// intentionally limited to the core scene shaders until that translator has
++	// a real ES 3.x path.
+@@ -3071,0 +3103,3 @@ void GL_InitGPUShaders( void )
++	#else
++	ALERT( at_console, "iOS mobile renderer profile: desktop post-processing shaders disabled\n" );
++	#endif
+diff --git a/client/render/r_main.cpp b/client/render/r_main.cpp
+--- a/client/render/r_main.cpp
++++ b/client/render/r_main.cpp
+@@ -1844,0 +1845 @@ void R_RenderScene( void )
++	#if !XASH_IOS
+@@ -1848,0 +1850 @@ void R_RenderScene( void )
++	#endif
+@@ -1858,0 +1861,6 @@ void R_DrawPostEffects(void)
++	#if XASH_IOS
++	// GL4ES emits an ES 1.00 shader target on iOS. The desktop post stack uses
++	// newer GLSL operations, so the mobile profile leaves the core scene intact
++	// instead of partially compiling effects and aborting renderer startup.
++	return;
++	#else
+@@ -1899,0 +1908 @@ void R_DrawPostEffects(void)
++	#endif
+@@ -2235,0 +2245 @@ int HUD_RenderFrame( const ref_viewpass_t *rvp )
++	#if !XASH_IOS
+@@ -2241,0 +2252 @@ int HUD_RenderFrame( const ref_viewpass_t *rvp )
++	#endif

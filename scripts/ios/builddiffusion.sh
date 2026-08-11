@@ -51,6 +51,10 @@ checkout_revision https://github.com/Aynekko/Diffusion-executable.git "$DIFFUSIO
 git -C "$SOURCE_DIR" apply --unidiff-zero "$ROOT_DIR/scripts/ios/diffusion-ios.patch"
 git -C "$SOURCE_DIR" apply --unidiff-zero "$ROOT_DIR/scripts/ios/diffusion-shaders-ios.patch"
 
+# Refuse to produce an IPA if any shader reachable through the iOS mobile
+# profile fails after the exact pinned GL4ES translation used on-device.
+bash "$ROOT_DIR/scripts/ios/validate-diffusion-mobile-shaders.sh" "$SOURCE_DIR"
+
 IOS_SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
 IOS_CLANG=$(xcrun --sdk iphoneos --find clang)
 IOS_CLANGXX=$(xcrun --sdk iphoneos --find clang++)

@@ -32,6 +32,7 @@ DIFFUSION_SERVER_PATH="$APP_PATH/bin/server_arm64.dylib"
 DIFFUSION_MENU_PATH="$APP_PATH/bin/menu_arm64.dylib"
 DIFFUSION_LOCALIZATION_PATH="$APP_PATH/diffusion/resource/gameui_english.txt"
 DIFFUSION_MATHLIB_PATH="$APP_PATH/ios_overrides/diffusion/glsl/mathlib.h"
+DIFFUSION_ALPHA_COVERAGE_PATH="$APP_PATH/ios_overrides/diffusion/glsl/alpha2coverage.h"
 DIFFUSION_SHAFTS_SHADER_PATH="$APP_PATH/ios_overrides/diffusion/glsl/genshafts_fp.glsl"
 GL4ES_RENDERER_PATH="$APP_PATH/libref_gl4es.dylib"
 
@@ -44,6 +45,7 @@ for required_path in \
 	"$DIFFUSION_MENU_PATH" \
 	"$DIFFUSION_LOCALIZATION_PATH" \
 	"$DIFFUSION_MATHLIB_PATH" \
+	"$DIFFUSION_ALPHA_COVERAGE_PATH" \
 	"$DIFFUSION_SHAFTS_SHADER_PATH" \
 	"$GL4ES_RENDERER_PATH"; do
 	if [ ! -e "$required_path" ]; then
@@ -51,6 +53,16 @@ for required_path in \
 		exit 1
 	fi
 done
+
+if ! grep -q 'XASH_MOBILE_GLES' "$DIFFUSION_ALPHA_COVERAGE_PATH"; then
+	echo "Diffusion mobile shader profile is missing from the IPA" >&2
+	exit 1
+fi
+
+if ! strings "$DIFFUSION_CLIENT_PATH" | grep -q 'iOS mobile renderer profile'; then
+	echo "Diffusion client was built without the iOS renderer profile" >&2
+	exit 1
+fi
 
 plutil -lint "$INFO_PLIST"
 
