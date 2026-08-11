@@ -207,9 +207,10 @@ diff --git a/glsl/lensflare_fp.glsl b/glsl/lensflare_fp.glsl
 diff --git a/glsl/interior.h b/glsl/interior.h
 --- a/glsl/interior.h
 +++ b/glsl/interior.h
-@@ -29 +29 @@ vec4 InteriorMapping( vec4 diffuse, vec2 TexDiffuse, vec3 N, float Time, vec3 Vi
+@@ -29,2 +29 @@ vec4 InteriorMapping( vec4 diffuse, vec2 TexDiffuse, vec3 N, float Time, vec3 Vi
 -	const float staticSeed = 500; // room positions
-+	const float staticSeed = 500.0; // room positions
+-	const float randomSeed = staticSeed;//don't change          floor(Time * SEED_CHANGING_FREQ); // lighting change
++	const int staticSeed = 500; // room positions
 @@ -152 +152 @@ vec4 InteriorMapping( vec4 diffuse, vec2 TexDiffuse, vec3 N, float Time, vec3 Vi
 -        diffuse = diffuse * diffuse.a + interior0 * (1 - diffuse.a);
 +        diffuse = diffuse * diffuse.a + interior0 * (1.0 - diffuse.a);
@@ -231,12 +232,12 @@ diff --git a/glsl/mathlib.h b/glsl/mathlib.h
 @@ -143 +143 @@ vec2 VogelDiskSample( int sampleIndex, int samplesCount, float phi )
 -	float theta = sampleIndex * goldenAngle + phi;
 +	float theta = float( sampleIndex ) * goldenAngle + phi;
-@@ -168,0 +169,5 @@ float randomFunction2( in float seed, in vec2 co )
-+
-+float randomFunction2( in int seed, in vec2 co )
-+{
-+	return randomFunction2( float( seed ), co );
-+}
+@@ -164 +164 @@ float randomFunction2( in float seed, in vec2 co )
+-float randomFunction2( in float seed, in vec2 co )
++float randomFunction2( int randomSeed, vec2 co )
+@@ -168 +168 @@ float randomFunction2( in float seed, in vec2 co )
+-	return fract( tan( distance( co * PHI, co ) * seed ) * co.x );
++	return fract( tan( distance( co * PHI, co ) * float( randomSeed ) ) * co.x );
 @@ -220 +220 @@ vec3 VectorAngles( vec3 vecSrc )
 -	ang.z = 0.0f;
 +	ang.z = 0.0;
