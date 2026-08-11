@@ -74,18 +74,208 @@ index ed1105a..2c28638 100644
 @@ -83,0 +84 @@ def build(bld):
 +		name     = 'menu',
 diff --git a/3rd-party/mainui_cpp/BaseMenu.cpp b/3rd-party/mainui_cpp/BaseMenu.cpp
+index fbd4d80..ed24ce9 100644
 --- a/3rd-party/mainui_cpp/BaseMenu.cpp
 +++ b/3rd-party/mainui_cpp/BaseMenu.cpp
-@@ -609,0 +610,9 @@ bool UI_StartBackGroundMap( void )
+@@ -583,6 +583,17 @@ void UI_DrawMouseCursor( void )
+ 
+ bool UI_LoadBackgroundMap( void ) // force load background map
+ {
 +#if XASH_IOS
-+	// Diffusion's desktop menu launches menux.bsp before drawing any controls.
-+	// That decorative level compiles the full material set and builds vertex
-+	// lighting for hundreds of props on the UI thread. Keep mobile startup
-+	// deterministic and reserve the renderer budget for playable levels.
-+	Con_Printf( "iOS mobile menu policy: skipping 3D background map\n" );
-+	return false;
-+#endif
++	static bool announced = false;
 +
++	if( !announced )
++	{
++		Con_Printf( "iOS mobile menu policy: decorative background map disabled; UI callbacks remain active\n" );
++		announced = true;
++	}
++
++	return false;
++#else
+ 	if( uiStatic.bgmaps.IsEmpty() )
+ 		return false;
+ 	
+@@ -598,6 +609,25 @@ bool UI_LoadBackgroundMap( void ) // force load background map
+ 	}
+ 
+ 	return false;
++#endif
++}
++
++void UI_SetMenuBackgroundTarget( const char *target )
++{
++#if XASH_IOS
++	// Diffusion uses these commands only to animate named entities in menux.bsp.
++	// Keep the real C++ menu callbacks and navigation, but do not send commands
++	// to a decorative server map that is intentionally absent on mobile.
++	Con_Printf( "iOS mobile menu transition: %s (decorative target skipped)\n", target ? target : "<null>" );
++#else
++	char cmd[128];
++
++	if( !target || !target[0] )
++		return;
++
++	snprintf( cmd, sizeof( cmd ), "menuactivate %s\n", target );
++	EngFuncs::ClientCmd( false, cmd );
++#endif
+ }
+ 
+ /*
+diff --git a/3rd-party/mainui_cpp/BaseMenu.h b/3rd-party/mainui_cpp/BaseMenu.h
+index 1c974f0..e7f5e37 100644
+--- a/3rd-party/mainui_cpp/BaseMenu.h
++++ b/3rd-party/mainui_cpp/BaseMenu.h
+@@ -179,6 +179,7 @@ void UI_DisableAlphaFactor();
+ 
+ int UI_GetFPS( void );
+ bool UI_LoadBackgroundMap( void );
++void UI_SetMenuBackgroundTarget( const char *target );
+ 
+ enum ETextFlags
+ {
+diff --git a/3rd-party/mainui_cpp/menus/Achievements.cpp b/3rd-party/mainui_cpp/menus/Achievements.cpp
+index f44003c..480e782 100644
+--- a/3rd-party/mainui_cpp/menus/Achievements.cpp
++++ b/3rd-party/mainui_cpp/menus/Achievements.cpp
+@@ -305,13 +305,13 @@ void CMenuAchievements::Draw(void)
+ void CMenuAchievements::Show(void)
+ {
+ 	CMenuFramework::Show();
+-	EngFuncs::ClientCmd(false, "menuactivate achievements\n");
++	UI_SetMenuBackgroundTarget( "achievements" );
+ }
+ 
+ void CMenuAchievements::Hide(void)
+ {
+ 	CMenuFramework::Hide();
+-	EngFuncs::ClientCmd(false, "menuactivate mainmenu\n");
++	UI_SetMenuBackgroundTarget( "mainmenu" );
+ }
+ 
+ void CMenuAchievements::GetConfig()
+diff --git a/3rd-party/mainui_cpp/menus/Main.cpp b/3rd-party/mainui_cpp/menus/Main.cpp
+index b9ec600..fc9a7df 100644
+--- a/3rd-party/mainui_cpp/menus/Main.cpp
++++ b/3rd-party/mainui_cpp/menus/Main.cpp
+@@ -419,12 +419,14 @@ void CMenuMain::_VidInit()
+ 
+ void CMenuMain::Draw(void)
+ {
++#if !XASH_IOS
+ 	if( !EngFuncs::ClientInGame() && (int)EngFuncs::GetCvarFloat( "host_serverstate" ) == 0 )
+ 	{
+ 		uiStatic.bgmap_hack_framecount++;
+ 		if( uiStatic.bgmap_hack_framecount > 60 )
+ 			UI_LoadBackgroundMap();
+ 	}
++#endif
+ 
+ 	BaseClass::Draw();
+ }
+diff --git a/3rd-party/mainui_cpp/menus/NewGame.cpp b/3rd-party/mainui_cpp/menus/NewGame.cpp
+index 60bd1e1..83dbd52 100644
+--- a/3rd-party/mainui_cpp/menus/NewGame.cpp
++++ b/3rd-party/mainui_cpp/menus/NewGame.cpp
+@@ -69,7 +69,7 @@ public:
+ 			StartGameCb( 1.0f );
+ 			return;
+ 		}
+-		EngFuncs::ClientCmd(false, "menuactivate newgame");
++		UI_SetMenuBackgroundTarget( "newgame" );
+ 		chapters.SetCurrentValue( 0.0f );
+ 		lerp_value = 1.0f;
+ 
+@@ -123,6 +123,8 @@ CMenuNewGame::StartGame
+ */
+ void CMenuNewGame::StartGameCb( float skill )
+ {
++	Con_Printf( "Diffusion menu action: starting chapter %d at skill %.0f\n", SELECTED_CHAPTER + 1, skill );
++
+ 	if( EngFuncs::GetCvarFloat( "host_serverstate" ) && EngFuncs::GetCvarFloat( "maxplayers" ) > 1 )
+ 		EngFuncs::HostEndGame( "end of the game" );
+ 
+@@ -339,7 +341,7 @@ void CMenuNewGame::Draw( void )
+ void CMenuNewGame::Hide(void)
+ {
+ 	CMenuFramework::Hide();
+-	EngFuncs::ClientCmd(false, "menuactivate mainmenu\n");
++	UI_SetMenuBackgroundTarget( "mainmenu" );
+ }
+ 
+ ADD_MENU( menu_newgame, CMenuNewGame, UI_NewGame_Menu );
+diff --git a/3rd-party/mainui_cpp/menus/Options.cpp b/3rd-party/mainui_cpp/menus/Options.cpp
+index 82dfc59..db68503 100644
+--- a/3rd-party/mainui_cpp/menus/Options.cpp
++++ b/3rd-party/mainui_cpp/menus/Options.cpp
+@@ -208,7 +208,7 @@ void CMenuOptions::_Init( void )
+ void CMenuOptions::Show(void)
+ {
+ 	CMenuFramework::Show();
+-	EngFuncs::ClientCmd(false, "menuactivate options\n");
++	UI_SetMenuBackgroundTarget( "options" );
+ }
+ 
+ void CMenuOptions::Hide(void)
+@@ -225,7 +225,7 @@ void CMenuOptions::Hide(void)
+ 	EngFuncs::CvarSetValue( "cl_viewmodel_extras", cl_viewmodel_extras.GetCurrentValue() );
+ 
+ 	CMenuFramework::Hide();
+-	EngFuncs::ClientCmd(false, "menuactivate mainmenu\n");
++	UI_SetMenuBackgroundTarget( "mainmenu" );
+ }
+ 
+ void CMenuOptions::GetConfig()
+diff --git a/3rd-party/mainui_cpp/menus/SaveLoad.cpp b/3rd-party/mainui_cpp/menus/SaveLoad.cpp
+index 9b1e32f..8a7ee2b 100644
+--- a/3rd-party/mainui_cpp/menus/SaveLoad.cpp
++++ b/3rd-party/mainui_cpp/menus/SaveLoad.cpp
+@@ -68,13 +68,13 @@ void CMenuSaveLoad::_Init( void )
+ void CMenuSaveLoad::Show(void)
+ {
+ 	CMenuFramework::Show();
+-	EngFuncs::ClientCmd(false, "menuactivate loadgame\n");
++	UI_SetMenuBackgroundTarget( "loadgame" );
+ }
+ 
+ void CMenuSaveLoad::Hide(void)
+ {
+ 	CMenuFramework::Hide();
+-	EngFuncs::ClientCmd(false, "menuactivate mainmenu\n");
++	UI_SetMenuBackgroundTarget( "mainmenu" );
+ }
+ 
+ ADD_MENU( menu_saveload, CMenuSaveLoad, UI_SaveLoad_Menu );
+diff --git a/3rd-party/mainui_cpp/menus/VideoOptions.cpp b/3rd-party/mainui_cpp/menus/VideoOptions.cpp
+index 6b2a6a1..48d2772 100644
+--- a/3rd-party/mainui_cpp/menus/VideoOptions.cpp
++++ b/3rd-party/mainui_cpp/menus/VideoOptions.cpp
+@@ -207,7 +207,7 @@ void SetSettingsTo( int Quality )
+ 		EngFuncs::CvarSetValue( "gl_hbao", 1 );
+ 		EngFuncs::CvarSetValue( "cl_lod_enable", 0 );
+ 
+-		EngFuncs::ClientCmd( false, "menuactivate video_maximum\n" );
++		UI_SetMenuBackgroundTarget( "video_maximum" );
+ 	}
+ }
+ 
+@@ -790,7 +790,7 @@ void CMenuVidOptions::_VidInit()
+ 
+ void CMenuVidOptions::Show( void )
+ {
+-	EngFuncs::ClientCmd( false, "menuactivate vidoptions\n" );
++	UI_SetMenuBackgroundTarget( "vidoptions" );
+ 	hideMenus.bChecked = false;
+ 	HideMenus(); // unhide them
+ 	EngFuncs::CvarSetValue( "ui_videooptions_active", 1 );
+@@ -800,7 +800,7 @@ void CMenuVidOptions::Show( void )
+ void CMenuVidOptions::Hide( void )
+ {
+ 	hideMenus.bChecked = false;
+-	EngFuncs::ClientCmd( false, "menuactivate options\n" );
++	UI_SetMenuBackgroundTarget( "options" );
+ 	EngFuncs::CvarSetValue( "ui_videooptions_active", 0 );
+ 	CMenuFramework::Hide();
+ }
 diff --git a/client/render/view.cpp b/client/render/view.cpp
 --- a/client/render/view.cpp
 +++ b/client/render/view.cpp
