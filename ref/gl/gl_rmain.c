@@ -29,47 +29,11 @@ ref_instance_t	RI;
 static string ios_renderer_trace_map;
 static int ios_renderer_trace_frames;
 static int ios_present_trace_frames;
-static qboolean ios_frame_world_rendered;
+static qboolean ios_visual_probe_active;
 
 void R_IOSFramebufferTrace( const char *stage )
 {
-	byte pixels[5][4];
-	int x, y, w, h;
-	int sample_x[5], sample_y[5];
-	GLenum pre_error, post_error;
-
-	if( ios_present_trace_frames <= 0 || !ios_frame_world_rendered )
-		return;
-
-	x = RI.rvp.viewport[0];
-	y = RI.rvp.viewport[1];
-	w = RI.rvp.viewport[2];
-	h = RI.rvp.viewport[3];
-	if( w <= 0 || h <= 0 )
-		return;
-
-	sample_x[0] = x + w / 2;
-	sample_x[1] = x + w / 4;
-	sample_x[2] = x + ( 3 * w ) / 4;
-	sample_x[3] = sample_x[4] = x + w / 2;
-	sample_y[0] = sample_y[1] = sample_y[2] = y + h / 2;
-	sample_y[3] = y + h / 4;
-	sample_y[4] = y + ( 3 * h ) / 4;
-
-	memset( pixels, 0xCD, sizeof( pixels ));
-	pre_error = pglGetError();
-	for( int i = 0; i < 5; i++ )
-		pglReadPixels( sample_x[i], sample_y[i], 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixels[i] );
-	post_error = pglGetError();
-
-	gEngfuncs.Con_Printf( "iOS renderer trace[%d] %-20s center=%u,%u,%u,%u left=%u,%u,%u,%u right=%u,%u,%u,%u low=%u,%u,%u,%u high=%u,%u,%u,%u glerr=0x%x->0x%x\n",
-		4 - ios_present_trace_frames, stage,
-		pixels[0][0], pixels[0][1], pixels[0][2], pixels[0][3],
-		pixels[1][0], pixels[1][1], pixels[1][2], pixels[1][3],
-		pixels[2][0], pixels[2][1], pixels[2][2], pixels[2][3],
-		pixels[3][0], pixels[3][1], pixels[3][2], pixels[3][3],
-		pixels[4][0], pixels[4][1], pixels[4][2], pixels[4][3],
-		pre_error, post_error );
+	(void)stage;
 }
 
 void R_IOSFramebufferTraceCheckpoint( int checkpoint )
@@ -82,6 +46,31 @@ void R_IOSFramebufferTraceCheckpoint( int checkpoint )
 
 	if( checkpoint > 0 && checkpoint < (int)( sizeof( stages ) / sizeof( stages[0] )))
 		R_IOSFramebufferTrace( stages[checkpoint] );
+}
+
+static void R_IOSVisualProbeScene( void )
+{
+	if( !ios_visual_probe_active )
+		return;
+
+	pglDisable( GL_SCISSOR_TEST );
+	pglColorMask( GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE );
+	pglClearColor( 1.0f, 0.0f, 1.0f, 1.0f );
+	pglClear( GL_COLOR_BUFFER_BIT );
+}
+
+static void R_IOSVisualProbePresent( void )
+{
+	if( !ios_visual_probe_active )
+		return;
+
+	pglEnable( GL_SCISSOR_TEST );
+	pglScissor( 0, 0, gpGlobals->width / 4, gpGlobals->height );
+	pglColorMask( GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE );
+	pglClearColor( 0.0f, 1.0f, 0.0f, 1.0f );
+	pglClear( GL_COLOR_BUFFER_BIT );
+	pglDisable( GL_SCISSOR_TEST );
+	pglFinish();
 }
 #endif
 
@@ -1056,8 +1045,7 @@ void R_RenderScene( void )
 	R_DrawWaterSurfaces();
 
 #if XASH_APPLE
-	ios_frame_world_rendered = true;
-	R_IOSFramebufferTrace( "scene-end" );
+	R_IOSVisualProbeScene();
 #endif
 }
 
@@ -1116,9 +1104,6 @@ R_BeginFrame
 */
 void R_BeginFrame( qboolean clearScene )
 {
-#if XASH_APPLE
-	ios_frame_world_rendered = false;
-#endif
 	glConfig.softwareGammaUpdate = false;	// in case of possible fails
 
 	if(( gl_clear->value || ENGINE_GET_PARM( PARM_DEV_OVERVIEW )) &&
@@ -1169,6 +1154,7 @@ void R_RenderFrame( const ref_viewpass_t *rvp )
 		Q_strncpy( ios_renderer_trace_map, world_name, sizeof( ios_renderer_trace_map ));
 		ios_renderer_trace_frames = 3;
 		ios_present_trace_frames = 3;
+		ios_visual_probe_active = Q_stricmp( world_name, "<none>" ) && Q_stricmp( world_name, "maps/menux.bsp" );
 		gEngfuncs.Con_Printf( "iOS GLES map: %s surfaces=%d leafs=%d nodes=%d entities=%u norefresh=%.0f custom=%d\n",
 			ios_renderer_trace_map,
 			WORLDMODEL ? WORLDMODEL->numsurfaces : 0,
@@ -1176,6 +1162,8 @@ void R_RenderFrame( const ref_viewpass_t *rvp )
 			WORLDMODEL ? WORLDMODEL->numnodes : 0,
 			tr.draw_list ? r_numEntities : 0, r_norefresh->value,
 			gEngfuncs.drawFuncs->GL_RenderFrame != NULL );
+		if( ios_visual_probe_active )
+			gEngfuncs.Con_Printf( "iOS visual probe: magenta scene with green left strip enabled.\n" );
 	}
 #endif
 
@@ -1252,6 +1240,7 @@ void R_EndFrame( void )
 		R_IOSFramebufferTrace( "before-swap" );
 		ios_present_trace_frames--;
 	}
+	R_IOSVisualProbePresent();
 #endif
 	gEngfuncs.GL_SwapBuffers();
 }
