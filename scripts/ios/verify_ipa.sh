@@ -59,7 +59,9 @@ if ! grep -q 'XASH_MOBILE_GLES' "$DIFFUSION_ALPHA_COVERAGE_PATH"; then
 	exit 1
 fi
 
-if ! strings "$DIFFUSION_CLIENT_PATH" | grep -q 'iOS mobile renderer profile'; then
+DIFFUSION_CLIENT_STRINGS="$VERIFY_ROOT/diffusion-client.strings"
+strings "$DIFFUSION_CLIENT_PATH" > "$DIFFUSION_CLIENT_STRINGS"
+if ! grep -q 'iOS mobile renderer profile' "$DIFFUSION_CLIENT_STRINGS"; then
 	echo "Diffusion client was built without the iOS renderer profile" >&2
 	exit 1
 fi
