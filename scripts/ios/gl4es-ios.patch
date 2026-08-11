@@ -19,3 +19,18 @@ diff --git a/src/gl/directstate.c b/src/gl/directstate.c
 +#else
 +AliasDecl(void,gl4es_glDisableClientStatei,(GLenum array, GLuint index),gl4es_glDisableClientStateIndexed);
 +#endif
+diff --git a/src/gl/texgen.c b/src/gl/texgen.c
+--- a/src/gl/texgen.c
++++ b/src/gl/texgen.c
+@@ -255 +255 @@ void eye_loop_dual(const GLfloat *verts, const GLfloat *param1, const GLfloat* par
+-    glGetFloatv(GL_MODELVIEW_MATRIX, InvModelview);
++    gl4es_glGetFloatv(GL_MODELVIEW_MATRIX, InvModelview);
+diff --git a/src/gl/stencil.c b/src/gl/stencil.c
+--- a/src/gl/stencil.c
++++ b/src/gl/stencil.c
+@@ -81 +81 @@ void APIENTRY_GL4ES gl4es_glStencilFuncSeparate(GLenum face, GLenum func, GLint r
+-        glStencilFunc(func, ref, mask);
++        gl4es_glStencilFunc(func, ref, mask);
+@@ -135 +135 @@ void APIENTRY_GL4ES gl4es_glStencilOpSeparate(GLenum face, GLenum sfail, GLenum z
+-        glStencilOp(sfail, zfail, zpass);
++        gl4es_glStencilOp(sfail, zfail, zpass);

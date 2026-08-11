@@ -33,6 +33,33 @@ GNU General Public License for more details.
 #if XASH_GL4ES && defined( __APPLE__ )
 	#define MANGLE( name ) gl4es_gl##name
 	#include "gl4es/include/GL/gl_mangle.h"
+	/* Apple builds expose implementation symbols, not suffixed aliases. */
+	#undef glActiveTextureARB
+	#define glActiveTextureARB gl4es_glActiveTexture
+	#undef glClientActiveTextureARB
+	#define glClientActiveTextureARB gl4es_glClientActiveTexture
+	#undef glBindBufferARB
+	#define glBindBufferARB gl4es_glBindBuffer
+	#undef glBufferDataARB
+	#define glBufferDataARB gl4es_glBufferData
+	#undef glBufferSubDataARB
+	#define glBufferSubDataARB gl4es_glBufferSubData
+	#undef glDeleteBuffersARB
+	#define glDeleteBuffersARB gl4es_glDeleteBuffers
+	#undef glGenBuffersARB
+	#define glGenBuffersARB gl4es_glGenBuffers
+	#undef glCompressedTexImage1DARB
+	#define glCompressedTexImage1DARB gl4es_glCompressedTexImage1D
+	#undef glCompressedTexImage2DARB
+	#define glCompressedTexImage2DARB gl4es_glCompressedTexImage2D
+	#undef glCompressedTexImage3DARB
+	#define glCompressedTexImage3DARB gl4es_glCompressedTexImage3D
+	#undef glCompressedTexSubImage1DARB
+	#define glCompressedTexSubImage1DARB gl4es_glCompressedTexSubImage1D
+	#undef glCompressedTexSubImage2DARB
+	#define glCompressedTexSubImage2DARB gl4es_glCompressedTexSubImage2D
+	#undef glCompressedTexSubImage3DARB
+	#define glCompressedTexSubImage3DARB gl4es_glCompressedTexSubImage3D
 #endif
 
 #if XASH_NANOGL || XASH_WES || XASH_REGAL
