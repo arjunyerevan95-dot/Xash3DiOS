@@ -73,6 +73,19 @@ index ed1105a..2c28638 100644
 +++ b/3rd-party/mainui_cpp/wscript
 @@ -83,0 +84 @@ def build(bld):
 +		name     = 'menu',
+diff --git a/3rd-party/mainui_cpp/BaseMenu.cpp b/3rd-party/mainui_cpp/BaseMenu.cpp
+--- a/3rd-party/mainui_cpp/BaseMenu.cpp
++++ b/3rd-party/mainui_cpp/BaseMenu.cpp
+@@ -609,0 +610,9 @@ bool UI_StartBackGroundMap( void )
++#if XASH_IOS
++	// Diffusion's desktop menu launches menux.bsp before drawing any controls.
++	// That decorative level compiles the full material set and builds vertex
++	// lighting for hundreds of props on the UI thread. Keep mobile startup
++	// deterministic and reserve the renderer budget for playable levels.
++	Con_Printf( "iOS mobile menu policy: skipping 3D background map\n" );
++	return false;
++#endif
++
 diff --git a/client/render/view.cpp b/client/render/view.cpp
 --- a/client/render/view.cpp
 +++ b/client/render/view.cpp
