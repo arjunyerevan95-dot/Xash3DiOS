@@ -50,6 +50,7 @@ checkout_revision https://github.com/Aynekko/Diffusion-executable.git "$DIFFUSIO
 # layer. The iPhoneOS SDK exposes the same allocation APIs through stdlib.h.
 git -C "$SOURCE_DIR" apply --unidiff-zero "$ROOT_DIR/scripts/ios/diffusion-ios.patch"
 git -C "$SOURCE_DIR" apply --unidiff-zero "$ROOT_DIR/scripts/ios/diffusion-shaders-ios.patch"
+python3 "$ROOT_DIR/scripts/ios/validate-diffusion-ios-policy.py" "$SOURCE_DIR"
 
 # Refuse to produce an IPA if any shader reachable through the iOS mobile
 # profile fails after the exact pinned GL4ES translation used on-device.

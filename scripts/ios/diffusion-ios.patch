@@ -429,13 +429,13 @@ index 95091b1..7e5aa42 100644
  		GL_AddShaderDirective( options, "STUDIO_DEFAULTALPHATEST" ); // do not use 0.5 threshold
  
 +	#if XASH_IOS
-+	if( numbones > 0 )
++	if( numbones == 1 )
 +	{
-+		// Mobile drivers pay heavily for the desktop default of 128 bone uniforms.
-+		// Size the program to the model actually being drawn; uploads already use
-+		// this same bounded count.
-+		int num_bones = Q_min( numbones, glConfig.max_skinning_bones );
-+		GL_AddShaderDefine( options, va( "#define MAXSTUDIOBONES %d\n", num_bones ));
++		// One-bone models use a genuinely distinct rigid path in the shader.
++		// All animated models intentionally omit a per-model bone define so the
++		// default glConfig.max_skinning_bones layout becomes a shared cache key.
++		// This avoids recompiling the same translated GL4ES uniform layout.
++		GL_AddShaderDefine( options, "#define MAXSTUDIOBONES 1\n" );
 +	}
 +	#else
  	if( numbones > 0 && glConfig.max_skinning_bones < MAXSTUDIOBONES && glConfig.uniforms_economy )
@@ -454,10 +454,10 @@ index 95091b1..7e5aa42 100644
  	}
  
 +	#if XASH_IOS
-+	if( numbones > 0 )
++	if( numbones == 1 )
 +	{
-+		int num_bones = Q_min( numbones, glConfig.max_skinning_bones );
-+		GL_AddShaderDefine( options, va( "#define MAXSTUDIOBONES %d\n", num_bones ));
++		// Keep only the genuinely distinct one-bone rigid shader path.
++		GL_AddShaderDefine( options, "#define MAXSTUDIOBONES 1\n" );
 +	}
 +	#else
  	if( numbones > 0 && glConfig.max_skinning_bones < MAXSTUDIOBONES && glConfig.uniforms_economy )
@@ -502,7 +502,7 @@ index 95091b1..7e5aa42 100644
  	glsl.BilateralBlur = shader = GL_InitGPUShader( "BilateralBlur", "generic", "bilateralblur" );
  	GL_InitBilateralBlurUniforms( shader );
 +	#else
-+	ALERT( at_console, "iOS mobile renderer profile: canonical materials, model-sized studio bones, on-demand shaders\n" );
++	ALERT( at_console, "iOS mobile renderer profile: canonical materials, shared animated-model shader layout, on-demand shaders\n" );
 +	#endif
  
  	// draw sun & skybox

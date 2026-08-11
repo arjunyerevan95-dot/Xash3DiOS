@@ -61,7 +61,7 @@ fi
 
 DIFFUSION_CLIENT_STRINGS="$VERIFY_ROOT/diffusion-client.strings"
 strings "$DIFFUSION_CLIENT_PATH" > "$DIFFUSION_CLIENT_STRINGS"
-if ! grep -q 'iOS mobile renderer profile' "$DIFFUSION_CLIENT_STRINGS"; then
+if ! grep -q 'iOS mobile renderer profile: canonical materials, shared animated-model shader layout, on-demand shaders' "$DIFFUSION_CLIENT_STRINGS"; then
 	echo "Diffusion client was built without the iOS renderer profile" >&2
 	exit 1
 fi
