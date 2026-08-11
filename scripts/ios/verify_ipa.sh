@@ -66,6 +66,19 @@ if ! grep -q 'iOS mobile renderer profile' "$DIFFUSION_CLIENT_STRINGS"; then
 	exit 1
 fi
 
+GL4ES_RENDERER_STRINGS="$VERIFY_ROOT/gl4es-renderer.strings"
+strings "$GL4ES_RENDERER_PATH" > "$GL4ES_RENDERER_STRINGS"
+
+if ! grep -q 'Native GLES3 core NPOT support enabled' "$GL4ES_RENDERER_STRINGS"; then
+	echo "GL4ES was built without the GLES3 full-NPOT capability fix" >&2
+	exit 1
+fi
+
+if ! grep -q 'compressed texture buffer overrun' "$GL4ES_RENDERER_STRINGS"; then
+	echo "Renderer was built without compressed-texture bounds checks" >&2
+	exit 1
+fi
+
 plutil -lint "$INFO_PLIST"
 
 MINIMUM_OS=$(/usr/libexec/PlistBuddy -c 'Print :MinimumOSVersion' "$INFO_PLIST")
