@@ -211,16 +211,9 @@ static intptr_t GL_RefGetParm( int parm, int arg )
 	case PARM_STENCIL_ACTIVE:
 		return glState.stencilEnabled;
 #if XASH_APPLE
-	case PARM_DEBUG_FRAMEBUFFER_RGBA:
-	{
-		byte pixel[4];
-		int x = arg & 0xFFFF;
-		int y = ( arg >> 16 ) & 0xFFFF;
-
-		pglReadPixels( x, y, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixel );
-		return (intptr_t)((uint32_t)pixel[0] | ((uint32_t)pixel[1] << 8) |
-			((uint32_t)pixel[2] << 16) | ((uint32_t)pixel[3] << 24));
-	}
+	case PARM_DEBUG_FRAMEBUFFER_TRACE:
+		R_IOSFramebufferTraceCheckpoint( arg );
+		return 0;
 #endif
 	case PARM_TEX_FILTERING:
 		if( arg < 0 )

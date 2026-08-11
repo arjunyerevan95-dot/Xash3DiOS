@@ -28,32 +28,22 @@ static string ios_post_trace_map;
 
 static void V_IOSPostTrace( const char *stage )
 {
-	byte pixels[3][4];
-	int x = clgame.viewport[0];
-	int y = clgame.viewport[1];
-	int w = clgame.viewport[2];
-	int h = clgame.viewport[3];
-	const int sample_x[3] = { x + w / 2, x + w / 4, x + ( 3 * w ) / 4 };
-	const int sample_y = y + h / 2;
+	int checkpoint = 0;
 
-	if( ios_post_trace_frames <= 0 || w <= 0 || h <= 0 )
+	if( ios_post_trace_frames <= 0 )
 		return;
 
-	for( int i = 0; i < 3; i++ )
-	{
-		uint32_t packed = (uint32_t)REF_GET_PARM( PARM_DEBUG_FRAMEBUFFER_RGBA,
-			( sample_x[i] & 0xFFFF ) | (( sample_y & 0xFFFF ) << 16));
-		pixels[i][0] = packed & 0xFF;
-		pixels[i][1] = ( packed >> 8 ) & 0xFF;
-		pixels[i][2] = ( packed >> 16 ) & 0xFF;
-		pixels[i][3] = ( packed >> 24 ) & 0xFF;
-	}
+	if( !Q_strcmp( stage, "after-renderframe" )) checkpoint = 1;
+	else if( !Q_strcmp( stage, "post-enter" )) checkpoint = 2;
+	else if( !Q_strcmp( stage, "set-2d" )) checkpoint = 3;
+	else if( !Q_strcmp( stage, "hud-active" )) checkpoint = 4;
+	else if( !Q_strcmp( stage, "vgui" )) checkpoint = 5;
+	else if( !Q_strcmp( stage, "menu" )) checkpoint = 6;
+	else if( !Q_strcmp( stage, "touch" )) checkpoint = 7;
+	else if( !Q_strcmp( stage, "before-endframe" )) checkpoint = 8;
 
-	Con_Printf( "iOS post trace[%d] %-18s center=%u,%u,%u,%u left=%u,%u,%u,%u right=%u,%u,%u,%u\n",
-		4 - ios_post_trace_frames, stage,
-		pixels[0][0], pixels[0][1], pixels[0][2], pixels[0][3],
-		pixels[1][0], pixels[1][1], pixels[1][2], pixels[1][3],
-		pixels[2][0], pixels[2][1], pixels[2][2], pixels[2][3] );
+	if( checkpoint )
+		REF_GET_PARM( PARM_DEBUG_FRAMEBUFFER_TRACE, checkpoint );
 }
 
 static void V_IOSPostTraceEnd( void )

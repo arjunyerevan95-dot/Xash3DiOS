@@ -350,6 +350,10 @@ void R_ShowTextures( void );
 void R_ClearScene( void );
 void R_LoadIdentity( void );
 void R_RenderScene( void );
+#if XASH_APPLE
+void R_IOSFramebufferTrace( const char *stage );
+void R_IOSFramebufferTraceCheckpoint( int checkpoint );
+#endif
 void R_DrawCubemapView( const vec3_t origin, const vec3_t angles, int size );
 void R_SetupRefParams( const struct ref_viewpass_s *rvp );
 void R_TranslateForEntity( cl_entity_t *e );

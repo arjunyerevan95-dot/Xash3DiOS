@@ -29,6 +29,60 @@ ref_instance_t	RI;
 static string ios_renderer_trace_map;
 static int ios_renderer_trace_frames;
 static int ios_present_trace_frames;
+static qboolean ios_frame_world_rendered;
+
+void R_IOSFramebufferTrace( const char *stage )
+{
+	byte pixels[5][4];
+	int x, y, w, h;
+	int sample_x[5], sample_y[5];
+	GLenum pre_error, post_error;
+
+	if( ios_present_trace_frames <= 0 || !ios_frame_world_rendered )
+		return;
+
+	x = RI.rvp.viewport[0];
+	y = RI.rvp.viewport[1];
+	w = RI.rvp.viewport[2];
+	h = RI.rvp.viewport[3];
+	if( w <= 0 || h <= 0 )
+		return;
+
+	sample_x[0] = x + w / 2;
+	sample_x[1] = x + w / 4;
+	sample_x[2] = x + ( 3 * w ) / 4;
+	sample_x[3] = sample_x[4] = x + w / 2;
+	sample_y[0] = sample_y[1] = sample_y[2] = y + h / 2;
+	sample_y[3] = y + h / 4;
+	sample_y[4] = y + ( 3 * h ) / 4;
+
+	memset( pixels, 0xCD, sizeof( pixels ));
+	pre_error = pglGetError();
+	for( int i = 0; i < 5; i++ )
+		pglReadPixels( sample_x[i], sample_y[i], 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixels[i] );
+	post_error = pglGetError();
+
+	gEngfuncs.Con_Printf( "iOS renderer trace[%d] %-20s center=%u,%u,%u,%u left=%u,%u,%u,%u right=%u,%u,%u,%u low=%u,%u,%u,%u high=%u,%u,%u,%u glerr=0x%x->0x%x\n",
+		4 - ios_present_trace_frames, stage,
+		pixels[0][0], pixels[0][1], pixels[0][2], pixels[0][3],
+		pixels[1][0], pixels[1][1], pixels[1][2], pixels[1][3],
+		pixels[2][0], pixels[2][1], pixels[2][2], pixels[2][3],
+		pixels[3][0], pixels[3][1], pixels[3][2], pixels[3][3],
+		pixels[4][0], pixels[4][1], pixels[4][2], pixels[4][3],
+		pre_error, post_error );
+}
+
+void R_IOSFramebufferTraceCheckpoint( int checkpoint )
+{
+	const char *stages[] =
+	{
+		"invalid", "engine-return", "post-enter", "set2d-return",
+		"after-hud", "after-vgui", "after-menu", "after-touch", "before-endframe"
+	};
+
+	if( checkpoint > 0 && checkpoint < (int)( sizeof( stages ) / sizeof( stages[0] )))
+		R_IOSFramebufferTrace( stages[checkpoint] );
+}
 #endif
 
 static int R_RankForRenderMode( int rendermode )
@@ -1002,24 +1056,8 @@ void R_RenderScene( void )
 	R_DrawWaterSurfaces();
 
 #if XASH_APPLE
-	if( ios_renderer_trace_frames > 0 )
-	{
-		byte pixels[5][4];
-		int x = RI.rvp.viewport[0];
-		int y = RI.rvp.viewport[1];
-		int w = RI.rvp.viewport[2];
-		int h = RI.rvp.viewport[3];
-		const int sample_x[5] = { x + w / 2, x + w / 4, x + ( 3 * w ) / 4, x + w / 2, x + w / 2 };
-		const int sample_y[5] = { y + h / 2, y + h / 2, y + h / 2, y + h / 4, y + ( 3 * h ) / 4 };
-
-		for( int i = 0; i < 5; i++ )
-			pglReadPixels( sample_x[i], sample_y[i], 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixels[i] );
-
-		gEngfuncs.Con_Printf( "iOS GLES trace: pixels center=%u,%u,%u left=%u,%u,%u right=%u,%u,%u low=%u,%u,%u high=%u,%u,%u glerr=0x%x\n",
-			pixels[0][0], pixels[0][1], pixels[0][2], pixels[1][0], pixels[1][1], pixels[1][2],
-			pixels[2][0], pixels[2][1], pixels[2][2], pixels[3][0], pixels[3][1], pixels[3][2],
-			pixels[4][0], pixels[4][1], pixels[4][2], pglGetError() );
-	}
+	ios_frame_world_rendered = true;
+	R_IOSFramebufferTrace( "scene-end" );
 #endif
 }
 
@@ -1078,6 +1116,9 @@ R_BeginFrame
 */
 void R_BeginFrame( qboolean clearScene )
 {
+#if XASH_APPLE
+	ios_frame_world_rendered = false;
+#endif
 	glConfig.softwareGammaUpdate = false;	// in case of possible fails
 
 	if(( gl_clear->value || ENGINE_GET_PARM( PARM_DEV_OVERVIEW )) &&
@@ -1179,6 +1220,7 @@ void R_RenderFrame( const ref_viewpass_t *rvp )
 	R_RenderScene();
 
 #if XASH_APPLE
+	R_IOSFramebufferTrace( "frame-return" );
 	if( ios_renderer_trace_frames > 0 )
 		ios_renderer_trace_frames--;
 #endif
@@ -1199,18 +1241,15 @@ void R_EndFrame( void )
 #if !defined( XASH_GL_STATIC )
 	GL2_ShimEndFrame();
 #endif
+#if XASH_APPLE
+	R_IOSFramebufferTrace( "endframe-enter" );
+#endif
 	// flush any remaining 2D bits
 	R_Set2DMode( false );
 #if XASH_APPLE
 	if( ios_present_trace_frames > 0 )
 	{
-		byte pixel[4];
-		int x = RI.rvp.viewport[0] + RI.rvp.viewport[2] / 2;
-		int y = RI.rvp.viewport[1] + RI.rvp.viewport[3] / 2;
-
-		pglReadPixels( x, y, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixel );
-		gEngfuncs.Con_Printf( "iOS present trace[%d]: center=%u,%u,%u,%u glerr=0x%x\n",
-			4 - ios_present_trace_frames, pixel[0], pixel[1], pixel[2], pixel[3], pglGetError() );
+		R_IOSFramebufferTrace( "before-swap" );
 		ios_present_trace_frames--;
 	}
 #endif
