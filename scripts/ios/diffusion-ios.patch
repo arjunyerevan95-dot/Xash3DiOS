@@ -122,13 +122,23 @@ diff --git a/client/render/view.cpp b/client/render/view.cpp
 +		return;
 +	}
 diff --git a/client/render/r_shader.cpp b/client/render/r_shader.cpp
+index 95091b1..7e5aa42 100644
 --- a/client/render/r_shader.cpp
 +++ b/client/render/r_shader.cpp
-@@ -271,0 +272,3 @@ static bool GL_ProcessShader( const char *filename, CVirtualFS *out, bool compat
+@@ -269,6 +269,9 @@ static bool GL_ProcessShader( const char *filename, CVirtualFS *out, bool compat
+ 
+ 	// add internal defines
+ 	out->Printf( "#version 130\n" );
 +	#if XASH_IOS
 +	out->Printf( "#define XASH_MOBILE_GLES 1\n" );
 +	#endif
-@@ -286 +289,24 @@ static bool GL_ProcessShader( const char *filename, CVirtualFS *out, bool compat
+ 	out->Printf( "#ifndef M_PI\n#define M_PI 3.14159265358979323846\n#endif\n" );
+ 	out->Printf( "#ifndef M_PI2\n#define M_PI2 6.28318530717958647692\n#endif\n" );
+ 	if( GL_Support( R_EXT_GPU_SHADER4 ))
+@@ -283,7 +286,33 @@ static bool GL_ProcessShader( const char *filename, CVirtualFS *out, bool compat
+ 	//	out->Printf( "#extension GL_EXT_texture_array : require\n" ); // support texture arrays
+ 		out->Printf( "#define GLSL_ALLOW_TEXTURE_ARRAY\n" );
+ 	}
 -	if( defines ) out->Print( defines );
 +	if( defines )
 +	{
@@ -145,7 +155,10 @@ diff --git a/client/render/r_shader.cpp b/client/render/r_shader.cpp
 +			if( Q_stristr( line, "MULTI_LAYERS" ) ||
 +				Q_stristr( line, "EMBOSS" ) ||
 +				Q_stristr( line, "HAS_SHADOWS" ) ||
-+				Q_stristr( line, "INTERIOR" ) )
++				Q_stristr( line, "INTERIOR" ) ||
++				Q_stristr( line, "SPECULAR" ) ||
++				Q_stristr( line, "BUMP" ) ||
++				Q_stristr( line, "REFLECTION_CUBEMAP" ) )
 +				continue;
 +
 +			out->Printf( "%s\n", line );
@@ -154,16 +167,150 @@ diff --git a/client/render/r_shader.cpp b/client/render/r_shader.cpp
 +		out->Print( defines );
 +	#endif
 +	}
-@@ -2977,0 +3004,5 @@ void GL_InitGPUShaders( void )
+ 
+ 	// user may override this constants
+ 	out->Printf( "#ifndef MAXSTUDIOBONES\n#define MAXSTUDIOBONES %i\n#endif\n", glConfig.max_skinning_bones );
+@@ -327,6 +356,9 @@ static void GL_LoadGPUShader( glsl_program_t *shader, const char *name, GLenum s
+ 	int bufferSize = (int)source.GetSize();
+ 
+ 	ALERT( at_aiconsole, "\nloading '%s'\n", filename );
++	#if XASH_IOS
++	ALERT( at_console, "iOS shader compile: %s\n%s", filename, defines ? defines : "" );
++	#endif
+ 	object = pglCreateShaderObjectARB( shaderType );
+ 	pglShaderSourceARB( object, GL_TRUE, (const GLcharARB **)&buffer, &bufferSize );
+ 
+@@ -370,6 +402,12 @@ static void GL_LinkProgram( glsl_program_t *shader )
+ 
+ static bool GL_ValidateProgram( glsl_program_t *shader )
+ {
++	#if XASH_IOS
++	// glValidateProgram checks the complete current draw state. During Diffusion's
++	// startup the iOS drawable is not complete yet, so validation rejects every
++	// otherwise-linked program. Compile and link status remain checked above.
++	return shader != NULL;
++	#else
+ 	GLint validated = 0;
+ 
+ 	if( !shader ) return false;
+@@ -382,6 +420,7 @@ static bool GL_ValidateProgram( glsl_program_t *shader )
+ 		ALERT( at_error, "%s\n%s shader failed to validate\n", GL_PrintInfoLog( shader->handle ), shader->name );
+ 
+ 	return validated;
++	#endif
+ }
+ 
+ int GL_UniformTypeToDwordCount( GLuint type, bool align = false )
+@@ -992,6 +1031,19 @@ static glsl_program_t *GL_FindUberShader( const char *glname, const char *option
+ 
+ void GL_AddShaderDirective( char *options, const char *directive )
+ {
++	#if XASH_IOS
++	// Canonical mobile material tier. Drop desktop-only features before the
++	// option string becomes a shader cache key, so equivalent variants share a
++	// single program instead of stalling Metal with duplicate first-frame work.
++	if( Q_stristr( directive, "MULTI_LAYERS" ) ||
++		Q_stristr( directive, "EMBOSS" ) ||
++		Q_stristr( directive, "HAS_SHADOWS" ) ||
++		Q_stristr( directive, "INTERIOR" ) ||
++		Q_stristr( directive, "SPECULAR" ) ||
++		Q_stristr( directive, "BUMP" ) ||
++		Q_stristr( directive, "REFLECTION_CUBEMAP" ) )
++		return;
++	#endif
+ 	Q_strncat( options, va( "#define %s\n", directive ), MAX_OPTIONS_LENGTH );
+ }
+ 
+@@ -2479,6 +2531,16 @@ word GL_UberShaderForSolidStudio( mstudiomaterial_t *mat, bool vertex_lighting,
+ 	if( RI->currententity && RI->currententity->curstate.rendermode == kRenderTransTexture )
+ 		GL_AddShaderDirective( options, "STUDIO_DEFAULTALPHATEST" ); // do not use 0.5 threshold
+ 
++	#if XASH_IOS
++	if( numbones > 0 )
++	{
++		// Mobile drivers pay heavily for the desktop default of 128 bone uniforms.
++		// Size the program to the model actually being drawn; uploads already use
++		// this same bounded count.
++		int num_bones = Q_min( numbones, glConfig.max_skinning_bones );
++		GL_AddShaderDefine( options, va( "#define MAXSTUDIOBONES %d\n", num_bones ));
++	}
++	#else
+ 	if( numbones > 0 && glConfig.max_skinning_bones < MAXSTUDIOBONES && glConfig.uniforms_economy )
+ 	{
+ 		int num_bones = Q_min( numbones, glConfig.max_skinning_bones );
+@@ -2488,6 +2550,7 @@ word GL_UberShaderForSolidStudio( mstudiomaterial_t *mat, bool vertex_lighting,
+ 	{
+ 		GL_AddShaderDefine( options, "#define MAXSTUDIOBONES 1\n" );
+ 	}
++	#endif
+ 
+ 	if( bone_weighting )
+ 		GL_AddShaderDirective( options, "STUDIO_BONEWEIGHTING" );
+@@ -2624,6 +2687,13 @@ word GL_UberShaderForDlightStudio( const plight_t *pl, struct mstudiomat_s *mat,
+ 		GL_AddShaderDirective( options, "STUDIO_LIGHT_PROJECTION" );
+ 	}
+ 
++	#if XASH_IOS
++	if( numbones > 0 )
++	{
++		int num_bones = Q_min( numbones, glConfig.max_skinning_bones );
++		GL_AddShaderDefine( options, va( "#define MAXSTUDIOBONES %d\n", num_bones ));
++	}
++	#else
+ 	if( numbones > 0 && glConfig.max_skinning_bones < MAXSTUDIOBONES && glConfig.uniforms_economy )
+ 	{
+ 		int num_bones = Q_min( numbones, glConfig.max_skinning_bones );
+@@ -2633,6 +2703,7 @@ word GL_UberShaderForDlightStudio( const plight_t *pl, struct mstudiomat_s *mat,
+ 	{
+ 		GL_AddShaderDefine( options, "#define MAXSTUDIOBONES 1\n" );
+ 	}
++	#endif
+ 
+ 	if( bone_weighting )
+ 		GL_AddShaderDirective( options, "STUDIO_BONEWEIGHTING" );
+@@ -2827,6 +2898,13 @@ void GL_ListGPUShaders( void )
+ 
+ bool GL_PrecompileUberShaders( int &processed, int &total )
+ {
++	#if XASH_IOS
++	// The desktop list contains hundreds of permutations that the canonical
++	// mobile tier can never request. Compile only real, canonical variants on
++	// demand and keep them cached for the session.
++	processed = total = iTotalShaders - 1;
++	return true;
++	#endif
+ 	if( bPrecompiled )
+ 		return true;
+ 
+@@ -2975,6 +3053,11 @@ void GL_InitGPUShaders( void )
+ 
+ 	glsl_program_t *shader; // generic pointer. help to initialize uniforms
+ 
 +	#if !XASH_IOS
 +	// Desktop post-processing requires GLSL features that GL4ES currently
 +	// translates to an ES 1.00 target on iOS. Keep the mobile renderer profile
 +	// intentionally limited to the core scene shaders until that translator has
 +	// a real ES 3.x path.
-@@ -3071,0 +3103,3 @@ void GL_InitGPUShaders( void )
+ 	// prepare sunshafts
+ 	glsl.genSunShafts = shader = GL_InitGPUShader( "GenSunShafts", "generic", "genshafts" );
+ 	GL_InitGenShaftsUniforms( shader );
+@@ -3069,6 +3152,9 @@ void GL_InitGPUShaders( void )
+ 
+ 	glsl.BilateralBlur = shader = GL_InitGPUShader( "BilateralBlur", "generic", "bilateralblur" );
+ 	GL_InitBilateralBlurUniforms( shader );
 +	#else
-+	ALERT( at_console, "iOS mobile renderer profile: desktop post-processing shaders disabled\n" );
++	ALERT( at_console, "iOS mobile renderer profile: canonical materials, model-sized studio bones, on-demand shaders\n" );
 +	#endif
+ 
+ 	// draw sun & skybox
+ 	glsl.skyboxEnv = shader = GL_InitGPUShader( "SkyBoxGeneric", "generic", "skybox" );
+@@ -3134,4 +3220,4 @@ void GL_FreeGPUShaders( void )
+ 	memset( glsl_programsHashTable, 0, sizeof( glsl_programsHashTable ) );
+ 
+ 	GL_BindShader( GL_NONE );
+-}
+\ No newline at end of file
++}
 diff --git a/client/render/r_main.cpp b/client/render/r_main.cpp
 --- a/client/render/r_main.cpp
 +++ b/client/render/r_main.cpp

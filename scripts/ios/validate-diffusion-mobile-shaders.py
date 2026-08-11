@@ -23,7 +23,10 @@ POSTPROCESS_BASES = {
     "monochrome", "motionblur", "screenwater", "smaaedgedetect",
     "smaablendweight", "smaaneighborblend", "tonemap", "waterdrops",
 }
-UNSUPPORTED_DIRECTIVES = ("MULTI_LAYERS", "EMBOSS", "HAS_SHADOWS", "INTERIOR")
+UNSUPPORTED_DIRECTIVES = (
+    "MULTI_LAYERS", "EMBOSS", "HAS_SHADOWS", "INTERIOR",
+    "SPECULAR", "BUMP", "REFLECTION_CUBEMAP",
+)
 
 
 def sanitize_defines(defines: str) -> str:
