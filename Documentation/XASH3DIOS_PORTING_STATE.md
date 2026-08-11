@@ -21,14 +21,16 @@ Updated: 2026-08-11
 - Reproducible analysis: `python3 scripts/ios/analyze-diffusion-shader-log.py engine.log --expect-run39` reports 138 total uber-shader compiles (indices 8–145), including 51 `StudioSolid` and 80 `StudioDlight` programs. It observes 30 exact `MAXSTUDIOBONES` values but only translated `u_BonePosition[128]` and `u_BoneQuaternion[128]` layouts. Removing animated per-model counts from the observed keys reduces 131 studio keys to 33 while retaining one-bone keys.
 - Attempted approach and result: run 39 already canonicalized mobile material features and switched to on-demand compilation. Its additional exact per-model bone-count specialization did not reduce the GL4ES-reported layout and instead multiplied first-frame cache entries. Run 36 is obsolete and must not be retested.
 
-## Run 40 — shared animated-model shader layout
+## Run 41 — work order 40, shared animated-model shader layout
 
-- Candidate commit: pending publication.
-- Workflow and IPA: pending CI.
+- Candidate commit: `aa5c54dffa40feeb737d18ce59118d2eb8cc8fdd`.
+- Workflow: [iOS Proof of Life run 41](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/31519910689), ID `31519910689`, result `success`.
+- Artifact: `Xash3DiOS-arm64-unsigned`, ID `9112778515`, GitHub artifact ZIP SHA-256 `B1E203E29161446190FCD5689E5AF7D8E7314EF6742B57E74758F6E331003666`.
+- IPA: `Xash3DiOS-run41-aa5c54df-arm64-unsigned.ipa`, 8,656,903 bytes, SHA-256 `D15B2A059AAADF6C32519B21839D212D1992DDD75D46D67B8F584A2C6F2FE72C`.
 - Change: `GL_UberShaderForSolidStudio` and `GL_UberShaderForDlightStudio` now retain only the source's genuinely distinct `MAXSTUDIOBONES 1` rigid-model path on iOS. Animated models omit per-model bone-count defines and share the default `glConfig.max_skinning_bones` option/layout key.
 - Guardrails: the real Diffusion menu remains intact; desktop shader economy behavior is unchanged; no core renderer/model feature is disabled. `validate-diffusion-ios-policy.py` fails CI if an arbitrary model bone count returns to either iOS key builder. IPA verification requires the exact renderer-policy marker.
 - Expected marker: `iOS mobile renderer profile: canonical materials, shared animated-model shader layout, on-demand shaders`
-- Local validation: the updated main patch applies to the three exact pinned source revisions; the run-39 evidence analyzer passes; the applied-source iOS policy validator passes. The macOS CI job is responsible for the `XASH_IOS=1` arm64 `client`, `server`, and `menu` builds, shader translation gate, IPA contract verification, and artifact packaging.
+- Validation: the updated main patch applies to the exact pinned source tree; the run-39 evidence analyzer passes; the applied-source iOS policy validator passes. CI validated all 350 translated GL4ES mobile shader variants, linked the `XASH_IOS=1` arm64 Diffusion `client`, `server`, and `menu` targets, verified every required arm64 Mach-O and embedded marker in the IPA, and packaged the artifact successfully.
 - Acceptance state: pending one device test. A successful compile or CI run is not device acceptance.
-- Single requested device test: install the run-40 IPA, launch with the unchanged arguments, select **New Game → chapter 1 → Normal** once, and wait up to 60 seconds without backgrounding. Report whether an interactive gameplay frame appears and whether touch input responds; attach one screenshot and the resulting `engine.log`. Do not retest run 39.
-- Next action: publish, complete CI, record the workflow/artifact SHA-256 here, deliver the IPA, then wait for orchestrator review and the single device result before any further patch.
+- Single requested device test: install the run-41 IPA, launch with the unchanged arguments, select **New Game → chapter 1 → Normal** once, and wait up to 60 seconds without backgrounding. Report whether an interactive gameplay frame appears and whether touch input responds; attach one screenshot and the resulting `engine.log`. Do not retest run 39.
+- Next action: deliver the checksummed IPA, then wait for orchestrator review and the single device result before any further patch.
