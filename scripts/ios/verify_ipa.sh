@@ -66,6 +66,16 @@ if ! grep -q 'iOS mobile renderer profile: canonical materials, shared animated-
 	exit 1
 fi
 
+if ! grep -q 'iOS foliage liveness policy: bounded_lines=' "$DIFFUSION_CLIENT_STRINGS"; then
+	echo "Diffusion client was built without bounded foliage liveness diagnostics" >&2
+	exit 1
+fi
+
+if ! grep -q 'iOS world traversal:' "$DIFFUSION_CLIENT_STRINGS"; then
+	echo "Diffusion client was built without bounded world-traversal diagnostics" >&2
+	exit 1
+fi
+
 DIFFUSION_MENU_STRINGS="$VERIFY_ROOT/diffusion-menu.strings"
 strings "$DIFFUSION_MENU_PATH" > "$DIFFUSION_MENU_STRINGS"
 if ! grep -q 'iOS mobile menu policy: decorative background map disabled; UI callbacks remain active' "$DIFFUSION_MENU_STRINGS"; then
@@ -81,6 +91,11 @@ fi
 GL4ES_RENDERER_STRINGS="$VERIFY_ROOT/gl4es-renderer.strings"
 strings "$GL4ES_RENDERER_PATH" > "$GL4ES_RENDERER_STRINGS"
 
+if ! grep -q 'iOS liveness renderer policy: bounded_frames=12' "$GL4ES_RENDERER_STRINGS"; then
+	echo "Renderer was built without bounded flush/present liveness diagnostics" >&2
+	exit 1
+fi
+
 if ! grep -q 'Native GLES3 core NPOT support enabled' "$GL4ES_RENDERER_STRINGS"; then
 	echo "GL4ES was built without the GLES3 full-NPOT capability fix" >&2
 	exit 1
@@ -88,6 +103,13 @@ fi
 
 if ! grep -q 'compressed texture buffer overrun' "$GL4ES_RENDERER_STRINGS"; then
 	echo "Renderer was built without compressed-texture bounds checks" >&2
+	exit 1
+fi
+
+ENGINE_STRINGS="$VERIFY_ROOT/engine.strings"
+strings "$ENGINE_PATH" > "$ENGINE_STRINGS"
+if ! grep -q 'iOS liveness instrumentation: host, screen, renderer, foliage, flush, swap/present' "$ENGINE_STRINGS"; then
+	echo "Engine was built without bounded host/screen liveness diagnostics" >&2
 	exit 1
 fi
 

@@ -584,6 +584,12 @@ void Host_ValidateEngineFeatures( uint32_t mask, uint32_t features );
 void Host_Frame( double time );
 void Host_Credits( void );
 void Host_ExitInMain( void ) NORETURN;
+#if XASH_APPLE
+void Host_IOSLivenessArm( const char *world_name );
+qboolean Host_IOSLivenessActive( void );
+unsigned int Host_IOSLivenessFrameNumber( void );
+void Host_IOSLivenessStage( const char *subsystem, const char *stage );
+#endif
 
 //
 // host_state.c

@@ -27,12 +27,30 @@ ref_instance_t	RI;
 
 #if XASH_APPLE
 static string ios_renderer_trace_map;
-static int ios_renderer_trace_frames;
 static int ios_present_trace_frames;
+static unsigned int ios_renderer_calls;
+static unsigned int ios_renderer_returns;
+static unsigned int ios_swap_attempts;
+static unsigned int ios_presented_frames;
+static double ios_present_heartbeat;
 
 void R_IOSFramebufferTrace( const char *stage )
 {
-	(void)stage;
+	double now = gEngfuncs.pfnTime();
+	qboolean heartbeat = false;
+
+	if( ios_present_trace_frames <= 0 )
+	{
+		if( Q_strcmp( stage, "after-swap/present" ) || now - ios_present_heartbeat < 2.0 )
+			return;
+		heartbeat = true;
+	}
+
+	gEngfuncs.Con_Printf( "iOS liveness renderer: t=%.3f stage=%s render_calls=%u rendered=%u swap_attempts=%u presented=%u trace_remaining=%d%s\n",
+		now, stage, ios_renderer_calls, ios_renderer_returns, ios_swap_attempts,
+		ios_presented_frames, ios_present_trace_frames, heartbeat ? " heartbeat" : "" );
+	if( heartbeat )
+		ios_present_heartbeat = now;
 }
 
 void R_IOSFramebufferTraceCheckpoint( int checkpoint )
@@ -1123,8 +1141,13 @@ void R_RenderFrame( const ref_viewpass_t *rvp )
 	if( Q_stricmp( ios_renderer_trace_map, world_name ))
 	{
 		Q_strncpy( ios_renderer_trace_map, world_name, sizeof( ios_renderer_trace_map ));
-		ios_renderer_trace_frames = 3;
-		ios_present_trace_frames = 3;
+		ios_present_trace_frames = 12;
+		ios_renderer_calls = 0;
+		ios_renderer_returns = 0;
+		ios_swap_attempts = 0;
+		ios_presented_frames = 0;
+		ios_present_heartbeat = gEngfuncs.pfnTime();
+		gEngfuncs.Con_Printf( "iOS liveness renderer policy: bounded_frames=12 heartbeat_seconds=2 flush=GL2_ShimEndFrame present=GL_SwapBuffers\n" );
 		gEngfuncs.Con_Printf( "iOS GLES map: %s surfaces=%d leafs=%d nodes=%d entities=%u norefresh=%.0f custom=%d\n",
 			ios_renderer_trace_map,
 			WORLDMODEL ? WORLDMODEL->numsurfaces : 0,
@@ -1133,13 +1156,15 @@ void R_RenderFrame( const ref_viewpass_t *rvp )
 			tr.draw_list ? r_numEntities : 0, r_norefresh->value,
 			gEngfuncs.drawFuncs->GL_RenderFrame != NULL );
 	}
+	ios_renderer_calls++;
+	R_IOSFramebufferTrace( "renderer-begin" );
 #endif
 
 	if( r_norefresh->value )
 	{
 #if XASH_APPLE
-		if( ios_renderer_trace_frames > 0 )
-			ios_renderer_trace_frames--;
+		ios_renderer_returns++;
+		R_IOSFramebufferTrace( "renderer-end-norefresh" );
 #endif
 		return;
 	}
@@ -1153,16 +1178,25 @@ void R_RenderFrame( const ref_viewpass_t *rvp )
 	// completely override rendering
 	if( gEngfuncs.drawFuncs->GL_RenderFrame != NULL )
 	{
-		tr.fCustomRendering = true;
+		int custom_result;
 
-		if( gEngfuncs.drawFuncs->GL_RenderFrame( rvp ))
+		tr.fCustomRendering = true;
+#if XASH_APPLE
+		R_IOSFramebufferTrace( "before-custom-renderer" );
+#endif
+		custom_result = gEngfuncs.drawFuncs->GL_RenderFrame( rvp );
+#if XASH_APPLE
+		R_IOSFramebufferTrace( "after-custom-renderer" );
+#endif
+
+		if( custom_result )
 		{
 			R_GatherPlayerLight( tr.viewent );
 			tr.realframecount++;
 			tr.fResetVis = true;
 #if XASH_APPLE
-			if( ios_renderer_trace_frames > 0 )
-				ios_renderer_trace_frames--;
+			ios_renderer_returns++;
+			R_IOSFramebufferTrace( "renderer-end-custom" );
 #endif
 			return;
 		}
@@ -1176,9 +1210,8 @@ void R_RenderFrame( const ref_viewpass_t *rvp )
 	R_RenderScene();
 
 #if XASH_APPLE
-	R_IOSFramebufferTrace( "frame-return" );
-	if( ios_renderer_trace_frames > 0 )
-		ios_renderer_trace_frames--;
+	ios_renderer_returns++;
+	R_IOSFramebufferTrace( "renderer-end-standard" );
 #endif
 
 	return;
@@ -1191,25 +1224,38 @@ R_EndFrame
 */
 void R_EndFrame( void )
 {
+#if XASH_APPLE
+	R_IOSFramebufferTrace( "endframe-enter" );
+#endif
 #if XASH_PSVITA
 	VGL_ShimEndFrame();
 #endif
 #if !defined( XASH_GL_STATIC )
+#if XASH_APPLE
+	R_IOSFramebufferTrace( "before-gl2-flush" );
+#endif
 	GL2_ShimEndFrame();
+#if XASH_APPLE
+	R_IOSFramebufferTrace( "after-gl2-flush" );
+#endif
 #endif
 #if XASH_APPLE
-	R_IOSFramebufferTrace( "endframe-enter" );
+	R_IOSFramebufferTrace( "before-set2d-flush" );
 #endif
 	// flush any remaining 2D bits
 	R_Set2DMode( false );
 #if XASH_APPLE
-	if( ios_present_trace_frames > 0 )
-	{
-		R_IOSFramebufferTrace( "before-swap" );
-		ios_present_trace_frames--;
-	}
+	R_IOSFramebufferTrace( "after-set2d-flush" );
+	ios_swap_attempts++;
+	R_IOSFramebufferTrace( "before-swap/present" );
 #endif
 	gEngfuncs.GL_SwapBuffers();
+#if XASH_APPLE
+	ios_presented_frames++;
+	R_IOSFramebufferTrace( "after-swap/present" );
+	if( ios_present_trace_frames > 0 )
+		ios_present_trace_frames--;
+#endif
 }
 
 /*

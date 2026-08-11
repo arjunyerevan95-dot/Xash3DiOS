@@ -640,6 +640,90 @@ static qboolean Host_FilterTime( double time )
 	return true;
 }
 
+#if XASH_APPLE
+#define IOS_LIVENESS_TRACE_FRAMES 12
+#define IOS_LIVENESS_HEARTBEAT_SECONDS 2.0
+
+static string ios_liveness_world;
+static qboolean ios_liveness_armed;
+static unsigned int ios_liveness_frame;
+static unsigned int ios_liveness_returned_frames;
+static int ios_liveness_trace_frames;
+static double ios_liveness_last_heartbeat;
+
+void Host_IOSLivenessArm( const char *world_name )
+{
+	if( ios_liveness_armed && !Q_stricmp( ios_liveness_world, world_name ))
+		return;
+
+	Q_strncpy( ios_liveness_world, world_name, sizeof( ios_liveness_world ));
+	ios_liveness_armed = true;
+	ios_liveness_frame = 1;
+	ios_liveness_returned_frames = 0;
+	ios_liveness_trace_frames = IOS_LIVENESS_TRACE_FRAMES;
+	ios_liveness_last_heartbeat = Platform_DoubleTime();
+
+	Con_Printf( "iOS liveness instrumentation: host, screen, renderer, foliage, flush, swap/present; bounded_frames=%d heartbeat_seconds=%.0f\n",
+		IOS_LIVENESS_TRACE_FRAMES, IOS_LIVENESS_HEARTBEAT_SECONDS );
+	Con_Printf( "iOS liveness host: t=%.3f frame=%u returned=%u stage=arm world=%s\n",
+		ios_liveness_last_heartbeat, ios_liveness_frame, ios_liveness_returned_frames,
+		ios_liveness_world );
+}
+
+qboolean Host_IOSLivenessActive( void )
+{
+	return ios_liveness_armed && ios_liveness_trace_frames > 0;
+}
+
+unsigned int Host_IOSLivenessFrameNumber( void )
+{
+	return ios_liveness_frame;
+}
+
+void Host_IOSLivenessStage( const char *subsystem, const char *stage )
+{
+	if( !Host_IOSLivenessActive( ))
+		return;
+
+	Con_Printf( "iOS liveness host: t=%.3f frame=%u returned=%u subsystem=%s stage=%s\n",
+		Platform_DoubleTime(), ios_liveness_frame, ios_liveness_returned_frames,
+		subsystem, stage );
+}
+
+static void Host_IOSLivenessFrameBegin( void )
+{
+	if( !ios_liveness_armed )
+		return;
+
+	ios_liveness_frame = ios_liveness_returned_frames + 1;
+	Host_IOSLivenessStage( "host-frame", "begin" );
+}
+
+static void Host_IOSLivenessFrameEnd( void )
+{
+	double now;
+
+	if( !ios_liveness_armed )
+		return;
+
+	Host_IOSLivenessStage( "host-frame", "end" );
+	ios_liveness_returned_frames++;
+	if( ios_liveness_trace_frames > 0 )
+		ios_liveness_trace_frames--;
+
+	now = Platform_DoubleTime();
+	if( now - ios_liveness_last_heartbeat >= IOS_LIVENESS_HEARTBEAT_SECONDS )
+	{
+		Con_Printf( "iOS liveness host heartbeat: t=%.3f frame=%u returned=%u world=%s\n",
+			now, ios_liveness_frame, ios_liveness_returned_frames, ios_liveness_world );
+		ios_liveness_last_heartbeat = now;
+	}
+}
+#else
+#define Host_IOSLivenessFrameBegin() ((void)0)
+#define Host_IOSLivenessFrameEnd() ((void)0)
+#endif
+
 /*
 =================
 Host_Frame
@@ -652,6 +736,7 @@ void Host_Frame( double time )
 		return;
 
 	double t1 = Platform_DoubleTime();
+	Host_IOSLivenessFrameBegin();
 
 	if( host.framecount == 0 )
 		Con_DPrintf( "Time to first frame: %.3f seconds\n", t1 - host.starttime );
@@ -666,6 +751,7 @@ void Host_Frame( double time )
 
 	host.framecount++;
 	host.pureframetime = Platform_DoubleTime() - t1;
+	Host_IOSLivenessFrameEnd();
 }
 
 /*

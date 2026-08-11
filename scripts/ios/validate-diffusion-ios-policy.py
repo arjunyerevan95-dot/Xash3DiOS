@@ -36,6 +36,12 @@ def main() -> int:
 
     shader_path = pathlib.Path(sys.argv[1]) / "client" / "render" / "r_shader.cpp"
     source = shader_path.read_text(encoding="utf-8", errors="strict")
+    grass_source = (pathlib.Path(sys.argv[1]) / "client" / "render" / "r_grass.cpp").read_text(
+        encoding="utf-8", errors="strict"
+    )
+    world_source = (pathlib.Path(sys.argv[1]) / "client" / "render" / "r_world.cpp").read_text(
+        encoding="utf-8", errors="strict"
+    )
     failures: list[str] = []
 
     boundaries = (
@@ -61,12 +67,42 @@ def main() -> int:
     if EXPECTED_MARKER not in source:
         failures.append("shared animated-model renderer diagnostic marker is missing")
 
+    required_liveness_tokens = {
+        "r_grass.cpp": (
+            "iOS foliage liveness policy: bounded_lines=%d sample_stride=%d",
+            "stage=construct-begin",
+            "stage=sample-progress",
+            "stage=construct-end",
+            "stage=dispatch-end",
+            "#define IOS_GRASS_TRACE_LIMIT 128",
+        ),
+        "r_world.cpp": (
+            "iOS world traversal:",
+            "before-visible-surfaces",
+            "after-visible-surfaces",
+            "before-brush-list",
+            "after-brush-list",
+            "ios_normal_world && ios_world_draw <= 12",
+        ),
+    }
+    for filename, tokens in required_liveness_tokens.items():
+        liveness_source = grass_source if filename == "r_grass.cpp" else world_source
+        for token in tokens:
+            if token not in liveness_source:
+                failures.append(f"{filename}: missing bounded iOS liveness token {token!r}")
+
+    if "Surface 648" in grass_source or "Surface 648" in world_source:
+        failures.append("foliage instrumentation is overfit to the last observed surface")
+
     if failures:
         for failure in failures:
             print(f"error: {failure}", file=sys.stderr)
         return 1
 
-    print("Diffusion iOS shader policy: shared animated-model key; one-bone rigid key retained")
+    print(
+        "Diffusion iOS policy: shared animated-model key; one-bone rigid key retained; "
+        "bounded foliage/world liveness enabled"
+    )
     return 0
 
 
