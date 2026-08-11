@@ -1376,7 +1376,13 @@ void GL_SetupAttributes( int safegl )
 #elif XASH_GL4ES
 	gEngfuncs.GL_SetAttribute( REF_GL_CONTEXT_PROFILE_MASK, REF_GL_CONTEXT_PROFILE_ES );
 	gEngfuncs.GL_SetAttribute( REF_GL_CONTEXT_EGL, 1 );
+#if XASH_IOS
+	// Diffusion uses GLSL ES 3 features. GL4ES remains the compatibility
+	// layer, but needs an ES 3 backing context for its converted shaders.
+	gEngfuncs.GL_SetAttribute( REF_GL_CONTEXT_MAJOR_VERSION, 3 );
+#else
 	gEngfuncs.GL_SetAttribute( REF_GL_CONTEXT_MAJOR_VERSION, 2 );
+#endif
 	gEngfuncs.GL_SetAttribute( REF_GL_CONTEXT_MINOR_VERSION, 0 );
 #else // GL1.x
 	if( gEngfuncs.Sys_CheckParm( "-glcore" ))

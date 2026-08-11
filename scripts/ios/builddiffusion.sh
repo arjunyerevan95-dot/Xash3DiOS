@@ -49,6 +49,7 @@ checkout_revision https://github.com/Aynekko/Diffusion-executable.git "$DIFFUSIO
 # Diffusion inherits a Linux-only malloc header from its Source SDK utility
 # layer. The iPhoneOS SDK exposes the same allocation APIs through stdlib.h.
 git -C "$SOURCE_DIR" apply --unidiff-zero "$ROOT_DIR/scripts/ios/diffusion-ios.patch"
+git -C "$SOURCE_DIR" apply --unidiff-zero "$ROOT_DIR/scripts/ios/diffusion-shaders-ios.patch"
 
 IOS_SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
 IOS_CLANG=$(xcrun --sdk iphoneos --find clang)
@@ -112,6 +113,11 @@ cp "$SOURCE_DIR/3rd-party/mainui_cpp/gamedir_data/kb_act.lst" \
 	"$APP_LIBS_DIR/diffusion/kb_act.lst"
 cp "$SOURCE_DIR/3rd-party/mainui_cpp/gamedir_data/kb_def.lst" \
 	"$APP_LIBS_DIR/diffusion/kb_def.lst"
+
+# User archives take precedence over the app's normal game directory. Stage
+# corrected shaders in the dedicated iOS override tree mounted last by Xash.
+mkdir -p "$APP_LIBS_DIR/ios_overrides/diffusion/glsl"
+cp -R "$SOURCE_DIR/glsl/." "$APP_LIBS_DIR/ios_overrides/diffusion/glsl/"
 
 echo "Diffusion iOS modules staged from:"
 echo "  Diffusion:            $DIFFUSION_REF"
