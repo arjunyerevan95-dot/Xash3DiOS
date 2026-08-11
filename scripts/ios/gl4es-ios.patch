@@ -34,3 +34,15 @@ diff --git a/src/gl/stencil.c b/src/gl/stencil.c
 @@ -135 +135 @@ void APIENTRY_GL4ES gl4es_glStencilOpSeparate(GLenum face, GLenum sfail, GLenum z
 -        glStencilOp(sfail, zfail, zpass);
 +        gl4es_glStencilOp(sfail, zfail, zpass);
+diff --git a/src/glx/hardext.c b/src/glx/hardext.c
+--- a/src/glx/hardext.c
++++ b/src/glx/hardext.c
+@@ -271,0 +272 @@ void GetHardwareExtensions(int notest)
++    const char *Version = (const char *) gles_glGetString(GL_VERSION);
+@@ -276,0 +278,6 @@ void GetHardwareExtensions(int notest)
++    // Full NPOT texture support is core in OpenGL ES 3.0, so ES3 drivers do
++    // not need to repeat GL_OES_texture_npot in their extension strings.
++    if(Version && strstr(Version, "OpenGL ES 3.")) {
++        hardext.npot = 3;
++        SHUT_LOGD("Native GLES3 core NPOT support enabled\n");
++    }
