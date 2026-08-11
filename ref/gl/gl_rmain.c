@@ -27,6 +27,7 @@ ref_instance_t	RI;
 
 #if XASH_APPLE
 static string ios_renderer_trace_map;
+static int ios_renderer_trace_frames;
 static int ios_present_trace_frames;
 static unsigned int ios_renderer_calls;
 static unsigned int ios_renderer_returns;
@@ -1141,6 +1142,7 @@ void R_RenderFrame( const ref_viewpass_t *rvp )
 	if( Q_stricmp( ios_renderer_trace_map, world_name ))
 	{
 		Q_strncpy( ios_renderer_trace_map, world_name, sizeof( ios_renderer_trace_map ));
+		ios_renderer_trace_frames = 3;
 		ios_present_trace_frames = 12;
 		ios_renderer_calls = 0;
 		ios_renderer_returns = 0;
@@ -1165,6 +1167,8 @@ void R_RenderFrame( const ref_viewpass_t *rvp )
 #if XASH_APPLE
 		ios_renderer_returns++;
 		R_IOSFramebufferTrace( "renderer-end-norefresh" );
+		if( ios_renderer_trace_frames > 0 )
+			ios_renderer_trace_frames--;
 #endif
 		return;
 	}
@@ -1197,6 +1201,8 @@ void R_RenderFrame( const ref_viewpass_t *rvp )
 #if XASH_APPLE
 			ios_renderer_returns++;
 			R_IOSFramebufferTrace( "renderer-end-custom" );
+			if( ios_renderer_trace_frames > 0 )
+				ios_renderer_trace_frames--;
 #endif
 			return;
 		}
@@ -1212,6 +1218,8 @@ void R_RenderFrame( const ref_viewpass_t *rvp )
 #if XASH_APPLE
 	ios_renderer_returns++;
 	R_IOSFramebufferTrace( "renderer-end-standard" );
+	if( ios_renderer_trace_frames > 0 )
+		ios_renderer_trace_frames--;
 #endif
 
 	return;
