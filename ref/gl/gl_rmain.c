@@ -29,7 +29,6 @@ ref_instance_t	RI;
 static string ios_renderer_trace_map;
 static int ios_renderer_trace_frames;
 static int ios_present_trace_frames;
-static qboolean ios_visual_probe_active;
 
 void R_IOSFramebufferTrace( const char *stage )
 {
@@ -48,69 +47,6 @@ void R_IOSFramebufferTraceCheckpoint( int checkpoint )
 		R_IOSFramebufferTrace( stages[checkpoint] );
 }
 
-static void R_IOSVisualProbeSceneBegin( void )
-{
-	if( !ios_visual_probe_active )
-		return;
-
-	pglDisable( GL_SCISSOR_TEST );
-	pglColorMask( GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE );
-	pglClearColor( 1.0f, 0.0f, 1.0f, 1.0f );
-	pglClear( GL_COLOR_BUFFER_BIT );
-}
-
-static void R_IOSVisualProbeGeometry( void )
-{
-	vec3_t center, vertices[3];
-
-	if( !ios_visual_probe_active )
-		return;
-
-	for( int i = 0; i < 3; i++ )
-	{
-		center[i] = RI.rvp.vieworigin[i] + RI.vforward[i] * 64.0f;
-		vertices[0][i] = center[i] - RI.vright[i] * 28.0f - RI.vup[i] * 20.0f;
-		vertices[1][i] = center[i] + RI.vright[i] * 28.0f - RI.vup[i] * 20.0f;
-		vertices[2][i] = center[i] + RI.vup[i] * 28.0f;
-	}
-
-	// Reassert the world matrices explicitly, then submit one known primitive.
-	// Depth is disabled so the triangle tests projection and vertex submission
-	// independently of whatever the Diffusion world left in the depth buffer.
-	pglDisable( GL_SCISSOR_TEST );
-	pglColorMask( GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE );
-	pglMatrixMode( GL_PROJECTION );
-	GL_LoadMatrix( RI.projectionMatrix );
-	pglMatrixMode( GL_MODELVIEW );
-	GL_LoadMatrix( RI.worldviewMatrix );
-	pglDisable( GL_TEXTURE_2D );
-	pglDisable( GL_CULL_FACE );
-	pglDisable( GL_DEPTH_TEST );
-	pglDisable( GL_ALPHA_TEST );
-	pglDisable( GL_BLEND );
-	pglDisable( GL_FOG );
-	pglColor4ub( 0, 255, 255, 255 );
-	pglBegin( GL_TRIANGLES );
-	pglVertex3fv( vertices[0] );
-	pglVertex3fv( vertices[1] );
-	pglVertex3fv( vertices[2] );
-	pglEnd();
-	pglFinish();
-}
-
-static void R_IOSVisualProbePresent( void )
-{
-	if( !ios_visual_probe_active )
-		return;
-
-	pglEnable( GL_SCISSOR_TEST );
-	pglScissor( 0, 0, gpGlobals->width / 16, gpGlobals->height );
-	pglColorMask( GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE );
-	pglClearColor( 0.0f, 1.0f, 0.0f, 1.0f );
-	pglClear( GL_COLOR_BUFFER_BIT );
-	pglDisable( GL_SCISSOR_TEST );
-	pglFinish();
-}
 #endif
 
 static int R_RankForRenderMode( int rendermode )
@@ -1060,9 +996,6 @@ void R_RenderScene( void )
 #endif
 	R_SetupGL( true );
 	R_Clear( ~0 );
-#if XASH_APPLE
-	R_IOSVisualProbeSceneBegin();
-#endif
 
 	R_MarkLeaves();
 	R_DrawFog ();
@@ -1085,10 +1018,6 @@ void R_RenderScene( void )
 	R_DrawEntitiesOnList();
 
 	R_DrawWaterSurfaces();
-
-#if XASH_APPLE
-	R_IOSVisualProbeGeometry();
-#endif
 }
 
 void R_GammaChanged( qboolean do_reset_gamma )
@@ -1196,7 +1125,6 @@ void R_RenderFrame( const ref_viewpass_t *rvp )
 		Q_strncpy( ios_renderer_trace_map, world_name, sizeof( ios_renderer_trace_map ));
 		ios_renderer_trace_frames = 3;
 		ios_present_trace_frames = 3;
-		ios_visual_probe_active = Q_stricmp( world_name, "<none>" ) && Q_stricmp( world_name, "maps/menux.bsp" );
 		gEngfuncs.Con_Printf( "iOS GLES map: %s surfaces=%d leafs=%d nodes=%d entities=%u norefresh=%.0f custom=%d\n",
 			ios_renderer_trace_map,
 			WORLDMODEL ? WORLDMODEL->numsurfaces : 0,
@@ -1204,8 +1132,6 @@ void R_RenderFrame( const ref_viewpass_t *rvp )
 			WORLDMODEL ? WORLDMODEL->numnodes : 0,
 			tr.draw_list ? r_numEntities : 0, r_norefresh->value,
 			gEngfuncs.drawFuncs->GL_RenderFrame != NULL );
-		if( ios_visual_probe_active )
-			gEngfuncs.Con_Printf( "iOS visual probe: magenta scene-start, cyan 3D triangle, green present strip enabled.\n" );
 	}
 #endif
 
@@ -1282,7 +1208,6 @@ void R_EndFrame( void )
 		R_IOSFramebufferTrace( "before-swap" );
 		ios_present_trace_frames--;
 	}
-	R_IOSVisualProbePresent();
 #endif
 	gEngfuncs.GL_SwapBuffers();
 }
