@@ -28,6 +28,7 @@ ref_instance_t	RI;
 #if XASH_APPLE
 static string ios_renderer_trace_map;
 static int ios_renderer_trace_frames;
+static int ios_present_trace_frames;
 #endif
 
 static int R_RankForRenderMode( int rendermode )
@@ -1126,6 +1127,7 @@ void R_RenderFrame( const ref_viewpass_t *rvp )
 	{
 		Q_strncpy( ios_renderer_trace_map, world_name, sizeof( ios_renderer_trace_map ));
 		ios_renderer_trace_frames = 3;
+		ios_present_trace_frames = 3;
 		gEngfuncs.Con_Printf( "iOS GLES map: %s surfaces=%d leafs=%d nodes=%d entities=%u norefresh=%.0f custom=%d\n",
 			ios_renderer_trace_map,
 			WORLDMODEL ? WORLDMODEL->numsurfaces : 0,
@@ -1199,6 +1201,19 @@ void R_EndFrame( void )
 #endif
 	// flush any remaining 2D bits
 	R_Set2DMode( false );
+#if XASH_APPLE
+	if( ios_present_trace_frames > 0 )
+	{
+		byte pixel[4];
+		int x = RI.rvp.viewport[0] + RI.rvp.viewport[2] / 2;
+		int y = RI.rvp.viewport[1] + RI.rvp.viewport[3] / 2;
+
+		pglReadPixels( x, y, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixel );
+		gEngfuncs.Con_Printf( "iOS present trace[%d]: center=%u,%u,%u,%u glerr=0x%x\n",
+			4 - ios_present_trace_frames, pixel[0], pixel[1], pixel[2], pixel[3], pglGetError() );
+		ios_present_trace_frames--;
+	}
+#endif
 	gEngfuncs.GL_SwapBuffers();
 }
 
