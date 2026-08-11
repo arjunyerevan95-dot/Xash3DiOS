@@ -994,6 +994,19 @@ static qboolean GL_UploadTexture( gl_texture_t *tex, rgbdata_t *pic )
 	GL_SetTextureDimensions( tex, pic->width, pic->height, pic->depth );
 	GL_SetTextureFormat( tex, pic->type, pic->flags );
 
+	// Block-compressed payloads cannot be resampled by changing only their
+	// dimensions. Refuse a mismatched upload instead of letting a renderer
+	// decode beyond the source buffer. This also protects genuine max-size
+	// reductions on hardware that cannot accept the original dimensions.
+	if( ImageCompressed( pic->type ) &&
+		( tex->width != pic->width || tex->height != pic->height || tex->depth != pic->depth ))
+	{
+		gEngfuncs.Con_Printf( S_ERROR "%s: compressed texture dimensions changed for %s "
+			"[%ux%ux%u -> %ux%ux%u]\n", __func__, tex->name,
+			pic->width, pic->height, pic->depth, tex->width, tex->height, tex->depth );
+		return false;
+	}
+
 	tex->fogParams[0] = pic->fogParams[0];
 	tex->fogParams[1] = pic->fogParams[1];
 	tex->fogParams[2] = pic->fogParams[2];
@@ -1032,6 +1045,14 @@ static qboolean GL_UploadTexture( gl_texture_t *tex, rgbdata_t *pic )
 				uint depth = texture3d ? Q_max( 1, ( tex->depth >> j )) : tex->depth;
 				texsize = GL_CalcTextureSize( tex->format, width, height, depth );
 				size_t size = gEngfuncs.Image_CalcImageSize( pic->type, width, height, depth );
+				if( buf != NULL && ( buf > bufend || size > (size_t)( bufend - buf )))
+				{
+					gEngfuncs.Con_Printf( S_ERROR "%s: compressed texture buffer overrun for %s "
+						"[side %u mip %u, %ux%ux%u, need %zu, have %zu]\n",
+						__func__, tex->name, i, j, width, height, depth, size,
+						buf > bufend ? 0 : (size_t)( bufend - buf ));
+					return false;
+				}
 				GL_TextureImageCompressed( tex, i, j, width, height, depth, size, buf );
 				tex->size += texsize;
 				buf += size; // move pointer
