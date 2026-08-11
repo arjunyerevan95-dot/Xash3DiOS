@@ -23,6 +23,18 @@ GNU General Public License for more details.
 	#define APIENTRY_LINKAGE extern
 #endif
 
+/*
+ * Darwin does not support the ELF-style aliases GL4ES normally uses to
+ * expose gl* entry points from its gl4es_gl* implementation symbols.  Use
+ * GL4ES's generated compile-time namespace mapping instead, so both the
+ * declarations below and all renderer calls bind directly to the static
+ * library's real symbols on Apple platforms.
+ */
+#if XASH_GL4ES && defined( __APPLE__ )
+	#define MANGLE( name ) gl4es_gl##name
+	#include "gl4es/include/GL/gl_mangle.h"
+#endif
+
 #if XASH_NANOGL || XASH_WES || XASH_REGAL
 	#define XASH_GLES 1
 	#define XASH_GL_STATIC 1
