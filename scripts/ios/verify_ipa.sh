@@ -80,7 +80,9 @@ for wo43_client_marker in \
 	'WO43 GL interval begin:' \
 	'WO43 GL phase transition:' \
 	'WO43 GL exact first failure:' \
-	'WO43 init heartbeat:' \
+	'WO43 GL attribution gap:' \
+	'WO43 init phase: state=begin' \
+	'WO43 init phase: state=end' \
 	'WO43 init gap:'; do
 	if ! grep -q "$wo43_client_marker" "$DIFFUSION_CLIENT_STRINGS"; then
 		echo "Diffusion client is missing WO43 marker: $wo43_client_marker" >&2
@@ -130,14 +132,16 @@ if ! grep -q 'iOS liveness instrumentation: host, screen, renderer, foliage, flu
 	exit 1
 fi
 
-if ! grep -q 'iOS display audit policy: gameplay_frames=12 baseline=pre-world checksum=5x4x4 sentinel=disabled' "$ENGINE_STRINGS"; then
-	echo "Engine was built without the bounded display-audit policy" >&2
+if ! grep -q 'iOS display audit policy: gl_attribution_frames=12 init_timeout_seconds=120 native_sample_seconds=2 baseline=pre-world checksum=5x4x4 sentinel=disabled' "$ENGINE_STRINGS"; then
+	echo "Engine was built without independent GL-attribution and initialization windows" >&2
 	exit 1
 fi
 
 for wo43_engine_marker in \
 	'WO43 Phase B diagnostics:' \
 	'WO43 init timing:' \
+	'WO43 init heartbeat:' \
+	'WO43 init terminal:' \
 	'WO43 native presentation:' \
 	'WO43 normal-scene proof:'; do
 	if ! grep -q "$wo43_engine_marker" "$ENGINE_STRINGS"; then

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the bounded Work Order 43 Phase B iOS diagnostics contract."""
+"""Validate the corrected Work Order 43 Phase B iOS diagnostics contract."""
 
 from __future__ import annotations
 
@@ -9,8 +9,9 @@ import sys
 
 SDL_REF = "5d249570393f7a37e037abf22cd6012a4cc56a71"
 POLICY_MARKER = (
-    "iOS display audit policy: gameplay_frames=12 baseline=pre-world "
-    "checksum=5x4x4 sentinel=disabled present=EAGL_BOOL preserve_bindings=1"
+    "iOS display audit policy: gl_attribution_frames=12 init_timeout_seconds=120 "
+    "native_sample_seconds=2 baseline=pre-world checksum=5x4x4 sentinel=disabled "
+    "present=EAGL_BOOL preserve_bindings=1"
 )
 
 
@@ -49,7 +50,25 @@ def main() -> int:
 
     require(
         host,
-        (POLICY_MARKER, 'GL_IOSDisplayAuditSnapshot( "next-host-frame-entry"'),
+        (
+            POLICY_MARKER,
+            'GL_IOSDisplayAuditSnapshot( "next-host-frame-entry"',
+            "#define IOS_WO43_HEARTBEAT_SECONDS 2.0",
+            "#define IOS_WO43_INIT_TIMEOUT_SECONDS 120.0",
+            "Host_IOSWO43ShouldSampleNative",
+            "now - ios_wo43_last_heartbeat >= IOS_WO43_HEARTBEAT_SECONDS",
+            "ios_wo43_next_native_sample = now + IOS_WO43_HEARTBEAT_SECONDS",
+            "Host_IOSWO43RecordNativePresentation",
+            "Host_IOSWO43PrintCounters( \"WO43 init heartbeat:\"",
+            "Host_IOSWO43Terminal( \"timeout\" )",
+            'Host_IOSWO43Terminal( "normal-scene" )',
+            'Host_IOSWO43PrintCounters( "WO43 init terminal:"',
+            "last_phase=%s",
+            "last_site=%s",
+            "exact_0x0502=%d",
+            'Cvar_SetValue( "wo43_init_generation"',
+            'Cvar_SetValue( "wo43_init_active", 0.0f )',
+        ),
         "host",
         failures,
     )
@@ -69,7 +88,10 @@ def main() -> int:
         (
             'GL_IOSDisplayAuditSnapshot( "immediately-before-presentation"',
             'GL_IOSDisplayAuditSnapshot( "immediately-after-presentation"',
-            "Host_IOSLivenessActive() && frame <= 12",
+            "Host_IOSWO43ShouldSampleNative( scene_mask )",
+            "Host_IOSWO43InitializationActive()",
+            "Host_IOSWO43RecordNativePresentation",
+            "Host_IOSWO43NormalScene",
             "SDL_XASH_IOSDisplayAuditSnapshot",
             "WO43 native presentation:",
             "WO43 normal-scene proof:",
@@ -109,6 +131,7 @@ def main() -> int:
             f"SDL_REF=${{SDL_REF:-{SDL_REF}}}",
             "sdl2-display-audit-ios.patch",
             "sdl2-wo43-diagnostics-ios.patch",
+            "sdl2-wo43-phase-b-correction-ios.patch",
             "validate-ios-display-audit.py",
         ),
         "pinned SDL build",
@@ -146,10 +169,22 @@ def main() -> int:
     if swap:
         if "glBindRenderbuffer(GL_RENDERBUFFER, viewRenderbuffer)" in swap:
             failures.append("SDL swap: diagnostic candidate must not repair the observed renderbuffer binding")
-        if "auditFrame > 0 && auditFrame <= 12" not in swap:
-            failures.append("SDL swap: drawable work is not bounded to twelve frames")
+        if "if (auditFrame > 0)" not in swap:
+            failures.append("SDL swap: throttled drawable sampling is unavailable beyond frame twelve")
+        if "auditFrame <= 12" in swap:
+            failures.append("SDL swap: initialization sampling is still truncated at frame twelve")
         if "xashDrawSentinelForFrame" in swap or "sentinel" in swap.lower():
             failures.append("SDL swap: Phase B must not draw a colored sentinel")
+
+    platform_audit = function(
+        platform,
+        "void GL_IOSDisplayAuditSnapshot",
+        "int GL_SetAttribute",
+        "engine native audit",
+        failures,
+    )
+    if platform_audit and ("frame > 12" in platform_audit or "frame <= 12" in platform_audit):
+        failures.append("engine native audit: normal-scene proof is still frame-twelve limited")
 
     if "SDL_Log(" in sdl_view or "iOS display audit native:" in sdl_view:
         failures.append("SDL audit: native evidence must return to engine Con_Printf, not SDL_Log")
@@ -160,8 +195,8 @@ def main() -> int:
         return 1
 
     print(
-        "WO43 Phase B diagnostics: pinned SDL; twelve gameplay frames; engine-routed POD; "
-        "preserved bindings; drawable checksum; no sentinel; EAGL result"
+        "WO43 Phase B correction: pinned SDL; independent 12-frame GL and 120-second init "
+        "windows; throttled engine-routed POD; terminal summary; preserved bindings; no sentinel"
     )
     return 0
 

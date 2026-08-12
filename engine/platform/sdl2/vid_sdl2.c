@@ -46,7 +46,6 @@ typedef struct ios_display_audit_result_s
 
 extern int SDLCALL SDL_XASH_IOSDisplayAuditSnapshot( SDL_Window *window, const char *stage,
 	Uint32 frame, void *result, Uint32 resultSize );
-static qboolean ios_wo43_normal_scene_logged;
 #endif
 static struct
 {
@@ -822,7 +821,9 @@ void GL_SwapBuffers( void )
 {
 #if XASH_IOS
 	const unsigned int frame = Host_IOSLivenessFrameNumber();
-	const qboolean audit = Host_IOSLivenessActive() && frame <= 12;
+	const int scene_mask = Cvar_VariableInteger( "wo43_scene_submission" );
+	const qboolean audit = ( Host_IOSLivenessActive() && frame <= 12 ) ||
+		Host_IOSWO43ShouldSampleNative( scene_mask );
 
 	if( audit )
 		GL_IOSDisplayAuditSnapshot( "immediately-before-presentation", frame );
@@ -840,14 +841,20 @@ void GL_IOSDisplayAuditSnapshot( const char *stage, unsigned int frame )
 	ios_display_audit_result_t result;
 	const int scene_mask = Cvar_VariableInteger( "wo43_scene_submission" );
 	const qboolean after_present = stage && !Q_stricmp( stage, "immediately-after-presentation" );
+	const qboolean presentation_stage = after_present ||
+		( stage && !Q_stricmp( stage, "immediately-before-presentation" ) );
 
-	if( !host.hWnd || !stage || frame == 0 || frame > 12 )
+	if( !host.hWnd || !stage || frame == 0 ||
+		( !Host_IOSLivenessActive() &&
+		( !presentation_stage || !Host_IOSWO43InitializationActive() ) ) )
 		return;
 
 	memset( &result, 0, sizeof( result ));
 	if( !SDL_XASH_IOSDisplayAuditSnapshot( host.hWnd, stage, (Uint32)frame, &result, sizeof( result )) || !result.available )
 	{
 		Con_Printf( "WO43 native presentation: frame=%u phase=%s captured=unavailable\n", frame, stage );
+		if( after_present )
+			Host_IOSWO43RecordNativePresentation( false, false, false, false, 0, false, 0, false, scene_mask );
 		return;
 	}
 
@@ -863,13 +870,18 @@ void GL_IOSDisplayAuditSnapshot( const char *stage, unsigned int frame )
 		result.prePresentChecksum, result.checksumChanged, result.presentAttempted,
 		result.presentResult, scene_mask, cls.state, cls.signon, UI_IsVisible(), Host_IOSWO43Elapsed() );
 
-	if( after_present && !ios_wo43_normal_scene_logged && result.presentResult && result.checksumChanged &&
+	if( after_present )
+		Host_IOSWO43RecordNativePresentation( true, result.presentAttempted, result.presentResult,
+			result.baselineValid, result.baselineChecksum, result.prePresentChecksumValid,
+			result.prePresentChecksum, result.checksumChanged, scene_mask );
+
+	if( after_present && Host_IOSWO43InitializationActive() && result.presentResult && result.checksumChanged &&
 		FBitSet( scene_mask, 1 ) && FBitSet( scene_mask, 2 ) && cls.state == ca_active && cls.signon == SIGNONS )
 	{
-		ios_wo43_normal_scene_logged = true;
 		Con_Printf( "WO43 normal-scene proof: frame=%u elapsed=%.3f engine_active=1 signon=%d scene_mask=0x%x world=1 brush=1 studio=%d present=1 baseline=0x%08x checksum_pre=0x%08x changed=1 sentinel=disabled\n",
 			frame, Host_IOSWO43Elapsed(), cls.signon, scene_mask, FBitSet( scene_mask, 4 ) ? 1 : 0,
 			result.baselineChecksum, result.prePresentChecksum );
+		Host_IOSWO43NormalScene();
 	}
 }
 #endif

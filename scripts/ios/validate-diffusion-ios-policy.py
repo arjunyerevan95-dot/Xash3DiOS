@@ -48,6 +48,9 @@ def main() -> int:
     backend_source = (pathlib.Path(sys.argv[1]) / "client" / "render" / "r_backend.cpp").read_text(
         encoding="utf-8", errors="strict"
     )
+    local_source = (pathlib.Path(sys.argv[1]) / "client" / "render" / "r_local.h").read_text(
+        encoding="utf-8", errors="strict"
+    )
     failures: list[str] = []
 
     boundaries = (
@@ -105,10 +108,18 @@ def main() -> int:
             "WO43 GL interval begin:",
             "WO43 GL phase transition:",
             "WO43 GL exact first failure:",
-            "WO43 init heartbeat:",
+            "WO43 GL attribution gap:",
+            "WO43 init phase: state=begin",
+            "WO43 init phase: state=end",
             "WO43 init gap:",
+            "WO43_SyncInitialization",
+            "WO43_PublishCounters",
             "WO43_ShaderLookup",
             "WO43_RecordSubmission",
+            'CVAR_GET_FLOAT( "wo43_init_generation" )',
+            'CVAR_GET_FLOAT( "wo43_init_active" )',
+            'CVAR_SET_FLOAT( "wo43_diag_world_submissions"',
+            "coverage=selected-preclean-sites",
             "tracer=stopped",
         ),
         "r_backend.cpp": (
@@ -117,6 +128,9 @@ def main() -> int:
             "R_AllocFrameBuffer/draw-buffer",
         ),
         "r_shader.cpp": (
+            'WO43_PhaseBegin( 2, "shader-translation"',
+            'WO43_PhaseBegin( 3, "shader-compile"',
+            'WO43_PhaseBegin( 4, "shader-link"',
             "WO43_ShaderTranslate",
             "WO43_ShaderCompile",
             "WO43_ShaderLink",
@@ -127,6 +141,7 @@ def main() -> int:
             "R_DrawBrushList/final-batch",
         ),
         "r_grass.cpp": (
+            'WO43_PhaseBegin( 5, "foliage-construction"',
             "WO43_FoliageDuplicateAvoided",
             "WO43_FoliageConstructed",
         ),
@@ -143,6 +158,39 @@ def main() -> int:
             if token not in sources[filename]:
                 failures.append(f"{filename}: missing WO43 Phase B token {token!r}")
 
+    begin_frame = main_source[main_source.find("void WO43_BeginFrame"):main_source.find("static void WO43_AttributionGap")]
+    end_frame = main_source[main_source.find("void WO43_EndFrame"):main_source.find("#endif", main_source.find("void WO43_EndFrame"))]
+    sync = main_source[main_source.find("static bool WO43_SyncInitialization"):main_source.find("static void WO43_PublishCounters")]
+    if "frame <= 12" not in begin_frame or "wo43.glActive" not in begin_frame:
+        failures.append("r_main.cpp: GL attribution is not independently bounded to twelve frames")
+    if "frame > 12" in end_frame or "frame <= 12" in end_frame:
+        failures.append("r_main.cpp: initialization accounting is still frame-twelve limited")
+    if "if( wo43.initGeneration != generation )" not in sync or "memset( &wo43, 0" not in sync:
+        failures.append("r_main.cpp: cumulative counters are not reset solely on command generation change")
+    if main_source.count("memset( &wo43, 0") != 1:
+        failures.append("r_main.cpp: diagnostics state has a reset outside the command-generation transition")
+    if "WO43 init heartbeat:" in main_source:
+        failures.append("r_main.cpp: per-frame heartbeat remains in Diffusion instead of the engine two-second clock")
+
+    require_preclean = (
+        "WO43_GLCallBegin( site, __func__, __FILE__, __LINE__, api, args )",
+        "WO43_GLCallSite( site, __func__, __FILE__, __LINE__, api, args, wo43_preclean )",
+    )
+    for token in require_preclean:
+        if token not in local_source:
+            failures.append(f"r_local.h: missing pre-call exact-attribution guard {token!r}")
+
+    wrapped_calls = sum(
+        text.count("WO43_GL_CALL(")
+        for text in (backend_source, source, world_source)
+    )
+    if wrapped_calls < 15:
+        failures.append(
+            f"WO43 coverage audit: only {wrapped_calls} source-owned GL calls are wrapped; expected at least 15"
+        )
+    if "exact_first=0" not in main_source or "unwrapped-operation-inside-phase" not in main_source:
+        failures.append("WO43 coverage audit: uncovered operations do not fall back honestly to the smallest phase")
+
     if failures:
         for failure in failures:
             print(f"error: {failure}", file=sys.stderr)
@@ -150,7 +198,7 @@ def main() -> int:
 
     print(
         "Diffusion iOS policy: shared animated-model key; one-bone rigid key retained; "
-        "bounded foliage/world liveness enabled"
+        f"independent init accounting; selected preclean GL coverage={wrapped_calls}; phase fallback enabled"
     )
     return 0
 

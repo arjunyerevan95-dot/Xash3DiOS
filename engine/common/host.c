@@ -642,28 +642,213 @@ static qboolean Host_FilterTime( double time )
 
 #if XASH_APPLE
 #define IOS_LIVENESS_TRACE_FRAMES 12
-#define IOS_LIVENESS_HEARTBEAT_SECONDS 2.0
+#define IOS_WO43_HEARTBEAT_SECONDS 2.0
+#define IOS_WO43_INIT_TIMEOUT_SECONDS 120.0
+
+typedef struct ios_wo43_native_state_s
+{
+	qboolean captured;
+	qboolean presentAttempted;
+	qboolean presentResult;
+	qboolean baselineValid;
+	qboolean checksumValid;
+	qboolean checksumChanged;
+	uint32_t baselineChecksum;
+	uint32_t checksum;
+	int sceneMask;
+} ios_wo43_native_state_t;
 
 static string ios_liveness_world;
 static qboolean ios_liveness_armed;
 static unsigned int ios_liveness_frame;
 static unsigned int ios_liveness_returned_frames;
 static int ios_liveness_trace_frames;
-static double ios_liveness_last_heartbeat;
 static double ios_wo43_command_time;
+static double ios_wo43_last_heartbeat;
+static double ios_wo43_next_native_sample;
 static qboolean ios_wo43_command_active;
+static qboolean ios_wo43_world_brush_sampled;
+static unsigned int ios_wo43_generation;
+static ios_wo43_native_state_t ios_wo43_native;
+
+static const char *Host_IOSWO43PhaseName( int phase )
+{
+	switch( phase )
+	{
+	case 1: return "shader-cache-lookup";
+	case 2: return "shader-translation";
+	case 3: return "shader-compile";
+	case 4: return "shader-link";
+	case 5: return "foliage-construction";
+	case 6: return "cubemap-load-rebuild";
+	case 7: return "R_RenderScene";
+	default: return "none";
+	}
+}
+
+static const char *Host_IOSWO43SiteName( int site )
+{
+	switch( site )
+	{
+	case 1: return "GL_FindUberShader";
+	case 2: return "GL_LoadGPUShader/GL_ProcessShader";
+	case 3: return "GL_LoadGPUShader/glCompileShader";
+	case 4: return "GL_LinkProgram/glLinkProgram";
+	case 5: return "R_ConstructGrass";
+	case 6: return "HUD_RenderFrame/GL_LoadAndRebuildCubemaps";
+	case 7: return "HUD_RenderFrame/R_RenderScene";
+	default: return "none";
+	}
+}
+
+static void Host_IOSWO43ResetTransport( void )
+{
+	static const char *transport[] =
+	{
+		"wo43_init_generation", "wo43_init_start_time", "wo43_init_active",
+		"wo43_scene_submission", "wo43_diag_shader_hits", "wo43_diag_shader_misses",
+		"wo43_diag_shader_lookup_seconds", "wo43_diag_shader_translations",
+		"wo43_diag_shader_translate_seconds", "wo43_diag_shader_compiles",
+		"wo43_diag_shader_compile_seconds", "wo43_diag_shader_links",
+		"wo43_diag_shader_link_seconds", "wo43_diag_foliage_constructed",
+		"wo43_diag_foliage_seconds", "wo43_diag_foliage_duplicates",
+		"wo43_diag_world_submissions", "wo43_diag_brush_submissions",
+		"wo43_diag_studio_submissions", "wo43_diag_last_phase",
+		"wo43_diag_last_site", "wo43_diag_phase_open", "wo43_diag_phase_errors",
+		"wo43_diag_stale_errors", "wo43_diag_exact_0502"
+	};
+	size_t i;
+
+	for( i = 0; i < ARRAYSIZE( transport ); ++i )
+	{
+		Cvar_Get( transport[i], "0", 0, "Work Order 43 diagnostics transport" );
+		Cvar_SetValue( transport[i], 0.0f );
+	}
+
+	Cvar_SetValue( "wo43_init_generation", (float)ios_wo43_generation );
+	Cvar_SetValue( "wo43_init_start_time", (float)ios_wo43_command_time );
+	Cvar_SetValue( "wo43_init_active", 1.0f );
+}
+
+static void Host_IOSWO43PrintCounters( const char *marker, const char *result, double elapsed )
+{
+	const int phase = Cvar_VariableInteger( "wo43_diag_last_phase" );
+	const int site = Cvar_VariableInteger( "wo43_diag_last_site" );
+
+	Con_Printf( "%s result=%s generation=%u elapsed=%.3f timeout=%.0f frame=%u last_phase=%s last_phase_id=%d last_site=%s last_site_id=%d phase_open=%d shader_hit=%d miss=%d lookup=%.3fs translate=%d/%.3fs compile=%d/%.3fs link=%d/%.3fs foliage_construct=%d/%.3fs duplicate_avoided=%d world=%d brush=%d studio=%d phase_errors=%d stale_drained=%d exact_0x0502=%d attribution_coverage=selected-preclean-sites native_captured=%d present_attempted=%d present_result=%d baseline_valid=%d baseline=0x%08x checksum_valid=%d checksum=0x%08x changed=%d scene_mask=0x%x\n",
+		marker, result, ios_wo43_generation, elapsed, IOS_WO43_INIT_TIMEOUT_SECONDS,
+		ios_liveness_frame, Host_IOSWO43PhaseName( phase ), phase,
+		Host_IOSWO43SiteName( site ), site,
+		Cvar_VariableInteger( "wo43_diag_phase_open" ),
+		Cvar_VariableInteger( "wo43_diag_shader_hits" ),
+		Cvar_VariableInteger( "wo43_diag_shader_misses" ),
+		Cvar_VariableValue( "wo43_diag_shader_lookup_seconds" ),
+		Cvar_VariableInteger( "wo43_diag_shader_translations" ),
+		Cvar_VariableValue( "wo43_diag_shader_translate_seconds" ),
+		Cvar_VariableInteger( "wo43_diag_shader_compiles" ),
+		Cvar_VariableValue( "wo43_diag_shader_compile_seconds" ),
+		Cvar_VariableInteger( "wo43_diag_shader_links" ),
+		Cvar_VariableValue( "wo43_diag_shader_link_seconds" ),
+		Cvar_VariableInteger( "wo43_diag_foliage_constructed" ),
+		Cvar_VariableValue( "wo43_diag_foliage_seconds" ),
+		Cvar_VariableInteger( "wo43_diag_foliage_duplicates" ),
+		Cvar_VariableInteger( "wo43_diag_world_submissions" ),
+		Cvar_VariableInteger( "wo43_diag_brush_submissions" ),
+		Cvar_VariableInteger( "wo43_diag_studio_submissions" ),
+		Cvar_VariableInteger( "wo43_diag_phase_errors" ),
+		Cvar_VariableInteger( "wo43_diag_stale_errors" ),
+		Cvar_VariableInteger( "wo43_diag_exact_0502" ),
+		ios_wo43_native.captured, ios_wo43_native.presentAttempted,
+		ios_wo43_native.presentResult, ios_wo43_native.baselineValid,
+		ios_wo43_native.baselineChecksum, ios_wo43_native.checksumValid,
+		ios_wo43_native.checksum, ios_wo43_native.checksumChanged,
+		ios_wo43_native.sceneMask );
+}
+
+static void Host_IOSWO43Terminal( const char *result )
+{
+	double elapsed;
+
+	if( !ios_wo43_command_active )
+		return;
+
+	elapsed = Platform_DoubleTime() - ios_wo43_command_time;
+	Host_IOSWO43PrintCounters( "WO43 init terminal:", result, elapsed );
+	ios_wo43_command_active = false;
+	Cvar_SetValue( "wo43_init_active", 0.0f );
+}
 
 void Host_IOSWO43Command( const char *command )
 {
 	ios_wo43_command_time = Platform_DoubleTime();
+	ios_wo43_last_heartbeat = ios_wo43_command_time;
+	ios_wo43_next_native_sample = ios_wo43_command_time;
 	ios_wo43_command_active = true;
-	Con_Printf( "WO43 init timing: milestone=difficulty-command elapsed=0.000 command=%s\n",
-		command ? command : "unavailable" );
+	ios_wo43_world_brush_sampled = false;
+	ios_wo43_generation++;
+	if( ios_wo43_generation == 0 )
+		ios_wo43_generation = 1;
+	memset( &ios_wo43_native, 0, sizeof( ios_wo43_native ));
+	ios_liveness_armed = false;
+	ios_liveness_frame = 0;
+	ios_liveness_returned_frames = 0;
+	ios_liveness_trace_frames = 0;
+	Host_IOSWO43ResetTransport();
+	Con_Printf( "WO43 init timing: milestone=difficulty-command generation=%u elapsed=0.000 timeout=120.000 command=%s\n",
+		ios_wo43_generation, command ? command : "unavailable" );
 }
 
 double Host_IOSWO43Elapsed( void )
 {
 	return ios_wo43_command_active ? Platform_DoubleTime() - ios_wo43_command_time : -1.0;
+}
+
+qboolean Host_IOSWO43InitializationActive( void )
+{
+	return ios_wo43_command_active;
+}
+
+qboolean Host_IOSWO43ShouldSampleNative( int scene_mask )
+{
+	const double now = Platform_DoubleTime();
+	const qboolean world_brush = FBitSet( scene_mask, 1 ) && FBitSet( scene_mask, 2 );
+
+	if( !ios_wo43_command_active )
+		return false;
+
+	if( world_brush && !ios_wo43_world_brush_sampled )
+	{
+		ios_wo43_world_brush_sampled = true;
+		return true;
+	}
+
+	if( now >= ios_wo43_next_native_sample )
+	{
+		ios_wo43_next_native_sample = now + IOS_WO43_HEARTBEAT_SECONDS;
+		return true;
+	}
+
+	return false;
+}
+
+void Host_IOSWO43RecordNativePresentation( qboolean captured, qboolean present_attempted,
+	qboolean present_result, qboolean baseline_valid, uint32_t baseline_checksum,
+	qboolean checksum_valid, uint32_t checksum, qboolean checksum_changed, int scene_mask )
+{
+	ios_wo43_native.captured = captured;
+	ios_wo43_native.presentAttempted = present_attempted;
+	ios_wo43_native.presentResult = present_result;
+	ios_wo43_native.baselineValid = baseline_valid;
+	ios_wo43_native.baselineChecksum = baseline_checksum;
+	ios_wo43_native.checksumValid = checksum_valid;
+	ios_wo43_native.checksum = checksum;
+	ios_wo43_native.checksumChanged = checksum_changed;
+	ios_wo43_native.sceneMask = scene_mask;
+}
+
+void Host_IOSWO43NormalScene( void )
+{
+	Host_IOSWO43Terminal( "normal-scene" );
 }
 
 void Host_IOSLivenessArm( const char *world_name )
@@ -676,16 +861,15 @@ void Host_IOSLivenessArm( const char *world_name )
 	ios_liveness_frame = 1;
 	ios_liveness_returned_frames = 0;
 	ios_liveness_trace_frames = IOS_LIVENESS_TRACE_FRAMES;
-	ios_liveness_last_heartbeat = Platform_DoubleTime();
 
-	Con_Printf( "iOS liveness instrumentation: host, screen, renderer, foliage, flush, swap/present; bounded_frames=%d heartbeat_seconds=%.0f\n",
-		IOS_LIVENESS_TRACE_FRAMES, IOS_LIVENESS_HEARTBEAT_SECONDS );
-	Con_Printf( "iOS display audit policy: gameplay_frames=12 baseline=pre-world checksum=5x4x4 sentinel=disabled present=EAGL_BOOL preserve_bindings=1\n" );
-	Con_Printf( "WO43 Phase B diagnostics: native_result=engine_routed first_error=hierarchical sentinel=disabled behavior_policy=unchanged\n" );
-	Con_Printf( "WO43 init timing: milestone=map-render-active elapsed=%.3f world=%s\n",
-		Host_IOSWO43Elapsed(), ios_liveness_world );
+	Con_Printf( "iOS liveness instrumentation: host, screen, renderer, foliage, flush, swap/present; gl_attribution_frames=%d init_timeout_seconds=120 heartbeat_seconds=2\n",
+		IOS_LIVENESS_TRACE_FRAMES );
+	Con_Printf( "iOS display audit policy: gl_attribution_frames=12 init_timeout_seconds=120 native_sample_seconds=2 baseline=pre-world checksum=5x4x4 sentinel=disabled present=EAGL_BOOL preserve_bindings=1\n" );
+	Con_Printf( "WO43 Phase B diagnostics: native_result=engine_routed gl_window=12 init_window=proof-or-120s first_error=preclean-selected-sites-with-phase-fallback sentinel=disabled behavior_policy=unchanged\n" );
+	Con_Printf( "WO43 init timing: milestone=map-render-active generation=%u elapsed=%.3f world=%s\n",
+		ios_wo43_generation, Host_IOSWO43Elapsed(), ios_liveness_world );
 	Con_Printf( "iOS liveness host: t=%.3f frame=%u returned=%u stage=arm world=%s\n",
-		ios_liveness_last_heartbeat, ios_liveness_frame, ios_liveness_returned_frames,
+		Platform_DoubleTime(), ios_liveness_frame, ios_liveness_returned_frames,
 		ios_liveness_world );
 }
 
@@ -723,8 +907,6 @@ static void Host_IOSLivenessFrameBegin( void )
 
 static void Host_IOSLivenessFrameEnd( void )
 {
-	double now;
-
 	if( !ios_liveness_armed )
 		return;
 
@@ -732,18 +914,33 @@ static void Host_IOSLivenessFrameEnd( void )
 	ios_liveness_returned_frames++;
 	if( ios_liveness_trace_frames > 0 )
 		ios_liveness_trace_frames--;
+}
+
+static void Host_IOSWO43Tick( void )
+{
+	double now, elapsed;
+
+	if( !ios_wo43_command_active )
+		return;
 
 	now = Platform_DoubleTime();
-	if( now - ios_liveness_last_heartbeat >= IOS_LIVENESS_HEARTBEAT_SECONDS )
+	elapsed = now - ios_wo43_command_time;
+	if( elapsed >= IOS_WO43_INIT_TIMEOUT_SECONDS )
 	{
-		Con_Printf( "iOS liveness host heartbeat: t=%.3f frame=%u returned=%u world=%s\n",
-			now, ios_liveness_frame, ios_liveness_returned_frames, ios_liveness_world );
-		ios_liveness_last_heartbeat = now;
+		Host_IOSWO43Terminal( "timeout" );
+		return;
+	}
+
+	if( now - ios_wo43_last_heartbeat >= IOS_WO43_HEARTBEAT_SECONDS )
+	{
+		Host_IOSWO43PrintCounters( "WO43 init heartbeat:", "active", elapsed );
+		ios_wo43_last_heartbeat = now;
 	}
 }
 #else
 #define Host_IOSLivenessFrameBegin() ((void)0)
 #define Host_IOSLivenessFrameEnd() ((void)0)
+#define Host_IOSWO43Tick() ((void)0)
 #endif
 
 /*
@@ -774,6 +971,7 @@ void Host_Frame( double time )
 	host.framecount++;
 	host.pureframetime = Platform_DoubleTime() - t1;
 	Host_IOSLivenessFrameEnd();
+	Host_IOSWO43Tick();
 }
 
 /*
