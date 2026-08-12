@@ -42,6 +42,12 @@ def main() -> int:
     world_source = (pathlib.Path(sys.argv[1]) / "client" / "render" / "r_world.cpp").read_text(
         encoding="utf-8", errors="strict"
     )
+    main_source = (pathlib.Path(sys.argv[1]) / "client" / "render" / "r_main.cpp").read_text(
+        encoding="utf-8", errors="strict"
+    )
+    backend_source = (pathlib.Path(sys.argv[1]) / "client" / "render" / "r_backend.cpp").read_text(
+        encoding="utf-8", errors="strict"
+    )
     failures: list[str] = []
 
     boundaries = (
@@ -93,6 +99,49 @@ def main() -> int:
 
     if "Surface 648" in grass_source or "Surface 648" in world_source:
         failures.append("foliage instrumentation is overfit to the last observed surface")
+
+    wo43_tokens = {
+        "r_main.cpp": (
+            "WO43 GL interval begin:",
+            "WO43 GL phase transition:",
+            "WO43 GL exact first failure:",
+            "WO43 init heartbeat:",
+            "WO43 init gap:",
+            "WO43_ShaderLookup",
+            "WO43_RecordSubmission",
+            "tracer=stopped",
+        ),
+        "r_backend.cpp": (
+            "R_AllocFrameBuffer/unbind-rb-zero",
+            '"glBindRenderbuffer"',
+            "R_AllocFrameBuffer/draw-buffer",
+        ),
+        "r_shader.cpp": (
+            "WO43_ShaderTranslate",
+            "WO43_ShaderCompile",
+            "WO43_ShaderLink",
+            "GL_BindShader/bind",
+        ),
+        "r_world.cpp": (
+            "HUD/R_RenderScene/R_DrawWorld/R_DrawBrushList",
+            "R_DrawBrushList/final-batch",
+        ),
+        "r_grass.cpp": (
+            "WO43_FoliageDuplicateAvoided",
+            "WO43_FoliageConstructed",
+        ),
+    }
+    sources = {
+        "r_main.cpp": main_source,
+        "r_backend.cpp": backend_source,
+        "r_shader.cpp": source,
+        "r_world.cpp": world_source,
+        "r_grass.cpp": grass_source,
+    }
+    for filename, tokens in wo43_tokens.items():
+        for token in tokens:
+            if token not in sources[filename]:
+                failures.append(f"{filename}: missing WO43 Phase B token {token!r}")
 
     if failures:
         for failure in failures:

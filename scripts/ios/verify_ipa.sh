@@ -76,6 +76,18 @@ if ! grep -q 'iOS world traversal:' "$DIFFUSION_CLIENT_STRINGS"; then
 	exit 1
 fi
 
+for wo43_client_marker in \
+	'WO43 GL interval begin:' \
+	'WO43 GL phase transition:' \
+	'WO43 GL exact first failure:' \
+	'WO43 init heartbeat:' \
+	'WO43 init gap:'; do
+	if ! grep -q "$wo43_client_marker" "$DIFFUSION_CLIENT_STRINGS"; then
+		echo "Diffusion client is missing WO43 marker: $wo43_client_marker" >&2
+		exit 1
+	fi
+done
+
 DIFFUSION_MENU_STRINGS="$VERIFY_ROOT/diffusion-menu.strings"
 strings "$DIFFUSION_MENU_PATH" > "$DIFFUSION_MENU_STRINGS"
 if ! grep -q 'iOS mobile menu policy: decorative background map disabled; UI callbacks remain active' "$DIFFUSION_MENU_STRINGS"; then
@@ -118,10 +130,21 @@ if ! grep -q 'iOS liveness instrumentation: host, screen, renderer, foliage, flu
 	exit 1
 fi
 
-if ! grep -q 'iOS display audit policy: first_gameplay_frames=3' "$ENGINE_STRINGS"; then
+if ! grep -q 'iOS display audit policy: gameplay_frames=12 baseline=pre-world checksum=5x4x4 sentinel=disabled' "$ENGINE_STRINGS"; then
 	echo "Engine was built without the bounded display-audit policy" >&2
 	exit 1
 fi
+
+for wo43_engine_marker in \
+	'WO43 Phase B diagnostics:' \
+	'WO43 init timing:' \
+	'WO43 native presentation:' \
+	'WO43 normal-scene proof:'; do
+	if ! grep -q "$wo43_engine_marker" "$ENGINE_STRINGS"; then
+		echo "Engine is missing WO43 marker: $wo43_engine_marker" >&2
+		exit 1
+	fi
+done
 
 if ! grep -q 'iOS display audit ScreenFade:' "$ENGINE_STRINGS"; then
 	echo "Engine was built without paired ScreenFade diagnostics" >&2
@@ -130,15 +153,10 @@ fi
 
 SDL_STRINGS="$VERIFY_ROOT/sdl.strings"
 strings "$SDL_PATH" > "$SDL_STRINGS"
-for sdl_marker in \
-	'iOS display audit native:' \
-	'iOS display audit drawable:' \
-	'iOS display audit present:'; do
-	if ! grep -q "$sdl_marker" "$SDL_STRINGS"; then
-		echo "SDL was built without required display marker: $sdl_marker" >&2
-		exit 1
-	fi
-done
+if grep -q 'sentinel_bars=' "$SDL_STRINGS"; then
+	echo "SDL still contains the disabled Run-51 sentinel path" >&2
+	exit 1
+fi
 
 SDL_EXPORTS="$VERIFY_ROOT/sdl.exports"
 nm -gU "$SDL_PATH" > "$SDL_EXPORTS"

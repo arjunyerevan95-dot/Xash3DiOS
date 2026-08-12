@@ -650,6 +650,21 @@ static unsigned int ios_liveness_frame;
 static unsigned int ios_liveness_returned_frames;
 static int ios_liveness_trace_frames;
 static double ios_liveness_last_heartbeat;
+static double ios_wo43_command_time;
+static qboolean ios_wo43_command_active;
+
+void Host_IOSWO43Command( const char *command )
+{
+	ios_wo43_command_time = Platform_DoubleTime();
+	ios_wo43_command_active = true;
+	Con_Printf( "WO43 init timing: milestone=difficulty-command elapsed=0.000 command=%s\n",
+		command ? command : "unavailable" );
+}
+
+double Host_IOSWO43Elapsed( void )
+{
+	return ios_wo43_command_active ? Platform_DoubleTime() - ios_wo43_command_time : -1.0;
+}
 
 void Host_IOSLivenessArm( const char *world_name )
 {
@@ -665,7 +680,10 @@ void Host_IOSLivenessArm( const char *world_name )
 
 	Con_Printf( "iOS liveness instrumentation: host, screen, renderer, foliage, flush, swap/present; bounded_frames=%d heartbeat_seconds=%.0f\n",
 		IOS_LIVENESS_TRACE_FRAMES, IOS_LIVENESS_HEARTBEAT_SECONDS );
-	Con_Printf( "iOS display audit policy: first_gameplay_frames=3 baseline=pre-world checksum=5x4x4 sentinel=bars1-3 present=EAGL_BOOL preserve_bindings=1\n" );
+	Con_Printf( "iOS display audit policy: gameplay_frames=12 baseline=pre-world checksum=5x4x4 sentinel=disabled present=EAGL_BOOL preserve_bindings=1\n" );
+	Con_Printf( "WO43 Phase B diagnostics: native_result=engine_routed first_error=hierarchical sentinel=disabled behavior_policy=unchanged\n" );
+	Con_Printf( "WO43 init timing: milestone=map-render-active elapsed=%.3f world=%s\n",
+		Host_IOSWO43Elapsed(), ios_liveness_world );
 	Con_Printf( "iOS liveness host: t=%.3f frame=%u returned=%u stage=arm world=%s\n",
 		ios_liveness_last_heartbeat, ios_liveness_frame, ios_liveness_returned_frames,
 		ios_liveness_world );

@@ -14,6 +14,8 @@ fi
 
 git -C SDL apply --check --unidiff-zero "$GITHUB_WORKSPACE/scripts/ios/sdl2-display-audit-ios.patch" || exit 1
 git -C SDL apply --unidiff-zero "$GITHUB_WORKSPACE/scripts/ios/sdl2-display-audit-ios.patch" || exit 1
+git -C SDL apply --check --unidiff-zero "$GITHUB_WORKSPACE/scripts/ios/sdl2-wo43-diagnostics-ios.patch" || exit 1
+git -C SDL apply --unidiff-zero "$GITHUB_WORKSPACE/scripts/ios/sdl2-wo43-diagnostics-ios.patch" || exit 1
 python3 "$GITHUB_WORKSPACE/scripts/ios/validate-ios-display-audit.py" "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/SDL" || exit 1
 
 cd SDL/Xcode/SDL || exit 1

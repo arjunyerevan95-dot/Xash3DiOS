@@ -30,7 +30,23 @@ static vidmode_t *vidmodes = NULL;
 static int num_vidmodes = 0;
 static void GL_SetupAttributes( void );
 #if XASH_IOS
-extern void SDLCALL SDL_XASH_IOSDisplayAuditSnapshot( SDL_Window *window, const char *stage, Uint32 frame );
+typedef struct ios_display_audit_result_s
+{
+	Uint32 version, size, available, frame;
+	Uint64 sdlContext, eaglCurrent, expectedContext;
+	Uint64 window, uiwindow, rootController, controllerView, view, layer;
+	Uint32 attached, keyWindow, windowHidden, viewHidden, layerHidden;
+	Uint32 drawableWidth, drawableHeight;
+	Uint32 framebuffer, drawFramebuffer, readFramebuffer, renderbuffer;
+	Uint32 expectedDrawFramebuffer, expectedPresentFramebuffer, expectedRenderbuffer;
+	Uint32 checksumStatus, baselineValid, baselineChecksum;
+	Uint32 prePresentChecksumValid, prePresentChecksum, checksumChanged;
+	Uint32 presentAttempted, presentResult;
+} ios_display_audit_result_t;
+
+extern int SDLCALL SDL_XASH_IOSDisplayAuditSnapshot( SDL_Window *window, const char *stage,
+	Uint32 frame, void *result, Uint32 resultSize );
+static qboolean ios_wo43_normal_scene_logged;
 #endif
 static struct
 {
@@ -806,7 +822,7 @@ void GL_SwapBuffers( void )
 {
 #if XASH_IOS
 	const unsigned int frame = Host_IOSLivenessFrameNumber();
-	const qboolean audit = Host_IOSLivenessActive() && frame <= 3;
+	const qboolean audit = Host_IOSLivenessActive() && frame <= 12;
 
 	if( audit )
 		GL_IOSDisplayAuditSnapshot( "immediately-before-presentation", frame );
@@ -821,8 +837,40 @@ void GL_SwapBuffers( void )
 #if XASH_IOS
 void GL_IOSDisplayAuditSnapshot( const char *stage, unsigned int frame )
 {
-	if( host.hWnd && stage && frame > 0 && frame <= 4 )
-		SDL_XASH_IOSDisplayAuditSnapshot( host.hWnd, stage, (Uint32)frame );
+	ios_display_audit_result_t result;
+	const int scene_mask = Cvar_VariableInteger( "wo43_scene_submission" );
+	const qboolean after_present = stage && !Q_stricmp( stage, "immediately-after-presentation" );
+
+	if( !host.hWnd || !stage || frame == 0 || frame > 12 )
+		return;
+
+	memset( &result, 0, sizeof( result ));
+	if( !SDL_XASH_IOSDisplayAuditSnapshot( host.hWnd, stage, (Uint32)frame, &result, sizeof( result )) || !result.available )
+	{
+		Con_Printf( "WO43 native presentation: frame=%u phase=%s captured=unavailable\n", frame, stage );
+		return;
+	}
+
+	Con_Printf( "WO43 native presentation: frame=%u phase=%s captured=1 sdl_ctx=0x%llx eagl_current=0x%llx expected_ctx=0x%llx view=0x%llx layer=0x%llx attached=%u key=%u hidden=%u/%u/%u view_fb=%u view_rb=%u current_fb=%u draw_fb=%u read_fb=%u current_rb=%u drawable=%ux%u checksum_status=0x%04x baseline_valid=%u baseline=0x%08x pre_valid=%u checksum_pre=0x%08x changed=%u present_attempted=%u present_result=%u scene_mask=0x%x state=%d signon=%d ui=%d elapsed=%.3f\n",
+		frame, stage, (unsigned long long)result.sdlContext,
+		(unsigned long long)result.eaglCurrent, (unsigned long long)result.expectedContext,
+		(unsigned long long)result.view, (unsigned long long)result.layer,
+		result.attached, result.keyWindow, result.windowHidden, result.viewHidden, result.layerHidden,
+		result.expectedPresentFramebuffer, result.expectedRenderbuffer, result.framebuffer,
+		result.drawFramebuffer, result.readFramebuffer, result.renderbuffer,
+		result.drawableWidth, result.drawableHeight, result.checksumStatus,
+		result.baselineValid, result.baselineChecksum, result.prePresentChecksumValid,
+		result.prePresentChecksum, result.checksumChanged, result.presentAttempted,
+		result.presentResult, scene_mask, cls.state, cls.signon, UI_IsVisible(), Host_IOSWO43Elapsed() );
+
+	if( after_present && !ios_wo43_normal_scene_logged && result.presentResult && result.checksumChanged &&
+		FBitSet( scene_mask, 1 ) && FBitSet( scene_mask, 2 ) && cls.state == ca_active && cls.signon == SIGNONS )
+	{
+		ios_wo43_normal_scene_logged = true;
+		Con_Printf( "WO43 normal-scene proof: frame=%u elapsed=%.3f engine_active=1 signon=%d scene_mask=0x%x world=1 brush=1 studio=%d present=1 baseline=0x%08x checksum_pre=0x%08x changed=1 sentinel=disabled\n",
+			frame, Host_IOSWO43Elapsed(), cls.signon, scene_mask, FBitSet( scene_mask, 4 ) ? 1 : 0,
+			result.baselineChecksum, result.prePresentChecksum );
+	}
 }
 #endif
 

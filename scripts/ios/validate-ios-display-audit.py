@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the bounded Work Order 42 iOS display discriminator."""
+"""Validate the bounded Work Order 43 Phase B iOS diagnostics contract."""
 
 from __future__ import annotations
 
@@ -9,8 +9,8 @@ import sys
 
 SDL_REF = "5d249570393f7a37e037abf22cd6012a4cc56a71"
 POLICY_MARKER = (
-    "iOS display audit policy: first_gameplay_frames=3 baseline=pre-world "
-    "checksum=5x4x4 sentinel=bars1-3 present=EAGL_BOOL preserve_bindings=1"
+    "iOS display audit policy: gameplay_frames=12 baseline=pre-world "
+    "checksum=5x4x4 sentinel=disabled present=EAGL_BOOL preserve_bindings=1"
 )
 
 
@@ -69,8 +69,12 @@ def main() -> int:
         (
             'GL_IOSDisplayAuditSnapshot( "immediately-before-presentation"',
             'GL_IOSDisplayAuditSnapshot( "immediately-after-presentation"',
-            "Host_IOSLivenessActive() && frame <= 3",
+            "Host_IOSLivenessActive() && frame <= 12",
             "SDL_XASH_IOSDisplayAuditSnapshot",
+            "WO43 native presentation:",
+            "WO43 normal-scene proof:",
+            "presentResult",
+            "prePresentChecksum",
         ),
         "platform presentation boundary",
         failures,
@@ -104,6 +108,7 @@ def main() -> int:
         (
             f"SDL_REF=${{SDL_REF:-{SDL_REF}}}",
             "sdl2-display-audit-ios.patch",
+            "sdl2-wo43-diagnostics-ios.patch",
             "validate-ios-display-audit.py",
         ),
         "pinned SDL build",
@@ -111,26 +116,27 @@ def main() -> int:
     )
     require(
         sdl_gles,
-        ("SDL_XASH_IOSDisplayAuditSnapshot", "xashAuditSnapshotForWindow"),
+        (
+            "SDL_XASH_IOSDisplayAuditSnapshot",
+            "xashAuditSnapshotForWindow",
+            "void *result",
+            "resultSize",
+        ),
         "SDL export",
         failures,
     )
     require(
         sdl_view,
         (
-            "iOS display audit native:",
-            "iOS display audit drawable:",
-            "iOS display audit present:",
             "xashDrawableChecksumWithStatus",
             "XASH_AUDIT_SAMPLE_COUNT 5",
             "XASH_AUDIT_SAMPLE_EDGE 4",
-            "xashDrawSentinelForFrame",
-            "glScissor(sentinelX, sentinelY, 180, 72)",
-            "sentinel_bars=%u",
             "BOOL presentResult = [context presentRenderbuffer:GL_RENDERBUFFER]",
             "xashAuditBaselineChecksum",
-            "checksumBeforeSentinel",
-            "checksumAfterSentinel",
+            "xashAuditPrePresentChecksum",
+            "xashAuditPresentResult",
+            "result->eaglCurrent",
+            "result->expectedPresentFramebuffer",
         ),
         "SDL drawable audit",
         failures,
@@ -138,14 +144,15 @@ def main() -> int:
 
     swap = function(sdl_view, "- (void)swapBuffers", "- (void)layoutSubviews", "SDL swap", failures)
     if swap:
-        if swap.find("checksumBeforeSentinel") > swap.find("xashDrawSentinelForFrame"):
-            failures.append("SDL swap: checksum must precede the sentinel")
-        if swap.find("xashDrawSentinelForFrame") > swap.find("presentRenderbuffer:GL_RENDERBUFFER"):
-            failures.append("SDL swap: sentinel must precede presentation")
         if "glBindRenderbuffer(GL_RENDERBUFFER, viewRenderbuffer)" in swap:
             failures.append("SDL swap: diagnostic candidate must not repair the observed renderbuffer binding")
-        if "auditFrame > 0 && auditFrame <= 3" not in swap:
-            failures.append("SDL swap: drawable work is not bounded to three frames")
+        if "auditFrame > 0 && auditFrame <= 12" not in swap:
+            failures.append("SDL swap: drawable work is not bounded to twelve frames")
+        if "xashDrawSentinelForFrame" in swap or "sentinel" in swap.lower():
+            failures.append("SDL swap: Phase B must not draw a colored sentinel")
+
+    if "SDL_Log(" in sdl_view or "iOS display audit native:" in sdl_view:
+        failures.append("SDL audit: native evidence must return to engine Con_Printf, not SDL_Log")
 
     if failures:
         for failure in failures:
@@ -153,8 +160,8 @@ def main() -> int:
         return 1
 
     print(
-        "iOS display audit policy: pinned SDL; three gameplay frames; preserved bindings; "
-        "paired native/GL4ES state; drawable checksum; sentinel; EAGL result"
+        "WO43 Phase B diagnostics: pinned SDL; twelve gameplay frames; engine-routed POD; "
+        "preserved bindings; drawable checksum; no sentinel; EAGL result"
     )
     return 0
 

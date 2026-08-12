@@ -589,6 +589,8 @@ void Host_IOSLivenessArm( const char *world_name );
 qboolean Host_IOSLivenessActive( void );
 unsigned int Host_IOSLivenessFrameNumber( void );
 void Host_IOSLivenessStage( const char *subsystem, const char *stage );
+void Host_IOSWO43Command( const char *command );
+double Host_IOSWO43Elapsed( void );
 #endif
 
 //

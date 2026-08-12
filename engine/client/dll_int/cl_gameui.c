@@ -674,6 +674,11 @@ static void GAME_EXPORT pfnClientCmd( int exec_now, const char *szCmdString )
 	if( !szCmdString || !szCmdString[0] )
 		return;
 
+#if XASH_APPLE
+	if( !Q_strnicmp( szCmdString, "newgame", 7 ) || !Q_strnicmp( szCmdString, "map ", 4 ))
+		Host_IOSWO43Command( szCmdString );
+#endif
+
 	Cbuf_AddText( szCmdString );
 	Cbuf_AddText( "\n" );
 
