@@ -29,6 +29,9 @@ GNU General Public License for more details.
 static vidmode_t *vidmodes = NULL;
 static int num_vidmodes = 0;
 static void GL_SetupAttributes( void );
+#if XASH_IOS
+extern void SDLCALL SDL_XASH_IOSDisplayAuditSnapshot( SDL_Window *window, const char *stage, Uint32 frame );
+#endif
 static struct
 {
 	int prev_width, prev_height;
@@ -801,8 +804,27 @@ static void GL_SetupAttributes( void )
 
 void GL_SwapBuffers( void )
 {
+#if XASH_IOS
+	const unsigned int frame = Host_IOSLivenessFrameNumber();
+	const qboolean audit = Host_IOSLivenessActive() && frame <= 3;
+
+	if( audit )
+		GL_IOSDisplayAuditSnapshot( "immediately-before-presentation", frame );
+#endif
 	SDL_GL_SwapWindow( host.hWnd );
+#if XASH_IOS
+	if( audit )
+		GL_IOSDisplayAuditSnapshot( "immediately-after-presentation", frame );
+#endif
 }
+
+#if XASH_IOS
+void GL_IOSDisplayAuditSnapshot( const char *stage, unsigned int frame )
+{
+	if( host.hWnd && stage && frame > 0 && frame <= 4 )
+		SDL_XASH_IOSDisplayAuditSnapshot( host.hWnd, stage, (Uint32)frame );
+}
+#endif
 
 int GL_SetAttribute( int attr, int val )
 {

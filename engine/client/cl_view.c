@@ -496,9 +496,14 @@ void V_RenderView( void )
 	Host_IOSLivenessArm( ios_world_name );
 	Host_IOSLivenessStage( "render-view", "begin" );
 	if( Host_IOSLivenessActive( ))
+	{
 		Con_Printf( "iOS liveness UI: t=%.3f frame=%u active=%d renderworld=%.0f background=%d state=%d signon=%d\n",
 			Platform_DoubleTime(), Host_IOSLivenessFrameNumber(), UI_IsVisible(),
 			ui_renderworld.value, cl.background, cls.state, cls.signon );
+#if XASH_IOS
+		GL_IOSDisplayAuditSnapshot( "engine-frame-entry", Host_IOSLivenessFrameNumber() );
+#endif
+	}
 #endif
 
 	V_CalcViewRect ();	// compute viewport rectangle
@@ -541,9 +546,15 @@ void V_RenderView( void )
 
 		#if XASH_APPLE
 		Host_IOSLivenessStage( "renderer-dispatch", "begin" );
+		#if XASH_IOS
+		GL_IOSDisplayAuditSnapshot( "before-renderer-dispatch", Host_IOSLivenessFrameNumber() );
+		#endif
 		#endif
 		GL_RenderFrame( &rvp );
 		#if XASH_APPLE
+		#if XASH_IOS
+		GL_IOSDisplayAuditSnapshot( "after-renderer-dispatch", Host_IOSLivenessFrameNumber() );
+		#endif
 		Host_IOSLivenessStage( "renderer-dispatch", "end" );
 		#endif
 		IOS_MAP_TRACE( "after renderer" );
@@ -740,6 +751,11 @@ void V_PostRender( void )
 		IOS_POST_TRACE( "touch" );
 		OSK_Draw();
 		IOS_POST_TRACE( "osk" );
+
+#if XASH_IOS
+		if( Host_IOSLivenessActive() )
+			GL_IOSDisplayAuditSnapshot( "after-2d-hud-menu-touch", Host_IOSLivenessFrameNumber() );
+#endif
 
 		S_ExtraUpdate();
 		IOS_POST_TRACE( "extra-audio" );

@@ -35,10 +35,68 @@ static unsigned int ios_swap_attempts;
 static unsigned int ios_presented_frames;
 static double ios_present_heartbeat;
 
+#define IOS_GL_FRAMEBUFFER_BINDING 0x8CA6
+#define IOS_GL_RENDERBUFFER_BINDING 0x8CA7
+
+static void R_IOSDrainGLErrors( char *buffer, size_t buffer_size )
+{
+	GLenum error;
+	int count = 0;
+
+	buffer[0] = '\0';
+	while( count < 16 && ( error = pglGetError()) != GL_NO_ERROR )
+	{
+		if( count < 8 )
+		{
+			size_t length = Q_strlen( buffer );
+			Q_snprintf( buffer + length, buffer_size - length, "%s0x%04x",
+				count ? "," : "", (unsigned int)error );
+		}
+		count++;
+	}
+
+	if( !count )
+		Q_strncpy( buffer, "none", buffer_size );
+	else if( count > 8 )
+	{
+		size_t length = Q_strlen( buffer );
+		Q_snprintf( buffer + length, buffer_size - length, ",+%d", count - 8 );
+	}
+}
+
+static void R_IOSDisplayAuditGLState( const char *stage )
+{
+	GLint framebuffer = 0;
+	GLint renderbuffer = 0;
+	GLint viewport[4] = { 0, 0, 0, 0 };
+	GLint scissor[4] = { 0, 0, 0, 0 };
+	GLboolean scissor_enabled;
+	char errors_before[128];
+	char errors_after_query[128];
+
+	if( ios_renderer_calls == 0 || ios_renderer_calls > 3 )
+		return;
+
+	R_IOSDrainGLErrors( errors_before, sizeof( errors_before ));
+	pglGetIntegerv( IOS_GL_FRAMEBUFFER_BINDING, &framebuffer );
+	pglGetIntegerv( IOS_GL_RENDERBUFFER_BINDING, &renderbuffer );
+	pglGetIntegerv( GL_VIEWPORT, viewport );
+	pglGetIntegerv( GL_SCISSOR_BOX, scissor );
+	scissor_enabled = pglIsEnabled( GL_SCISSOR_TEST );
+	R_IOSDrainGLErrors( errors_after_query, sizeof( errors_after_query ));
+
+	gEngfuncs.Con_Printf( "iOS display audit GL4ES: frame=%u stage=%s fb=%d rb=%d viewport=%d,%d,%d,%d scissor_enabled=%d scissor=%d,%d,%d,%d errors_before=%s errors_after_query=%s\n",
+		ios_renderer_calls, stage, framebuffer, renderbuffer,
+		viewport[0], viewport[1], viewport[2], viewport[3], scissor_enabled,
+		scissor[0], scissor[1], scissor[2], scissor[3], errors_before, errors_after_query );
+}
+
 void R_IOSFramebufferTrace( const char *stage )
 {
 	double now = gEngfuncs.pfnTime();
 	qboolean heartbeat = false;
+
+	R_IOSDisplayAuditGLState( stage );
 
 	if( ios_present_trace_frames <= 0 )
 	{

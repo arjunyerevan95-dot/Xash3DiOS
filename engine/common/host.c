@@ -665,6 +665,7 @@ void Host_IOSLivenessArm( const char *world_name )
 
 	Con_Printf( "iOS liveness instrumentation: host, screen, renderer, foliage, flush, swap/present; bounded_frames=%d heartbeat_seconds=%.0f\n",
 		IOS_LIVENESS_TRACE_FRAMES, IOS_LIVENESS_HEARTBEAT_SECONDS );
+	Con_Printf( "iOS display audit policy: first_gameplay_frames=3 baseline=pre-world checksum=5x4x4 sentinel=bars1-3 present=EAGL_BOOL preserve_bindings=1\n" );
 	Con_Printf( "iOS liveness host: t=%.3f frame=%u returned=%u stage=arm world=%s\n",
 		ios_liveness_last_heartbeat, ios_liveness_frame, ios_liveness_returned_frames,
 		ios_liveness_world );
@@ -697,6 +698,9 @@ static void Host_IOSLivenessFrameBegin( void )
 
 	ios_liveness_frame = ios_liveness_returned_frames + 1;
 	Host_IOSLivenessStage( "host-frame", "begin" );
+#if XASH_IOS
+	GL_IOSDisplayAuditSnapshot( "next-host-frame-entry", ios_liveness_frame );
+#endif
 }
 
 static void Host_IOSLivenessFrameEnd( void )

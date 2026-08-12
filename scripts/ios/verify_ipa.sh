@@ -96,6 +96,11 @@ if ! grep -q 'iOS liveness renderer policy: bounded_frames=12' "$GL4ES_RENDERER_
 	exit 1
 fi
 
+if ! grep -q 'iOS display audit GL4ES:' "$GL4ES_RENDERER_STRINGS"; then
+	echo "Renderer was built without paired GL4ES framebuffer diagnostics" >&2
+	exit 1
+fi
+
 if ! grep -q 'Native GLES3 core NPOT support enabled' "$GL4ES_RENDERER_STRINGS"; then
 	echo "GL4ES was built without the GLES3 full-NPOT capability fix" >&2
 	exit 1
@@ -110,6 +115,33 @@ ENGINE_STRINGS="$VERIFY_ROOT/engine.strings"
 strings "$ENGINE_PATH" > "$ENGINE_STRINGS"
 if ! grep -q 'iOS liveness instrumentation: host, screen, renderer, foliage, flush, swap/present' "$ENGINE_STRINGS"; then
 	echo "Engine was built without bounded host/screen liveness diagnostics" >&2
+	exit 1
+fi
+
+if ! grep -q 'iOS display audit policy: first_gameplay_frames=3' "$ENGINE_STRINGS"; then
+	echo "Engine was built without the bounded display-audit policy" >&2
+	exit 1
+fi
+
+if ! grep -q 'iOS display audit ScreenFade:' "$ENGINE_STRINGS"; then
+	echo "Engine was built without paired ScreenFade diagnostics" >&2
+	exit 1
+fi
+
+SDL_STRINGS="$VERIFY_ROOT/sdl.strings"
+strings "$SDL_PATH" > "$SDL_STRINGS"
+for sdl_marker in \
+	'iOS display audit native:' \
+	'iOS display audit drawable:' \
+	'iOS display audit present:'; do
+	if ! grep -q "$sdl_marker" "$SDL_STRINGS"; then
+		echo "SDL was built without required display marker: $sdl_marker" >&2
+		exit 1
+	fi
+done
+
+if ! nm -gU "$SDL_PATH" | grep -q '_SDL_XASH_IOSDisplayAuditSnapshot$'; then
+	echo "SDL display-audit snapshot export is missing" >&2
 	exit 1
 fi
 
