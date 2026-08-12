@@ -37,6 +37,7 @@ static double ios_present_heartbeat;
 
 #define IOS_GL_FRAMEBUFFER_BINDING 0x8CA6
 #define IOS_GL_RENDERBUFFER_BINDING 0x8CA7
+#define IOS_GL_VIEWPORT 0x0BA2
 
 static void R_IOSDrainGLErrors( char *buffer, size_t buffer_size )
 {
@@ -80,7 +81,7 @@ static void R_IOSDisplayAuditGLState( const char *stage )
 	R_IOSDrainGLErrors( errors_before, sizeof( errors_before ));
 	pglGetIntegerv( IOS_GL_FRAMEBUFFER_BINDING, &framebuffer );
 	pglGetIntegerv( IOS_GL_RENDERBUFFER_BINDING, &renderbuffer );
-	pglGetIntegerv( GL_VIEWPORT, viewport );
+	pglGetIntegerv( IOS_GL_VIEWPORT, viewport );
 	pglGetIntegerv( GL_SCISSOR_BOX, scissor );
 	scissor_enabled = pglIsEnabled( GL_SCISSOR_TEST );
 	R_IOSDrainGLErrors( errors_after_query, sizeof( errors_after_query ));
