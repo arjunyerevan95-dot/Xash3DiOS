@@ -140,7 +140,9 @@ for sdl_marker in \
 	fi
 done
 
-if ! nm -gU "$SDL_PATH" | grep -q '_SDL_XASH_IOSDisplayAuditSnapshot$'; then
+SDL_EXPORTS="$VERIFY_ROOT/sdl.exports"
+nm -gU "$SDL_PATH" > "$SDL_EXPORTS"
+if ! grep -q '_SDL_XASH_IOSDisplayAuditSnapshot$' "$SDL_EXPORTS"; then
 	echo "SDL display-audit snapshot export is missing" >&2
 	exit 1
 fi
