@@ -105,3 +105,37 @@ Updated: 2026-08-12
 - Expected new log markers: none; Phase A changes no binary. Single device test requested: none. Do not retest Run 39, Run 41, or Run 51.
 - Remaining risks: the first-error call, native drawable identities/checksum before the sentinel, and total first-map completion time remain unknown; the broad `HUD_RenderFrame` fence and failed SDL-log transport are insufficient to choose a structural repair.
 - Stop gate: stop at Outcome B for orchestrator review. Do not implement Phase B, publish an IPA, or ask Arjun for evidence or a device test unless the authoritative ledger later authorizes it.
+
+## Work order 43 Phase B — diagnostics-only build report
+
+Candidate/run: Work Order 43 Phase B diagnostics-only candidate after Run 51; build-qualified, not device-tested or accepted.
+
+Commit: `b56699df808b25c3ea57aab8f670c676b97f00f2` (`Instrument WO43 Phase B presentation boundary`).
+
+Workflow URL/ID and result: direct-push [iOS Proof of Life run 31572853730](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/31572853730), result `success`; job `Unsigned arm64 IPA` ID `94038377537`, all steps successful. GitHub also started PR-event run `31572857250` for the identical commit because this branch has an open PR; it produced no distinct code candidate. The direct-push run is the qualifying workflow recorded here.
+
+IPA filename/link: `xash3d-fwgs-ios-arm64.ipa`, 8,672,544 bytes. Artifact `Xash3DiOS-arm64-unsigned`, ID `9132108713`; stable page: https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/31572853730/artifacts/9132108713. No tempfile.org upload was made because the Phase B authorization explicitly prohibits it.
+
+SHA-256: `63328B4FA5839CEE888298F9AA955A8AD92CD4D542BFCD291BFEE9B7AFAA17E1` for the retrieved IPA.
+
+Exact files changed: `engine/client/dll_int/cl_gameui.c`; `engine/common/common.h`; `engine/common/host.c`; `engine/platform/sdl2/vid_sdl2.c`; `scripts/gha/deps_ios.sh`; `scripts/ios/builddiffusion.sh`; `scripts/ios/diffusion-wo43-diagnostics-ios.patch`; `scripts/ios/sdl2-wo43-diagnostics-ios.patch`; `scripts/ios/validate-diffusion-ios-policy.py`; `scripts/ios/validate-ios-display-audit.py`; `scripts/ios/verify_ipa.sh`.
+
+Verified failure boundary: unchanged from Phase A. On Run 51 the GL queue was clean before the custom renderer and contained `GL_INVALID_OPERATION` after `HUD_RenderFrame` on every audited gameplay frame, while the yellow final-drawable sentinel was visibly presented and CPU progress continued through foliage and shader #48. No exact source operation or completed normal-scene presentation was proven by Run 51.
+
+Structural cause: still unproven; this candidate deliberately contains no renderer repair. It adds bounded attribution for the first clean-to-error transition, native presentation state returned from SDL to engine logging, and cumulative initialization/submission timing so a future single observation can distinguish an exact bad GL call from finite excessive initialization, monotonic noncompletion, or a stable last-progress call.
+
+Why the diagnostic change addresses the evidence gap: patched SDL returns a fixed-size POD record to `vid_sdl2.c`, where `Con_Printf` records EAGL context, view/layer identities, native framebuffer/renderbuffer bindings, drawable size, final pre-present checksum, and the actual `presentRenderbuffer` result or explicit unavailability. The Run-51 colored sentinel is disabled. Diffusion empties the bounded audit queue at frame start, places hierarchical fences through `HUD_RenderFrame`/`R_RenderScene`/`R_DrawWorld`/`R_DrawBrushList`, and checks source-owned framebuffer, shader, uniform, and draw calls immediately after execution; the first failure reports a stable site, API, arguments, file/line, FB/RB/program state and stops per-call tracing. Shader lookup/translation/compile/link, foliage ownership/duplicate avoidance, world/brush/studio submissions, over-250 ms gaps, and compact heartbeats provide the finite-work timeline. Engine normal-scene proof requires active game state, world and brush submissions, successful presentation, and a final-drawable checksum change from the stale-menu baseline; checksum alone cannot pass it.
+
+Local/build validation: both new patches apply with `--unidiff-zero` to the already accepted exact pinned SDL `5d249570393f7a37e037abf22cd6012a4cc56a71` and Diffusion `14d156bf3a6993c172697fac83a937836c3b5561` trees after their retained patches. `validate-ios-display-audit.py` reports the twelve-frame engine-routed POD/no-sentinel contract; `validate-diffusion-ios-policy.py` reports the retained shared animated-model key plus bounded WO43 diagnostics; both Python validators compile, and repository `git diff --check` passed before commit. CI built the engine, Half-Life, and pinned arm64 `XASH_IOS=1` Diffusion client/server/menu targets; validated mobile shaders; and passed the IPA contract. The IPA reports bundle version 52, minimum iOS 12.0, 13 arm64 Mach-O files, and 11 game dylibs.
+
+Expected new log markers: `WO43 Phase B diagnostics:`; `WO43 init timing:`; `WO43 GL interval begin:`; `WO43 GL phase transition:`; `WO43 GL exact first failure:`; `WO43 init gap:`; `WO43 init heartbeat:`; `WO43 native presentation:`; and `WO43 normal-scene proof:`. The retained `iOS display audit policy:` marker now states `gameplay_frames=12` and `sentinel=disabled`.
+
+Proposed single observation for orchestrator review only: if separately authorized, one unchanged launch and one Normal difficulty selection would be sufficient; the complete resulting engine log should select the Work Order 43 decision table from the exact-failure marker, the native presentation/result/checksum record, and the cumulative heartbeat. This report does not request that observation and does not contact Arjun for logs or testing.
+
+Future one-run discriminator decision table: **A** is selected if `WO43 GL exact first failure:` identifies the first `0x0502` source operation before any `WO43 normal-scene proof:`. **B** is selected if audited GL submission is clean, cumulative initialization reaches completion, and `WO43 normal-scene proof:` appears only after a finite but excessive elapsed interval. **C** is selected if shader/foliage/submission milestones continue increasing through the observation window without normal-scene proof. **D** is selected if the same last phase/site and unchanged cumulative counters repeat without normal-scene proof. None of these branches is called a renderer fix without device evidence.
+
+Remaining risks: instrumentation checks only the bounded source-owned call sites and phase fences represented in this candidate, so an error in an unwrapped helper may resolve first to a phase rather than an exact operation. Diagnostic `glGetError` calls serialize enough state to perturb timing, and the 12-frame/32-error bounds may truncate a later transition. The checksum is a five-region sample rather than a full-frame hash. A successful CI build is not device acceptance.
+
+Durable ledger path and commit: `Documentation/XASH3DIOS_PORTING_STATE.md`; candidate commit `b56699df808b25c3ea57aab8f670c676b97f00f2`. This post-build report is published separately as a documentation-only `[skip ci]` ledger commit so it cannot create another qualifying IPA build.
+
+Stop state: Phase B candidate publication and both-ledger reporting are complete. Stop for orchestrator review; do not request evidence, initiate a device test, diagnose a future log, implement a repair, or begin another work order.
