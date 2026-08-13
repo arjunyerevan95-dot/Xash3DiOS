@@ -1,6 +1,6 @@
 # Xash3DiOS Diffusion porting state
 
-Updated: 2026-08-12
+Updated: 2026-08-14
 
 ## Reproducible inputs
 
@@ -169,3 +169,119 @@ Remaining risks: no device evidence exists for this correction. The exact tracer
 Durable ledger path and commit: `Documentation/XASH3DIOS_PORTING_STATE.md`; candidate commit `6a3b44d2e66f4bfb73b8f85f906aebb40a94c9c5`. This post-build report is published in a separate documentation-only `[skip ci]` commit so it cannot create another qualifying IPA build.
 
 Stop state: the one authorized Phase-B correction candidate, retained artifact, CI inspection, and worker reporting are complete. Stop for orchestrator review. Do not request a device test, contact Arjun for logs, upload to tempfile.org, install/recommend the IPA, diagnose future evidence, implement a renderer/gameplay repair, or begin another work order.
+
+## Work order 44 Phase A — render-to-drawable and first-transition subsystem audit
+
+Candidate/run and acceptance status: audit-only analysis of the bundle-version-54 diagnostics candidate. No candidate, workflow, artifact, IPA, tempfile.org upload, or device-test request is authorized or produced. Bundle version 54 remains build-qualified evidence, not an accepted gameplay candidate.
+
+Exact commits and evidence inspected:
+
+- Repository candidate: `6a3b44d2e66f4bfb73b8f85f906aebb40a94c9c5`; repository-ledger commit: `7d27600fb11e97294d643fd7b0ae7484d1891f3e`.
+- Pinned external inputs: Diffusion `14d156bf3a6993c172697fac83a937836c3b5561`; SDL `5d249570393f7a37e037abf22cd6012a4cc56a71`; GL4ES `81547d986798e876de8b434193920b606a72363f`; Diffusion-MainUI `8c68de2f2325a0130953719efc3ae413eb24e01a`.
+- Complete authoritative log: Drive file `WO43-B54-device-engine-20260813-111631.log` (`1UW0REa00fVegpsb1s0oi2jExMzL5FQXt`), 5,417,703 bytes and 35,481 text lines. It identifies `6a3b44d-dirty`, records 12 completed audited gameplay frames, 7,908 gameplay frames before the 120-second terminal summary, and 12,788 renderer/swap/present returns by the final heartbeat.
+- Recording: Drive file `WO43-B54-device-Xashrec2.mp4` (`1r811f00TWrAC4lvFp0zI2JRetdayrRuW`), 8,660,711 bytes and 141.8 seconds. The connector verified the exact MP4 identity and the authoritative orchestrator review records an unchanged difficulty image while gameplay/cutscene audio proceeds; the recording ends before the later transition termination. This worker runtime exposed the MP4 as a streamed file reference but no binary playback surface, so frame-by-frame independent replay remains an evidence limitation. The log and source traces below independently establish the render-target result.
+
+### Render-target ownership and presentation trace
+
+Exact files/functions inspected: `wscript` and `3rdparty/gl4es/wscript`; `ref/gl/gl_opengl.c::GL_OnContextCreated`; pinned GL4ES `src/gl/framebuffers.c::{gl4es_glBindFramebuffer,createMainFBO,unbindMainFBO,blitMainFBO,bindMainFBO}`, `src/gl/gl4es.c::{gl4es_pre_swap,gl4es_post_swap}`, `src/glx/glx.c::gl4es_glXSwapBuffers`, and `src/gl/uniform.c::GoUniformfv`; `ref/gl/gl_rmain.c::R_EndFrame`; `engine/platform/sdl2/vid_sdl2.c::GL_SwapBuffers`; pinned SDL `src/video/uikit/SDL_uikitopengles.m::UIKit_GL_SwapWindow` and `src/video/uikit/SDL_uikitopenglview.m::{initWithFrame,swapBuffers}`.
+
+Ownership diagram and observed namespace mapping:
+
+```text
+Diffusion + Xash OpenGL calls
+        |
+        | logical glBindFramebuffer(..., 0)
+        v
+GL4ES virtual default framebuffer 0
+        |
+        | gl4es_glBindFramebuffer maps logical 0 to mainfbo_fbo
+        v
+native GLES FBO 2: GL4ES texture-backed main FBO (normal scene/UI draw target)
+        |
+        | REQUIRED transfer is absent on the embedded iOS swap path
+        v
+native GLES FBO 1 + renderbuffer 1: SDL UIKit CAEAGLLayer drawable
+        |
+        | [EAGLContext presentRenderbuffer:GL_RENDERBUFFER]
+        v
+physical display
+
+native FBO 0: GLES platform default name; not SDL's generated view FBO 1
+native read binding 0 in the audit: native bookkeeping, not proof of drawable ownership
+```
+
+The complete return path is Diffusion `HUD_RenderFrame` -> Xash `V_PostRender` -> renderer `R_EndFrame` -> `GL2_ShimEndFrame`/`R_Set2DMode(false)` -> engine `GL_SwapBuffers` -> `SDL_GL_SwapWindow` -> `UIKit_GL_SwapWindow` -> `SDL_uikitopenglview::swapBuffers` -> `presentRenderbuffer`. The first native record has `view_fb=1`, `view_rb=1`, `current_fb=2`, `draw_fb=2`, `read_fb=0`, and `current_rb=1`. Before and after each audited custom-renderer call the native draw target remains FBO 2. Immediately before presentation, the five-region checksum of SDL's FBO 1 equals the stale-menu baseline; `present_result=1` and `changed=0`. Thus the API successfully presents renderbuffer 1, but its pixels were never replaced by the normal scene held in FBO 2.
+
+The missing owner is the GL4ES-to-SDL embedding boundary. With `NOX11`, `NOEGL`, and `LIBGL_FB=2`, GL4ES creates the texture-backed main FBO and exports `gl4es_pre_swap`/`gl4es_post_swap`; Xash's SDL path calls neither. GL4ES's GLX swap wrapper would call them, but the iOS `NOEGL` embedding bypasses that wrapper. Moreover, stock `gl4es_pre_swap` first raw-binds native FBO 0 and blits the main texture there. SDL's drawable is the separately generated FBO 1, so merely adding a call to `gl4es_pre_swap` would still target the wrong native destination. SDL's `swapBuffers` resolves only its own optional `msaaFramebuffer` into `viewFramebuffer`; when that SDL-owned MSAA FBO is absent, it performs no bind, blit, or copy from GL4ES FBO 2 to view FBO 1. `present_result=1` proves presentation of the currently bound renderbuffer, not transfer of GL4ES scene pixels.
+
+Structural conclusion: the stale difficulty image is caused by a missing explicit FBO-2-to-FBO-1 transfer before presentation, not by a dead drawable, active menu overlay, or stopped renderer. The transfer must be owned by a target-specific GL4ES/iOS presentation bridge because GL4ES owns the source texture/logical namespace while SDL UIKit owns the actual nonzero drawable FBO and renderbuffer.
+
+Minimum future repair boundary, not implemented in Phase A: after all renderer and 2-D/UI flushing but before `presentRenderbuffer`, pass SDL's live `viewFramebuffer` and drawable geometry into a GL4ES-side pre-present callback. The callback must flush pending GL4ES work, bind native FBO 1 as the explicit destination, blit the GL4ES main-FBO texture, preserve/restore viewport, scissor, color-mask and related blit state, leave view renderbuffer 1 presentable, and report success. After presentation, a matching callback must rebind GL4ES native main FBO 2 while keeping logical framebuffer 0 coherent. A future proof invariant is: immediately pre-present native draw FBO equals SDL view FBO 1, FBO-1 checksum differs from its menu baseline after the transfer, renderbuffer 1 is bound, presentation returns true, and immediately post-present native FBO 2 is restored while the GL4ES logical current framebuffer remains 0. This is an interface repair, not a hard-coded `glBindFramebuffer` guess.
+
+### Exact `glUniform4fv` finding
+
+Diffusion `client/render/r_world.cpp::R_DrawBrushList` creates `Vector4D brush_params[3]` and at line 2952 unconditionally calls `pglUniform4fvARB(location, 3, ...)`. `glsl/bmodelsolid_vp.glsl` and `glsl/bmodelsolid_fp.glsl` both declare `uniform vec4 u_BrushParams[3]`; `client/render/r_shader.cpp::GL_InitSolidBmodelUniforms` stores the base location. GL4ES's linked-program introspection in the log reports active `u_BrushParams[1]` or `[2]` for optimized BmodelSolid variants because unused tail elements were removed. Pinned GL4ES `src/gl/uniform.c::GoUniformfv` rejects an upload when `count > m->size` and raises `GL_INVALID_OPERATION` before copying the values. The first exact audit failure is therefore source-backed: frame 1, `r_world.cpp:2952`, program 52, location 15, `count=3`, error `0x0502`, with the queue clean before the call.
+
+Classification: independently incorrect and capable of leaving fog/view-origin/water brush parameters stale for affected programs, but not causal for the stale physical framebuffer. It occurs on every audited frame yet rendering, foliage, shader creation, swaps, presentations, and host frames continue. It cannot explain why FBO 1's checksum never changes while normal work targets FBO 2. Phase A makes no uniform patch.
+
+### UI/menu reconciliation
+
+The audit's `ui` field is `engine/client/dll_int/cl_gameui.c::UI_IsVisible`, which directly calls MainUI's `pfnIsVisible`. During gameplay the log repeatedly records `ui=0`, `state=4`, and `signon=2`. `engine/client/parse/cl_parse.c::CL_ParseServerData` calls `UI_SetActiveMenu(cl.background)` after normal map setup, so the real menu is logically inactive and is not an overlay redrawn over gameplay. The difficulty pixels are retained physical content in SDL view FBO 1 from the last successful menu-era draw. This reconciles `ui=0` with the visible difficulty screen without disabling or bypassing MainUI.
+
+### First `ch1map0` -> `ch1map1` transition trace
+
+Exact files/functions inspected: Diffusion `server/entities/changelevel.cpp::CChangeLevel::ChangeLevelNow`; `engine/server/sv_game.c::SV_QueueChangeLevel`; `engine/common/host_state.c::{COM_ChangeLevel,COM_Frame}`; `engine/server/sv_init.c::{SV_ExecChangeLevel,SV_SpawnServer,SV_ActivateServer}`; `engine/server/sv_save.c::{SV_ChangeLevel,SaveGameState,LoadGameState,LoadAdjacentEnts}`; `engine/server/sv_game.c::SV_SpawnEntities`; `engine/common/model.c::{Mod_FreeUserData,Mod_UnloadRenderData}`; Diffusion `client/render/r_world.cpp::{R_ProcessWorldData,Mod_FreeWorld}`, `client/cdll_int.cpp::HUD_VidInit`, and `client/render/r_misc.cpp::R_VidInit`; `engine/client/parse/cl_parse.c::{CL_ParseServerData,svc_changing}`.
+
+Source sequence:
+
+```text
+CChangeLevel::ChangeLevelNow
+  -> engine pfnChangeLevel / SV_QueueChangeLevel
+  -> COM_ChangeLevel stores levelName=ch1map1, landmark=to_map1,
+     loadGame=true, next state=STATE_CHANGELEVEL
+  -> next COM_Frame -> SV_ExecChangeLevel -> SV_ChangeLevel
+     -> SaveGameState(true) for ch1map0
+     -> SV_InactivateClients -> SV_FinalMessage -> SV_DeactivateServer
+     -> SV_SpawnServer(ch1map1, to_map1)
+        -> world/model/collision load and renderer Mod_ProcessRenderData(create=true)
+     -> SaveFinish
+     -> LoadGameState(ch1map1, true)
+        -> LoadSaveData fails for save/ch1map1.HL1 and returns 0
+     -> explicit fallback SV_SpawnEntities(ch1map1)
+     -> LoadAdjacentEnts(ch1map0, to_map1)
+     -> SV_ActivateServer(false) -> expected new "Game started"
+```
+
+The missing `save/ch1map1.HL1` is non-causal by source: `LoadGameState` returns false and `SV_ChangeLevel` immediately falls back to `SV_SpawnEntities`. The full log's last transition records are `Spawn Server: ch1map1 [to_map1]`, `total 242 packed normals`, `Loaded 8 cubemap boxes.`, the missing-save error, `execing maps/ch1map0_unload.cfg`, and `execing maps/ch1map1_load.cfg`, followed by EOF. The last source-backed safe boundary is therefore: new BSP/world renderer processing and cubemap loading returned, the missing-save read returned into its handled fallback path, and both queued config executions were reached. There is no marker proving return from fallback `SV_SpawnEntities`, `LoadAdjacentEnts`, `SV_ActivateServer`, or a new `Game started`. The termination boundary is after new-world load plus entry into the fallback/config interval and before proven activation of the new server; the exact crash operation is unresolved.
+
+Resource ownership is structured rather than obviously leaked across the transition. Engine model release runs `Mod_FreeUserData` -> `Mod_UnloadRenderData` -> renderer `Mod_ProcessRenderData(create=false)`; Diffusion `R_ProcessWorldData` calls `Mod_FreeWorld`, which frees cubemap boxes, world framebuffer textures, leaf/vertex/vertex-lighting data, VBO/VAO resources, cinematics, landscapes, per-surface foliage, and animations. On the new server/client data, `CL_ParseServerData` calls the client `pfnVidInit`; Diffusion `HUD_VidInit` calls `R_VidInit`, which frees/recreates screen color/depth/native textures, subview textures, custom framebuffers, shadow/post resources and studio-renderer video objects, then advances the shader validity sequence. `svc_changing` sets `cls.changelevel`, stops active sounds, and clears client state. The GL4ES main FBO and SDL drawable are context-global presentation objects, not per-map Diffusion world objects; their missing bridge persists independently of per-map teardown. Current evidence does not prove a double-free, use-after-free, audio teardown defect, or GL object ownership violation at the crash boundary.
+
+### Diagnostic perturbation assessment
+
+The log contains 32,408 `WO43 init phase` records in 35,481 lines over about 178 seconds. Per-phase synchronous logging, repeated `glGetError` fences, checksums, and multi-line records can materially change I/O volume, storage latency, GPU/CPU synchronization, thermal behavior, memory pressure, and transition timing. It does not invalidate the stable FBO-ID/checksum mismatch or the exact clean-to-error uniform call, but it prevents treating the observed crash timing as representative without an iOS diagnostic report.
+
+Any future diagnostic candidate should emit only: one generation-start record; one first-error record; one baseline and first world/brush pre/post-transfer sample; a cumulative heartbeat at no more than one record per two seconds; phase records only on phase change or duration over 250 ms; once-only transition records per subsystem/generation with object counts; a capped ring/output budget of at most 256 records per 120 seconds; flushes only at changelevel/terminal boundaries; and one terminal summary. Per-frame phase begin/end logging must be removed.
+
+### Hypothesis decision table
+
+| Hypothesis | Supporting evidence | Contradicting evidence / Phase-A classification | Next discriminator |
+| --- | --- | --- | --- |
+| Missing final FBO-to-drawable transfer | Normal draws remain in native FBO 2; SDL presents FBO/RB 1; FBO-1 checksum stays at the menu baseline; no Xash call reaches GL4ES pre/post swap. | None for the stale-frame symptom. Stock GL4ES pre-swap would target native FBO 0, so it is not already the required transfer. **Established structural cause of stale display.** | Target-aware bridge invariant: FBO 2 -> explicit FBO 1, changed FBO-1 checksum, RB 1 bound, successful present, FBO 2 rebound. |
+| Wrong framebuffer/renderbuffer binding at swap | Native draw FBO is 2 while SDL expects view FBO 1. | Current renderbuffer equals expected RB 1 and presentation returns true; this is a missing color transfer, not a wrong-RB presentation failure. **Partially true only for draw-target ownership.** | Same pre/post bridge invariant with both native draw-FBO and RB checks. |
+| Active menu overlay | Difficulty pixels remain visible. | `UI_IsVisible/pfnIsVisible` is false (`ui=0`) throughout active/sign-on gameplay; FBO-1 checksum is unchanged instead of receiving a newly composited overlay. **Rejected.** | No further discriminator needed unless future evidence shows `ui=1` or changing overlay pixels. |
+| `glUniform4fv` state corruption | Exact first `0x0502` is `r_world.cpp:2952`; count 3 exceeds GL4ES active extent 1/2 and blocks the update. | Renderer and host continue for thousands of frames; error cannot copy FBO 2 into FBO 1 or explain a constant drawable checksum. **Independently incorrect, non-causal for stale presentation.** | Later bounded fix should upload only the active extent or preserve a three-element active declaration, then verify no error and correct brush parameters; do not use it as display repair. |
+| Transition resource-lifetime/use-after-free | Termination occurs during the first map transition, which destroys and recreates world, foliage, cubemap, studio and custom-FBO resources. | Source shows explicit ownership/teardown paths; log proves new-world/cubemap work returns and contains no allocator, GL-object, or fatal marker. **Plausible but unproven for termination.** | iOS `.ips` crash report with crashed thread/backtrace and used images; if memory fault, instrument only the last proven transition interval with generation/object-owner IDs. |
+| Memory pressure or watchdog termination | Diagnostics are extremely verbose and synchronizing; transition has simultaneous old-state save and new-map resource creation. | No JetsamEvent, memory footprint, watchdog reason, or timing classification is present; the recording ends before the termination. **Unresolved.** | Matching-timestamp iOS app `.ips` or `JetsamEvent` report containing exception/termination reason, memory footprint and process state. |
+| Missing-save fallback failure | EOF follows `Couldn't open save data file save/ch1map1.HL1`. | `LoadGameState` returns 0 and `SV_ChangeLevel` explicitly calls `SV_SpawnEntities` as the normal fallback. **Rejected as cause absent contrary crash evidence.** | A crash backtrace inside fallback entity spawn/adjacent restore could reclassify the later operation, but the missing file itself remains handled. |
+
+### Remaining evidence gaps and stop state
+
+The stale-frame cause is established at the GL4ES/SDL presentation interface. The transition termination cause is not established: the log lacks proof after fallback entity-spawn entry and contains no OS-level termination record. The exact report needed is the iOS app crash `.ips` or `JetsamEvent` matching the incident timestamp, including exception/termination reason, crashed thread and backtrace, memory footprint, and used images. Its retrieval path is iPhone **Settings -> Privacy & Security -> Analytics & Improvements -> Analytics Data**, or Xcode **Devices and Simulators -> View Device Logs**. This specifies the evidence gap only; Phase A does not contact the user or request it.
+
+Validation performed: exact repository/pinned revisions were verified; Codebase Memory was used only for discovery and all material claims were checked in the pinned/applied source trees; the complete authoritative log was scanned for ordered markers and counts; source-level render and transition call sequences were inspected end to end; and `git diff --check` is required before publication. No compile, build, GitHub Actions run, or binary validation is warranted or allowed for this documentation-only phase.
+
+Exact files changed by Work Order 44 Phase A: `Documentation/XASH3DIOS_PORTING_STATE.md` only. Expected new log markers: none. Candidate/IPA/SHA-256/device test: not applicable and not authorized.
+
+Durable ledger commit: populated by the documentation-only `[skip ci]` publication commit containing this report. Both the repository ledger and authoritative Google Doc must be read back after publication.
+
+Stop state: Work Order 44 Phase A stops after the two subsystem traces and decision table for orchestrator review. Do not implement the bridge or uniform fix, create a candidate, run Actions, retrieve/upload an IPA, contact Arjun, request testing or evidence, or begin another work order.
