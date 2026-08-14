@@ -491,18 +491,7 @@ void V_RenderView( void )
 	if( Q_stricmp( ios_post_trace_map, ios_world_name ))
 	{
 		Q_strncpy( ios_post_trace_map, ios_world_name, sizeof( ios_post_trace_map ));
-		ios_post_trace_frames = 12;
-	}
-	Host_IOSLivenessArm( ios_world_name );
-	Host_IOSLivenessStage( "render-view", "begin" );
-	if( Host_IOSLivenessActive( ))
-	{
-		Con_Printf( "iOS liveness UI: t=%.3f frame=%u active=%d renderworld=%.0f background=%d state=%d signon=%d\n",
-			Platform_DoubleTime(), Host_IOSLivenessFrameNumber(), UI_IsVisible(),
-			ui_renderworld.value, cl.background, cls.state, cls.signon );
-#if XASH_IOS
-		GL_IOSDisplayAuditSnapshot( "engine-frame-entry", Host_IOSLivenessFrameNumber() );
-#endif
+		ios_post_trace_frames = 3;
 	}
 #endif
 
@@ -544,19 +533,7 @@ void V_RenderView( void )
 			ref.dllFuncs.R_ClearScreen();
 		}
 
-		#if XASH_APPLE
-		Host_IOSLivenessStage( "renderer-dispatch", "begin" );
-		#if XASH_IOS
-		GL_IOSDisplayAuditSnapshot( "before-renderer-dispatch", Host_IOSLivenessFrameNumber() );
-		#endif
-		#endif
 		GL_RenderFrame( &rvp );
-		#if XASH_APPLE
-		#if XASH_IOS
-		GL_IOSDisplayAuditSnapshot( "after-renderer-dispatch", Host_IOSLivenessFrameNumber() );
-		#endif
-		Host_IOSLivenessStage( "renderer-dispatch", "end" );
-		#endif
 		IOS_MAP_TRACE( "after renderer" );
 		IOS_POST_TRACE( "after-renderframe" );
 		S_UpdateFrame( &rvp );
@@ -576,7 +553,6 @@ void V_RenderView( void )
 #if XASH_APPLE
 	if( ios_trace_frames > 0 )
 		ios_trace_frames--;
-	Host_IOSLivenessStage( "render-view", "end" );
 #endif
 #undef IOS_MAP_TRACE
 }
@@ -682,10 +658,6 @@ void V_PostRender( void )
 {
 	qboolean		draw_2d = false;
 
-#if XASH_APPLE
-	Host_IOSLivenessStage( "post-render", "begin" );
-#endif
-
 	IOS_POST_TRACE( "post-enter" );
 	ref.dllFuncs.R_AllowFog( false );
 	IOS_POST_TRACE( "allow-fog-off" );
@@ -752,11 +724,6 @@ void V_PostRender( void )
 		OSK_Draw();
 		IOS_POST_TRACE( "osk" );
 
-#if XASH_IOS
-		if( Host_IOSLivenessActive() )
-			GL_IOSDisplayAuditSnapshot( "after-2d-hud-menu-touch", Host_IOSLivenessFrameNumber() );
-#endif
-
 		S_ExtraUpdate();
 		IOS_POST_TRACE( "extra-audio" );
 	}
@@ -769,10 +736,6 @@ void V_PostRender( void )
 	IOS_POST_TRACE( "before-endframe" );
 	ref.dllFuncs.R_EndFrame();
 	V_IOSPostTraceEnd();
-
-#if XASH_APPLE
-	Host_IOSLivenessStage( "post-render", "end" );
-#endif
 
 	V_CheckGammaEnd();
 }

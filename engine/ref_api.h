@@ -76,7 +76,8 @@ GNU General Public License for more details.
 // 17. _Mem_AllocPool now takes a flags argument (see MEM_SMALL_ALLOC_OPT in engine/common/common.h).
 //     Pools that opt into MEM_SMALL_ALLOC_OPT use a compact 16/24-byte header for allocations
 //     <= 255 bytes, dropping per-allocation filename/fileline tracking.
-#define REF_API_VERSION 17
+// 18. Added the optional iOS drawable bridge callback for explicit renderer-to-SDL presentation.
+#define REF_API_VERSION 18
 
 #define TF_SKY		(TF_SKYSIDE|TF_NOMIPMAP|TF_ALLOW_NEAREST)
 #define TF_FONT		(TF_NOMIPMAP|TF_CLAMP|TF_ALLOW_NEAREST)
@@ -521,6 +522,49 @@ typedef struct ref_api_s
 
 struct mip_s;
 
+#define REF_IOS_DRAWABLE_BRIDGE_VERSION 1
+#define REF_IOS_DRAWABLE_BRIDGE_MAX_RECORDS 64
+#define REF_IOS_DRAWABLE_BRIDGE_PROOF_TRANSFERS 3
+
+typedef enum ref_ios_drawable_bridge_action_e
+{
+	REF_IOS_DRAWABLE_BRIDGE_PRE_PRESENT = 1,
+	REF_IOS_DRAWABLE_BRIDGE_POST_PRESENT
+} ref_ios_drawable_bridge_action_t;
+
+typedef struct ref_ios_drawable_bridge_s
+{
+	uint32_t version;
+	uint32_t size;
+	uint64_t context;
+	uint64_t currentContext;
+	uint32_t contextMatches;
+	uint32_t targetFramebuffer;
+	uint32_t targetRenderbuffer;
+	uint32_t drawableWidth;
+	uint32_t drawableHeight;
+	uint32_t sourceFramebuffer;
+	uint32_t sourceTexture;
+	uint32_t sourceRenderbuffer;
+	uint32_t logicalFramebuffer;
+	uint32_t targetStatus;
+	uint32_t transferAttempted;
+	uint32_t transferResult;
+	uint32_t proofSample;
+	uint32_t checksumBeforeValid;
+	uint32_t checksumBefore;
+	uint32_t checksumAfterValid;
+	uint32_t checksumAfter;
+	uint32_t checksumChanged;
+	uint32_t presentAttempted;
+	uint32_t presentResult;
+	uint32_t restoredFramebuffer;
+	uint32_t restoredRenderbuffer;
+	uint32_t restoredLogicalFramebuffer;
+	uint32_t restoreResult;
+	uint32_t failureCode;
+} ref_ios_drawable_bridge_t;
+
 // render callbacks
 typedef struct ref_interface_s
 {
@@ -653,6 +697,9 @@ typedef struct ref_interface_s
 
 	// vgui drawing implementation
 	void	(*VGUI_SetupDrawing)( qboolean rect );
+
+	// iOS GL4ES-to-SDL drawable ownership bridge; NULL/no-op for other renderers
+	int	(*R_IOSDrawableBridge)( int action, void *state, size_t stateSize );
 } ref_interface_t;
 
 typedef int (*REFAPI)( int version, ref_interface_t *pFunctionTable, ref_api_t* engfuncs, ref_globals_t *pGlobals );

@@ -527,24 +527,10 @@ can be modulated
 static void CL_DrawScreenFade( void )
 {
 	screenfade_t	*sf = &clgame.fade;
-#if XASH_IOS
-	const unsigned int ios_audit_frame = Host_IOSLivenessFrameNumber();
-	const qboolean ios_audit = Host_IOSLivenessActive() && ios_audit_frame <= 3;
-	if( ios_audit )
-		Con_Printf( "iOS display audit ScreenFade: frame=%u stage=entry rgba=%u,%u,%u,%u flags=0x%x end=%.3f reset=%.3f total=%.3f\n",
-			ios_audit_frame, sf->fader, sf->fadeg, sf->fadeb, sf->fadealpha,
-			sf->fadeFlags, sf->fadeEnd, sf->fadeReset, sf->fadeTotalEnd );
-#endif
 	int alpha = V_FadeAlpha( sf );
 
 	if( !alpha )
-	{
-#if XASH_IOS
-		if( ios_audit )
-			Con_Printf( "iOS display audit ScreenFade: frame=%u stage=return action=alpha-zero\n", ios_audit_frame );
-#endif
 		return;
-	}
 
 #if XASH_APPLE
 	/*
@@ -562,11 +548,6 @@ static void CL_DrawScreenFade( void )
 				sf->fader, sf->fadeg, sf->fadeb, alpha, sf->fadeFlags );
 			announced = true;
 		}
-#if XASH_IOS
-		if( ios_audit )
-			Con_Printf( "iOS display audit ScreenFade: frame=%u stage=return action=existing-diffusion-suppression alpha=%d\n",
-				ios_audit_frame, alpha );
-#endif
 		return;
 	}
 #endif
@@ -597,11 +578,6 @@ static void CL_DrawScreenFade( void )
 	ref.dllFuncs.R_DrawStretchPic( 0, 0, refState.width, refState.height, 0, 0, 1, 1,
 		R_GetBuiltinTexture( REF_WHITE_TEXTURE ));
 	ref.dllFuncs.Color4ub( 255, 255, 255, 255 );
-#if XASH_IOS
-	if( ios_audit )
-		Con_Printf( "iOS display audit ScreenFade: frame=%u stage=return action=drawn alpha=%d\n",
-			ios_audit_frame, alpha );
-#endif
 }
 
 /*

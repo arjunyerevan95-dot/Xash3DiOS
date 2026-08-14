@@ -66,30 +66,6 @@ if ! grep -q 'iOS mobile renderer profile: canonical materials, shared animated-
 	exit 1
 fi
 
-if ! grep -q 'iOS foliage liveness policy: bounded_lines=' "$DIFFUSION_CLIENT_STRINGS"; then
-	echo "Diffusion client was built without bounded foliage liveness diagnostics" >&2
-	exit 1
-fi
-
-if ! grep -q 'iOS world traversal:' "$DIFFUSION_CLIENT_STRINGS"; then
-	echo "Diffusion client was built without bounded world-traversal diagnostics" >&2
-	exit 1
-fi
-
-for wo43_client_marker in \
-	'WO43 GL interval begin:' \
-	'WO43 GL phase transition:' \
-	'WO43 GL exact first failure:' \
-	'WO43 GL attribution gap:' \
-	'WO43 init phase: state=begin' \
-	'WO43 init phase: state=end' \
-	'WO43 init gap:'; do
-	if ! grep -q "$wo43_client_marker" "$DIFFUSION_CLIENT_STRINGS"; then
-		echo "Diffusion client is missing WO43 marker: $wo43_client_marker" >&2
-		exit 1
-	fi
-done
-
 DIFFUSION_MENU_STRINGS="$VERIFY_ROOT/diffusion-menu.strings"
 strings "$DIFFUSION_MENU_PATH" > "$DIFFUSION_MENU_STRINGS"
 if ! grep -q 'iOS mobile menu policy: decorative background map disabled; UI callbacks remain active' "$DIFFUSION_MENU_STRINGS"; then
@@ -105,15 +81,10 @@ fi
 GL4ES_RENDERER_STRINGS="$VERIFY_ROOT/gl4es-renderer.strings"
 strings "$GL4ES_RENDERER_PATH" > "$GL4ES_RENDERER_STRINGS"
 
-if ! grep -q 'iOS liveness renderer policy: bounded_frames=12' "$GL4ES_RENDERER_STRINGS"; then
-	echo "Renderer was built without bounded flush/present liveness diagnostics" >&2
-	exit 1
-fi
-
-if ! grep -q 'iOS display audit GL4ES:' "$GL4ES_RENDERER_STRINGS"; then
-	echo "Renderer was built without paired GL4ES framebuffer diagnostics" >&2
-	exit 1
-fi
+SDL_STRINGS="$VERIFY_ROOT/sdl.strings"
+ENGINE_STRINGS="$VERIFY_ROOT/engine.strings"
+strings "$SDL_PATH" > "$SDL_STRINGS"
+strings "$ENGINE_PATH" > "$ENGINE_STRINGS"
 
 if ! grep -q 'Native GLES3 core NPOT support enabled' "$GL4ES_RENDERER_STRINGS"; then
 	echo "GL4ES was built without the GLES3 full-NPOT capability fix" >&2
@@ -125,49 +96,47 @@ if ! grep -q 'compressed texture buffer overrun' "$GL4ES_RENDERER_STRINGS"; then
 	exit 1
 fi
 
-ENGINE_STRINGS="$VERIFY_ROOT/engine.strings"
-strings "$ENGINE_PATH" > "$ENGINE_STRINGS"
-if ! grep -q 'iOS liveness instrumentation: host, screen, renderer, foliage, flush, swap/present' "$ENGINE_STRINGS"; then
-	echo "Engine was built without bounded host/screen liveness diagnostics" >&2
-	exit 1
-fi
-
-if ! grep -q 'iOS display audit policy: gl_attribution_frames=12 init_timeout_seconds=120 native_sample_seconds=2 baseline=pre-world checksum=5x4x4 sentinel=disabled' "$ENGINE_STRINGS"; then
-	echo "Engine was built without independent GL-attribution and initialization windows" >&2
-	exit 1
-fi
-
-for wo43_engine_marker in \
-	'WO43 Phase B diagnostics:' \
-	'WO43 init timing:' \
-	'WO43 init heartbeat:' \
-	'WO43 init terminal:' \
-	'WO43 native presentation:' \
-	'WO43 normal-scene proof:'; do
-	if ! grep -q "$wo43_engine_marker" "$ENGINE_STRINGS"; then
-		echo "Engine is missing WO43 marker: $wo43_engine_marker" >&2
+for bridge_marker in \
+	'iOS drawable bridge policy:' \
+	'iOS drawable bridge source:' \
+	'iOS drawable bridge proof:' \
+	'iOS drawable bridge present:' \
+	'iOS drawable bridge restore:' \
+	'iOS drawable bridge terminal:'; do
+	if ! grep -q "$bridge_marker" "$GL4ES_RENDERER_STRINGS"; then
+		echo "Renderer is missing bounded drawable-bridge marker: $bridge_marker" >&2
 		exit 1
 	fi
 done
 
-if ! grep -q 'iOS display audit ScreenFade:' "$ENGINE_STRINGS"; then
-	echo "Engine was built without paired ScreenFade diagnostics" >&2
+SDL_NM="$VERIFY_ROOT/sdl.nm"
+GL4ES_RENDERER_NM="$VERIFY_ROOT/gl4es-renderer.nm"
+nm -g "$SDL_PATH" > "$SDL_NM"
+nm -g "$GL4ES_RENDERER_PATH" > "$GL4ES_RENDERER_NM"
+
+if ! grep -q '_SDL_XASH_IOSSetDrawableBridgeCallback' "$SDL_NM"; then
+	echo "SDL does not export the live drawable-bridge callback registration" >&2
 	exit 1
 fi
 
-SDL_STRINGS="$VERIFY_ROOT/sdl.strings"
-strings "$SDL_PATH" > "$SDL_STRINGS"
-if grep -q 'sentinel_bars=' "$SDL_STRINGS"; then
-	echo "SDL still contains the disabled Run-51 sentinel path" >&2
-	exit 1
-fi
+for bridge_symbol in _gl4es_drawable_bridge_pre _gl4es_drawable_bridge_post; do
+	if ! grep -q "$bridge_symbol" "$GL4ES_RENDERER_NM"; then
+		echo "GL4ES renderer is missing drawable-bridge symbol: $bridge_symbol" >&2
+		exit 1
+	fi
+done
 
-SDL_EXPORTS="$VERIFY_ROOT/sdl.exports"
-nm -gU "$SDL_PATH" > "$SDL_EXPORTS"
-if ! grep -q '_SDL_XASH_IOSDisplayAuditSnapshot$' "$SDL_EXPORTS"; then
-	echo "SDL display-audit snapshot export is missing" >&2
-	exit 1
-fi
+for diagnostic_strings in \
+	"$ENGINE_STRINGS" \
+	"$SDL_STRINGS" \
+	"$GL4ES_RENDERER_STRINGS" \
+	"$DIFFUSION_CLIENT_STRINGS" \
+	"$DIFFUSION_MENU_STRINGS"; do
+	if grep -Eqi 'WO43|iOS liveness|sentinel_bars|normal-scene proof|native presentation:' "$diagnostic_strings"; then
+		echo "Obsolete WO43/sentinel/high-volume diagnostics remain in $(basename "$diagnostic_strings")" >&2
+		exit 1
+	fi
+done
 
 plutil -lint "$INFO_PLIST"
 

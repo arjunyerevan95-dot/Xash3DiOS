@@ -477,6 +477,158 @@ static void R_FillTriAPI( triangleapi_t *api )
 	api->FogParams     = TriFogParams;
 }
 
+#if XASH_IOS && XASH_GL4ES
+typedef struct ios_drawable_bridge_diagnostics_s
+{
+	uint64_t context;
+	uint32_t samples;
+	uint32_t successes;
+	uint32_t failures;
+	uint32_t records;
+	qboolean policyPrinted;
+	qboolean presentPrinted;
+	qboolean restorePrinted;
+	qboolean terminalPrinted;
+} ios_drawable_bridge_diagnostics_t;
+
+static ios_drawable_bridge_diagnostics_t ios_drawable_bridge;
+
+static void R_IOSDrawableBridgeResetDiagnostics( uint64_t context )
+{
+	memset( &ios_drawable_bridge, 0, sizeof( ios_drawable_bridge ));
+	ios_drawable_bridge.context = context;
+}
+
+static qboolean R_IOSDrawableBridgeCanPrint( void )
+{
+	if( ios_drawable_bridge.records >= REF_IOS_DRAWABLE_BRIDGE_MAX_RECORDS )
+		return false;
+	ios_drawable_bridge.records++;
+	return true;
+}
+
+static int R_IOSDrawableBridge( int action, void *opaqueState, size_t stateSize )
+{
+	ref_ios_drawable_bridge_t *state = (ref_ios_drawable_bridge_t *)opaqueState;
+	int result;
+
+	if( !state || stateSize < sizeof( *state ) ||
+		state->version != REF_IOS_DRAWABLE_BRIDGE_VERSION || state->size < sizeof( *state ) )
+		return 0;
+
+	if( ios_drawable_bridge.context != state->context )
+		R_IOSDrawableBridgeResetDiagnostics( state->context );
+
+	if( !ios_drawable_bridge.policyPrinted && R_IOSDrawableBridgeCanPrint() )
+	{
+		gEngfuncs.Con_Printf( "iOS drawable bridge policy: target-aware GL4ES-to-SDL transfer active context=0x%llx proof_transfers=%d max_records=%d\n",
+			(unsigned long long)state->context, REF_IOS_DRAWABLE_BRIDGE_PROOF_TRANSFERS,
+			REF_IOS_DRAWABLE_BRIDGE_MAX_RECORDS );
+		ios_drawable_bridge.policyPrinted = true;
+	}
+
+	if( action == REF_IOS_DRAWABLE_BRIDGE_PRE_PRESENT )
+	{
+		state->proofSample = !ios_drawable_bridge.terminalPrinted &&
+			ios_drawable_bridge.samples < REF_IOS_DRAWABLE_BRIDGE_PROOF_TRANSFERS;
+		state->transferAttempted = 0;
+		state->transferResult = 0;
+		state->failureCode = 0;
+
+		if( !state->context || !state->currentContext || !state->contextMatches )
+		{
+			state->failureCode = 2;
+			return 0;
+		}
+
+		if( !state->targetFramebuffer || !state->targetRenderbuffer ||
+			!state->drawableWidth || !state->drawableHeight )
+		{
+			state->failureCode = 3;
+			return 0;
+		}
+
+		state->transferAttempted = 1;
+		result = gl4es_drawable_bridge_pre( state->targetFramebuffer,
+			state->drawableWidth, state->drawableHeight,
+			&state->sourceFramebuffer, &state->sourceTexture,
+			&state->sourceRenderbuffer, &state->logicalFramebuffer,
+			&state->targetStatus );
+		state->transferResult = result ? 1 : 0;
+		if( !result )
+			state->failureCode = 4;
+		return result;
+	}
+
+	if( action != REF_IOS_DRAWABLE_BRIDGE_POST_PRESENT )
+		return 0;
+
+	result = gl4es_drawable_bridge_post( state->sourceFramebuffer,
+		state->sourceRenderbuffer,
+		&state->restoredFramebuffer, &state->restoredRenderbuffer,
+		&state->restoredLogicalFramebuffer );
+	state->restoreResult = result ? 1 : 0;
+	if( !result && !state->failureCode )
+		state->failureCode = 5;
+
+	if( state->proofSample )
+	{
+		ios_drawable_bridge.samples++;
+		if( state->transferResult && state->presentResult && state->restoreResult )
+			ios_drawable_bridge.successes++;
+		else ios_drawable_bridge.failures++;
+
+		if( R_IOSDrawableBridgeCanPrint() )
+			gEngfuncs.Con_Printf( "iOS drawable bridge source: sample=%u context=0x%llx current=0x%llx match=%u source_fb=%u source_tex=%u source_rb=%u target_fb=%u target_rb=%u drawable=%ux%u logical_fb=%u target_status=0x%04x transferred=%u failure=%u\n",
+				ios_drawable_bridge.samples, (unsigned long long)state->context,
+				(unsigned long long)state->currentContext, state->contextMatches,
+				state->sourceFramebuffer, state->sourceTexture, state->sourceRenderbuffer,
+				state->targetFramebuffer,
+				state->targetRenderbuffer, state->drawableWidth, state->drawableHeight,
+				state->logicalFramebuffer, state->targetStatus, state->transferResult,
+				state->failureCode );
+
+		if( R_IOSDrawableBridgeCanPrint() )
+			gEngfuncs.Con_Printf( "iOS drawable bridge proof: sample=%u checksum_before_valid=%u checksum_before=0x%08x checksum_after_valid=%u checksum_after=0x%08x changed=%u transferred=%u\n",
+				ios_drawable_bridge.samples, state->checksumBeforeValid, state->checksumBefore,
+				state->checksumAfterValid, state->checksumAfter, state->checksumChanged,
+				state->transferResult );
+	}
+
+	if( !ios_drawable_bridge.presentPrinted && state->presentAttempted &&
+		state->presentResult && R_IOSDrawableBridgeCanPrint() )
+	{
+		gEngfuncs.Con_Printf( "iOS drawable bridge present: context=0x%llx target_fb=%u target_rb=%u attempted=1 result=1\n",
+			(unsigned long long)state->context, state->targetFramebuffer, state->targetRenderbuffer );
+		ios_drawable_bridge.presentPrinted = true;
+	}
+
+	if( !ios_drawable_bridge.restorePrinted && state->restoreResult &&
+		R_IOSDrawableBridgeCanPrint() )
+	{
+		gEngfuncs.Con_Printf( "iOS drawable bridge restore: native_fb=%u native_rb=%u logical_fb=%u restored=1\n",
+			state->restoredFramebuffer, state->restoredRenderbuffer,
+			state->restoredLogicalFramebuffer );
+		ios_drawable_bridge.restorePrinted = true;
+	}
+
+	if( !ios_drawable_bridge.terminalPrinted &&
+		( ios_drawable_bridge.failures ||
+		ios_drawable_bridge.samples >= REF_IOS_DRAWABLE_BRIDGE_PROOF_TRANSFERS ))
+	{
+		if( R_IOSDrawableBridgeCanPrint() )
+			gEngfuncs.Con_Printf( "iOS drawable bridge terminal: result=%s samples=%u success=%u failure=%u records=%u max_records=%d\n",
+				ios_drawable_bridge.failures ? "failure" : "success",
+				ios_drawable_bridge.samples, ios_drawable_bridge.successes,
+				ios_drawable_bridge.failures, ios_drawable_bridge.records,
+				REF_IOS_DRAWABLE_BRIDGE_MAX_RECORDS );
+		ios_drawable_bridge.terminalPrinted = true;
+	}
+
+	return result;
+}
+#endif
+
 const ref_interface_t gReffuncs =
 {
 	R_Init,
@@ -580,4 +732,10 @@ const ref_interface_t gReffuncs =
 	R_FillTriAPI,
 
 	VGUI_SetupDrawing,
+
+#if XASH_IOS && XASH_GL4ES
+	R_IOSDrawableBridge,
+#else
+	NULL,
+#endif
 };

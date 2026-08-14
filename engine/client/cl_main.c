@@ -3882,9 +3882,6 @@ void Host_ClientFrame( void )
 {
 	// if client is not active, do nothing
 	if( !cls.initialized ) return;
-#if XASH_APPLE
-	Host_IOSLivenessStage( "client-frame", "begin" );
-#endif
 	if( cls.key_dest == key_game && cls.state == ca_active && !Con_Visible() )
 		Platform_SetTimer( cl_maxframetime.value );
 
@@ -3936,9 +3933,6 @@ void Host_ClientFrame( void )
 
 	// adjust client time
 	CL_AdjustClock ();
-#if XASH_APPLE
-	Host_IOSLivenessStage( "client-frame", "end" );
-#endif
 }
 
 //============================================================================

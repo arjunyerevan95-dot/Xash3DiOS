@@ -12,13 +12,8 @@ if [ "$SDL_ACTUAL_REF" != "$SDL_REF" ]; then
 	exit 1
 fi
 
-git -C SDL apply --check --unidiff-zero "$GITHUB_WORKSPACE/scripts/ios/sdl2-display-audit-ios.patch" || exit 1
-git -C SDL apply --unidiff-zero "$GITHUB_WORKSPACE/scripts/ios/sdl2-display-audit-ios.patch" || exit 1
-git -C SDL apply --check --unidiff-zero "$GITHUB_WORKSPACE/scripts/ios/sdl2-wo43-diagnostics-ios.patch" || exit 1
-git -C SDL apply --unidiff-zero "$GITHUB_WORKSPACE/scripts/ios/sdl2-wo43-diagnostics-ios.patch" || exit 1
-git -C SDL apply --check -p3 --unidiff-zero "$GITHUB_WORKSPACE/scripts/ios/sdl2-wo43-phase-b-correction-ios.patch" || exit 1
-git -C SDL apply -p3 --unidiff-zero "$GITHUB_WORKSPACE/scripts/ios/sdl2-wo43-phase-b-correction-ios.patch" || exit 1
-python3 "$GITHUB_WORKSPACE/scripts/ios/validate-ios-display-audit.py" "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/SDL" || exit 1
+git -C SDL apply --check --unidiff-zero "$GITHUB_WORKSPACE/scripts/ios/sdl2-drawable-bridge-ios.patch" || exit 1
+git -C SDL apply --unidiff-zero "$GITHUB_WORKSPACE/scripts/ios/sdl2-drawable-bridge-ios.patch" || exit 1
 
 cd SDL/Xcode/SDL || exit 1
 xcodebuild -scheme xcFramework-iOS -target xcFramework-iOS build -configuration Release

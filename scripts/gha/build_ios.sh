@@ -10,8 +10,19 @@ IOS_BUNDLE_VERSION=${GITHUB_RUN_NUMBER:-2}
 
 git -C 3rdparty/nanogl apply --check --unidiff-zero "$GITHUB_WORKSPACE/scripts/ios/nanogl-large-primitive.patch" || die
 git -C 3rdparty/nanogl apply --unidiff-zero "$GITHUB_WORKSPACE/scripts/ios/nanogl-large-primitive.patch" || die
+GL4ES_REF=${GL4ES_REF:-81547d986798e876de8b434193920b606a72363f}
+GL4ES_ACTUAL_REF=$(git -C 3rdparty/gl4es/gl4es rev-parse HEAD) || die
+if [ "$GL4ES_ACTUAL_REF" != "$GL4ES_REF" ]; then
+	echo "Expected GL4ES $GL4ES_REF, got $GL4ES_ACTUAL_REF" >&2
+	exit 1
+fi
 git -C 3rdparty/gl4es/gl4es apply --check --unidiff-zero "$GITHUB_WORKSPACE/scripts/ios/gl4es-ios.patch" || die
 git -C 3rdparty/gl4es/gl4es apply --unidiff-zero "$GITHUB_WORKSPACE/scripts/ios/gl4es-ios.patch" || die
+git -C 3rdparty/gl4es/gl4es apply --check --unidiff-zero "$GITHUB_WORKSPACE/scripts/ios/gl4es-drawable-bridge-ios.patch" || die
+git -C 3rdparty/gl4es/gl4es apply --unidiff-zero "$GITHUB_WORKSPACE/scripts/ios/gl4es-drawable-bridge-ios.patch" || die
+python3 "$GITHUB_WORKSPACE/scripts/ios/validate-ios-drawable-bridge.py" \
+	"$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/SDL" \
+	"$GITHUB_WORKSPACE/3rdparty/gl4es/gl4es" --self-test || die
 mkdir -p build || die
 cc -std=gnu11 -DNANOGL_MANGLE_PREPEND=1 -DREF_DLL=1 \
 	-I3rdparty/nanogl -I3rdparty/nanogl/GL \

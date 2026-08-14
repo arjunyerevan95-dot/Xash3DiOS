@@ -1,0 +1,144 @@
+diff --git a/include/gl4esinit.h b/include/gl4esinit.h
+index 79cbb344..4793eaa6 100644
+--- a/include/gl4esinit.h
++++ b/include/gl4esinit.h
+@@ -27,0 +28,12 @@ void* APIENTRY_GL4ES gl4es_GetProcAddress(const char *name);
++// Embedder-owned drawable bridge for LIBGL_FB=2. The caller supplies the
++// actual native destination; GL4ES keeps logical framebuffer zero unchanged.
++int gl4es_drawable_bridge_pre(unsigned int target_framebuffer,
++    unsigned int drawable_width, unsigned int drawable_height,
++    unsigned int *source_framebuffer, unsigned int *source_texture,
++    unsigned int *source_renderbuffer, unsigned int *logical_framebuffer,
++    unsigned int *target_status);
++int gl4es_drawable_bridge_post(unsigned int expected_source_framebuffer,
++    unsigned int expected_source_renderbuffer,
++    unsigned int *restored_framebuffer, unsigned int *restored_renderbuffer,
++    unsigned int *logical_framebuffer);
++
+diff --git a/src/gl/framebuffers.c b/src/gl/framebuffers.c
+index 93194fcf..3d3dc9f9 100644
+--- a/src/gl/framebuffers.c
++++ b/src/gl/framebuffers.c
+@@ -1338,0 +1339,84 @@ void blitMainFBO(int x, int y, int width, int height) {
++int blitMainFBOTo(GLuint target, int width, int height, GLuint *source,
++    GLuint *source_texture, GLuint *source_renderbuffer, GLuint *logical,
++    GLenum *target_status) {
++    LOAD_GLES2_OR_OES(glBindFramebuffer);
++    LOAD_GLES2_OR_OES(glCheckFramebufferStatus);
++    LOAD_GLES(glGetIntegerv);
++    GLint native_source = 0;
++    GLint native_renderbuffer = 0;
++    gles_glGetIntegerv(GL_FRAMEBUFFER_BINDING, &native_source);
++    gles_glGetIntegerv(GL_RENDERBUFFER_BINDING, &native_renderbuffer);
++
++    if (source) *source = native_source;
++    if (source_texture) *source_texture = glstate->fbo.mainfbo_tex;
++    if (source_renderbuffer) *source_renderbuffer = native_renderbuffer;
++    if (logical) *logical = glstate->fbo.current_fb
++        ? glstate->fbo.current_fb->id : 0;
++    if (target_status) *target_status = 0;
++
++    if (!globals4es.usefbo || !glstate->fbo.mainfbo_fbo ||
++        !glstate->fbo.mainfbo_tex || !glstate->fbo.current_fb ||
++        glstate->fbo.current_fb->id != 0 || !target ||
++        native_source != glstate->fbo.mainfbo_fbo ||
++        target == glstate->fbo.mainfbo_fbo || width <= 0 || height <= 0)
++        return 0;
++
++    gles_glBindFramebuffer(GL_FRAMEBUFFER, target);
++    GLenum status = gles_glCheckFramebufferStatus(GL_FRAMEBUFFER);
++    if (target_status) *target_status = status;
++    if (status != GL_FRAMEBUFFER_COMPLETE) {
++        gles_glBindFramebuffer(GL_FRAMEBUFFER, glstate->fbo.mainfbo_fbo);
++        return 0;
++    }
++
++    GLint vp[4];
++    memcpy(vp, &glstate->raster.viewport, sizeof(vp));
++    gl4es_glViewport(0, 0, width, height);
++    gl4es_blitTexture(glstate->fbo.mainfbo_tex, 0.f, 0.f,
++        glstate->fbo.mainfbo_width, glstate->fbo.mainfbo_height,
++        glstate->fbo.mainfbo_nwidth, glstate->fbo.mainfbo_nheight,
++        (float)width / glstate->fbo.mainfbo_width,
++        (float)height / glstate->fbo.mainfbo_height,
++        width, height, 0, 0, BLIT_OPAQUE);
++    gl4es_glViewport(vp[0], vp[1], vp[2], vp[3]);
++
++    // The temporary native target is intentionally left bound for the
++    // embedder's presentation. GL4ES's logical current framebuffer stays 0.
++    gles_glBindFramebuffer(GL_FRAMEBUFFER, target);
++    return 1;
++}
++
++int restoreMainFBOAfterPresent(GLuint expected_source,
++    GLuint expected_renderbuffer, GLuint *restored,
++    GLuint *restored_renderbuffer, GLuint *logical) {
++    LOAD_GLES2_OR_OES(glBindFramebuffer);
++    LOAD_GLES2_OR_OES(glBindRenderbuffer);
++    LOAD_GLES(glGetIntegerv);
++
++    if (restored) *restored = 0;
++    if (restored_renderbuffer) *restored_renderbuffer = 0;
++    if (logical) *logical = glstate->fbo.current_fb
++        ? glstate->fbo.current_fb->id : 0;
++
++    if (!globals4es.usefbo || !glstate->fbo.mainfbo_fbo ||
++        !glstate->fbo.current_fb || glstate->fbo.current_fb->id != 0 ||
++        expected_source != glstate->fbo.mainfbo_fbo ||
++        !glstate->fbo.current_rb ||
++        expected_renderbuffer != glstate->fbo.current_rb->renderbuffer)
++        return 0;
++
++    gles_glBindFramebuffer(GL_FRAMEBUFFER, glstate->fbo.mainfbo_fbo);
++    gles_glBindRenderbuffer(GL_RENDERBUFFER, expected_renderbuffer);
++
++    GLint native_framebuffer = 0;
++    GLint native_renderbuffer = 0;
++    gles_glGetIntegerv(GL_FRAMEBUFFER_BINDING, &native_framebuffer);
++    gles_glGetIntegerv(GL_RENDERBUFFER_BINDING, &native_renderbuffer);
++
++    if (restored) *restored = native_framebuffer;
++    if (restored_renderbuffer) *restored_renderbuffer = native_renderbuffer;
++    if (logical) *logical = glstate->fbo.current_fb->id;
++    return native_framebuffer == glstate->fbo.mainfbo_fbo &&
++        native_renderbuffer == expected_renderbuffer;
++}
++
+diff --git a/src/gl/framebuffers.h b/src/gl/framebuffers.h
+index a917658a..3755f373 100644
+--- a/src/gl/framebuffers.h
++++ b/src/gl/framebuffers.h
+@@ -49,0 +50,6 @@ void unbindMainFBO();
++int blitMainFBOTo(GLuint target, int width, int height, GLuint *source,
++    GLuint *source_texture, GLuint *source_renderbuffer, GLuint *logical,
++    GLenum *target_status);
++int restoreMainFBOAfterPresent(GLuint expected_source,
++    GLuint expected_renderbuffer, GLuint *restored,
++    GLuint *restored_renderbuffer, GLuint *logical);
+diff --git a/src/gl/gl4es.c b/src/gl/gl4es.c
+index 674eaa5e..ad462c2d 100644
+--- a/src/gl/gl4es.c
++++ b/src/gl/gl4es.c
+@@ -1212,0 +1213,22 @@ void gl4es_use_scratch_indices(int use) {
++int gl4es_drawable_bridge_pre(unsigned int target_framebuffer,
++    unsigned int drawable_width, unsigned int drawable_height,
++    unsigned int *source_framebuffer, unsigned int *source_texture,
++    unsigned int *source_renderbuffer, unsigned int *logical_framebuffer,
++    unsigned int *target_status) {
++    if (glstate->list.active) gl4es_flush();
++    if (glstate->raster.bm_drawing) bitmap_flush();
++
++    return blitMainFBOTo(target_framebuffer, drawable_width, drawable_height,
++        source_framebuffer, source_texture, source_renderbuffer,
++        logical_framebuffer, target_status);
++}
++
++int gl4es_drawable_bridge_post(unsigned int expected_source_framebuffer,
++    unsigned int expected_source_renderbuffer,
++    unsigned int *restored_framebuffer, unsigned int *restored_renderbuffer,
++    unsigned int *logical_framebuffer) {
++    return restoreMainFBOAfterPresent(expected_source_framebuffer,
++        expected_source_renderbuffer,
++        restored_framebuffer, restored_renderbuffer, logical_framebuffer);
++}
++

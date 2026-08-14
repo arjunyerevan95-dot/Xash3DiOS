@@ -673,17 +673,7 @@ void SCR_UpdateScreen( void )
 {
 	qboolean screen_redraw = true; // assume screen has been redrawn
 
-#if XASH_APPLE
-	Host_IOSLivenessStage( "screen", "begin" );
-#endif
-
-	if( !V_PreRender( ))
-	{
-#if XASH_APPLE
-		Host_IOSLivenessStage( "screen", "pre-render-blocked" );
-#endif
-		return;
-	}
+	if( !V_PreRender( )) return;
 
 	switch( cls.state )
 	{
@@ -712,10 +702,6 @@ void SCR_UpdateScreen( void )
 	// is ugly, specifically with Adreno and ImgTec GPUs
 	if( screen_redraw || !cls.changelevel || !cls.changedemo )
 		V_PostRender();
-
-#if XASH_APPLE
-	Host_IOSLivenessStage( "screen", "end" );
-#endif
 }
 
 /*
