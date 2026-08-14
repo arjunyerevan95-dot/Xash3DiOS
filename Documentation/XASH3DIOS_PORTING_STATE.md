@@ -492,3 +492,75 @@ Workflow/artifact/IPA/SHA-256: not run or produced; forbidden by this audit-only
 Durable ledger path and commit: `Documentation/XASH3DIOS_PORTING_STATE.md`. This section is published in one documentation-only `[skip ci]` commit. The exact commit is recorded in the authoritative Google Docs mirror and final handoff because a commit cannot contain its own hash.
 
 Stop state: Work Order 45 Phase A ends at **Outcome B** for orchestrator review. Do not implement the proposed diagnostics, create or publish a candidate, run GitHub Actions, retrieve or upload an IPA, use tempfile.org, contact Arjun, request evidence or device testing, revive Bundle 60, diagnose a future run, or begin another work order.
+
+## Work Order 45 Phase B - bundle version 64 diagnostics-only main-FBO audit
+
+Candidate/run and acceptance status: **bundle version 64, build-qualified diagnostics-only candidate; not device-accepted and not a rendering fix**. The accepted device baseline remains Run 39. Bundle 60 remains rejected and was not rebuilt or proposed for another test. Phase B implements only the authorized one-run ownership/presentation discriminator and preserves the visible stale-difficulty-screen expectation until later device evidence is reviewed by the orchestrator.
+
+Commits and exact pinned inputs:
+
+- Behavioral diagnostic implementation: `380e31d90addc4a7540dfea5c0d10de5ffc6565b` (`Instrument Work Order 45 main-FBO pipeline`).
+- Final build commit: `7d8ed08c980cc15797d52b9d645f476a08c6ed00` (`Make Work Order 45 validation LTO-safe [skip ci]`). The second commit changes only an over-strict IPA symbol-export assertion; LTO may internalize the linked audit helper, while the required compiled marker contract remains directly verifiable.
+- Exact source pins remain Diffusion `14d156bf3a6993c172697fac83a937836c3b5561`, SDL `5d249570393f7a37e037abf22cd6012a4cc56a71`, GL4ES `81547d986798e876de8b434193920b606a72363f`, and Diffusion-MainUI `8c68de2f2325a0130953719efc3ae413eb24e01a`.
+
+Workflow URL/ID and result:
+
+- Sole qualifying candidate workflow: workflow-dispatch [iOS Proof of Life run 31793116163](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/31793116163), head `7d8ed08c980cc15797d52b9d645f476a08c6ed00`, result `success`; unsigned arm64 IPA job `94744240681`, every build, contract, and upload step successful.
+- The first behavioral push run `31787263990` successfully compiled all targets but failed the pre-upload verifier because it required the LTO-internal `gl4es_drawable_bridge_audit` helper to remain globally exported. Artifact upload was skipped, so it is not a candidate. The open PR automatically started duplicate run `31787266890`; cancellation raced its verifier-only failure and it likewise produced no artifact or candidate. The validation-only fix was pushed with `[skip ci]`, creating no automatic build, and the one corrected workflow was then dispatched manually.
+
+Artifact and IPA:
+
+- Retained artifact `Xash3DiOS-arm64-unsigned`, ID `9216452753`, archive size 8,566,145 bytes, GitHub digest `sha256:a840d0914483231057e3647364d4d7b0fee9e3712c0fd333fb23e84cdea13a5a`: https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/31793116163/artifacts/9216452753
+- Actual IPA `xash3d-fwgs-ios-arm64.ipa`: 8,663,710 bytes; SHA-256 `A2D409EE3374C39224A8E3795D0381FF541918C548C0EB34875DEA71932FAD49`.
+- Tempfile delivery page: https://tempfile.org/cotnm2PPBEy/ ; direct download: https://tempfile.org/cotnm2PPBEy/download ; reported expiry `2026-08-16 10:49:05 UTC`. API readback confirmed the exact filename, byte size, SHA-256, existence, and safe/no-warning scan result.
+
+Exact files changed:
+
+- Behavioral implementation: `engine/ref_api.h`; `ref/gl/gl_context.c`; `scripts/ios/gl4es-drawable-bridge-ios.patch`; `scripts/ios/sdl2-drawable-bridge-ios.patch`; `scripts/ios/validate-ios-drawable-bridge.py`; `scripts/ios/verify_ipa.sh`.
+- Validation-only follow-up: `scripts/ios/verify_ipa.sh`.
+- Durable report: `Documentation/XASH3DIOS_PORTING_STATE.md` only in the following documentation-only `[skip ci]` commit.
+
+Verified failure boundary: the underlying device boundary is unchanged from rejected Bundle 60: Diffusion reaches `ch1map0`, normal CPU/render processing and successful EAGL presentation continue, but the stale difficulty image remains visible; the first bridge call observed raw native FBO 2, GL4ES logical framebuffer zero, no GL4ES main texture, and failed the pre-transfer main-FBO guard before target status or transfer. Phase A proved that FBO 2's owner and attachment were unresolved and that the compiled SDL/NOEGL GL4ES route has no active main-FBO creator. Phase B intentionally does not reinterpret that raw binding or select a transfer.
+
+Structural cause: **still unresolved pending the authorized observation evidence**. Source proves only the diagnostic gap: the previous candidate collapsed all guard failures, did not expose GL4ES main-object lifecycle or SDL MSAA/depth identities, did not query source/target attachments, and stopped detailed sampling after the first failure. It could not distinguish SDL's renderbuffer-backed MSAA FBO, a different native renderer FBO, or a later ownership/binding change.
+
+Why this change satisfies Work Order 45 Phase B:
+
+- Checkpoint A wraps the engine swap function at the immediate renderer handoff after normal `R_EndFrame`; B records SDL swap entry before the ordinary resolve; C records immediately after SDL's unchanged resolve; D records the existing bridge's entry and return; E records immediately before presentation and after presentation plus the existing restore attempt. Every sampled record carries one monotonic invocation and the same engine phase/map/host/client timestamp identity.
+- The versioned ABI now carries EAGL API/context generation, SDL view/MSAA/depth FBO/RB names, requested/effective samples, geometry/resize generation, and a named bridge-precondition mask.
+- GL4ES exposes read-only state identity/generation, `usefb/usefbo`, logical/current/default/main objects and dimensions, bounded create/success/resize/delete counters and status, native draw/read/RB bindings, transient source/target completeness and color/depth/stencil attachment type/name, renderbuffer dimensions/format/samples, known main-texture dimensions, five fixed 4x4-region checksums, the first exact query failure operation/error, and post-query restored native/logical state.
+- Sampling is the first three menu invocations, first active-map invocation, active offsets 2/4/8/16/32/64, and observed identity/lifecycle changes, with one terminal record and a hard maximum of 64 records per context.
+- The existing bridge guard, transfer implementation, SDL resolve, view-renderbuffer binding, and EAGL present remain behaviorally unchanged. Failed guards remain no-ops. No main FBO or persistent render target is created, `LIBGL_FB` and MSAA are not changed, no new blit/resolve/copy/transfer or sentinel is introduced, and menu/gameplay/renderer functionality is not disabled or bypassed.
+
+Validation performed:
+
+- The SDL diagnostics patch passed `git apply --check --unidiff-zero` and applied cleanly to exact SDL `5d249570393f7a37e037abf22cd6012a4cc56a71`.
+- The accepted base iOS GL4ES patch and Phase-B audit patch passed `git apply --check --unidiff-zero` and applied in order to exact GL4ES `81547d986798e876de8b434193920b606a72363f`.
+- `validate-ios-drawable-bridge.py ... --self-test` passed its positive policy audit and rejected nine deliberate mutations: unauthorized main-FBO creation, `LIBGL_FB` injection, MSAA-policy change, hard-coded FBO identity, new transfer, persistent attachment mutation, sentinel insertion, unbounded record cap, and missing native restore.
+- `git diff --check` and Python bytecode compilation passed. A local arm64 iOS toolchain is unavailable on the Windows worker; the qualifying macOS job compiled the engine and relevant Half-Life/Diffusion client/server/menu targets with `XASH_IOS=1`, passed the policy and IPA contract, and published the artifact.
+- Independent downloaded-IPA validation found bundle version 64, minimum iOS 12.0, file sharing enabled, 13 Mach-O payloads and no non-arm64 Mach-O, all required engine/SDL/renderer/Diffusion payloads, all ten expected markers, no sentinel/legacy proof markers, and the exact SHA-256 above.
+
+Expected new log markers:
+
+```text
+iOS main-FBO audit policy:
+iOS main-FBO lifecycle:
+iOS main-FBO state:
+iOS native attachment:
+iOS presentation pipeline:
+iOS pixel checkpoint:
+iOS drawable bridge attempt:
+iOS drawable bridge present:
+iOS drawable bridge restore:
+iOS main-FBO audit terminal:
+```
+
+Preserved baseline: the real Diffusion menu and callbacks, touch, button audio, New Game/difficulty selection, canonical materials, shared animated-model shader layout, on-demand shaders, GL4ES, SDL presentation, gameplay, foliage, and all unrelated fixes remain enabled. This diagnostics-only build is not expected or claimed to improve visible rendering.
+
+Remaining risks: no device evidence exists for bundle version 64, so source ownership, attachment type, MSAA state, and the exact checksum divergence checkpoint remain unknown. Bounded native queries/readbacks add diagnostic GPU synchronization and may affect timing. A default/native framebuffer attachment query may itself be unsupported; the exact query operation/error field exists to make that outcome explicit while restoring and re-querying bindings. The known first custom-renderer `GL_INVALID_OPERATION`, possible later first-map transition defect, and rendering repair remain deliberately outside this phase.
+
+Single device test requested: **none by the worker**. This report does not contact Arjun, request evidence, recommend installation, or begin Phase C. The orchestrator alone reviews whether the candidate meets the proof gate and whether any later device test is authorized.
+
+Durable ledger path and commit: `Documentation/XASH3DIOS_PORTING_STATE.md`. This report is published in the immediately following documentation-only `[skip ci]` commit. Its exact hash is recorded in the authoritative Google Docs ledger and the final worker handoff because a Git commit cannot contain its own hash.
+
+Stop state: Work Order 45 Phase B diagnostics, validation, one qualifying candidate, artifact retrieval, independent verification, the one authorized tempfile.org upload, and both ledger reports are complete. Stop for orchestrator review. Do not request device testing, contact Arjun, diagnose future evidence, implement a renderer/gameplay repair, begin Phase C, or create another work order.
