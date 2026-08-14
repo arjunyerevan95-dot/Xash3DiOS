@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate Work Order 45 Phase B's diagnostics-only iOS main-FBO audit."""
+"""Validate Work Order 46 Phase B's direct iOS drawable ownership contract."""
 
 from __future__ import annotations
 
@@ -48,226 +48,212 @@ def validate(files: dict[str, str]) -> list[str]:
     failures: list[str] = []
     api = files["api"]
     engine = files["engine"]
+    platform = files["platform"]
+    ref_common = files["ref_common"]
     renderer = files["renderer"]
+    opengl = files["opengl"]
     sdl_header = files["sdl_header"]
     sdl_view = files["sdl_view"]
+    sdl_gles = files["sdl_gles"]
     gl4es_api = files["gl4es_api"]
     gl4es_fbo = files["gl4es_fbo"]
-    gl4es_main = files["gl4es_main"]
+    gl4es_fpe = files["gl4es_fpe"]
+    gl4es_state = files["gl4es_state"]
     deps = files["deps"]
     build = files["build"]
     diffusion_build = files["diffusion_build"]
 
     for token in (
-        "#define REF_API_VERSION 18",
-        "#define REF_IOS_DRAWABLE_BRIDGE_VERSION 2",
-        "REF_IOS_DRAWABLE_BRIDGE_MAX_RECORDS 64",
-        "REF_IOS_DRAWABLE_BRIDGE_MENU_ATTEMPTS 3",
-        "REF_IOS_DRAWABLE_BRIDGE_MAP_GAPS 6",
-        "REF_IOS_DRAWABLE_BRIDGE_RENDERER_HANDOFF",
-        "REF_IOS_DRAWABLE_BRIDGE_SDL_SWAP_ENTRY",
-        "REF_IOS_DRAWABLE_BRIDGE_SDL_POST_RESOLVE",
-        "REF_IOS_DRAWABLE_BRIDGE_PRE_PRESENT",
-        "REF_IOS_DRAWABLE_BRIDGE_PRESENT_BEFORE",
-        "REF_IOS_DRAWABLE_BRIDGE_POST_PRESENT",
-        "contextGeneration",
-        "resizeGeneration",
-        "requestedSamples",
-        "effectiveSamples",
-        "preconditionMask",
+        "#define REF_API_VERSION 19",
+        "#define REF_IOS_DIRECT_DRAWABLE_VERSION 3",
+        "REF_IOS_DIRECT_DRAWABLE_MAX_RECORDS 32",
+        "REF_IOS_DIRECT_DRAWABLE_MENU_SAMPLES 2",
+        "REF_IOS_DIRECT_DRAWABLE_ACTIVE_SAMPLES 3",
+        "REF_IOS_DIRECT_DRAWABLE_CONTEXT_RESTORED",
+        "REF_IOS_DIRECT_DRAWABLE_RESIZED",
+        "REF_IOS_DIRECT_DRAWABLE_DESTROYING",
+        "GL_GetDrawableInfo",
     ):
-        require(api, token, "engine audit ABI", failures)
+        require(api, token, "direct-drawable ABI", failures)
 
-    require(engine, "SDL_XASH_IOSSetDrawableBridgeCallback", "engine-to-SDL registration", failures)
-    require(engine, "ref.dllFuncs.R_IOSDrawableBridge", "engine-to-SDL registration", failures)
-    require(renderer, "gEngfuncs.GL_SwapBuffers = R_IOSMainFBOSwap", "renderer-handoff hook", failures)
-    require(renderer, "R_IOSMainFBOPrintCheckpoint( \"iOS presentation pipeline:\", \"A-renderer-handoff\"",
-            "renderer checkpoint A", failures)
+    for token in (
+        "SDL_XASH_IOSSetDirectDrawableCallback",
+        "SDL_GetWindowWMInfo( host.hWnd, &info )",
+        "info.subsystem != SDL_SYSWM_UIKIT",
+        "info.info.uikit.framebuffer",
+        "info.info.uikit.colorbuffer",
+        "SDL_GL_GetCurrentContext()",
+        "SDL_GL_GetDrawableSize",
+        "ios_direct_drawable_context_generation++",
+        "ios_direct_drawable_resize_generation++",
+        "SDL_XASH_IOSSetDirectDrawableCallback( NULL )",
+    ):
+        require(engine, token, "live SDL drawable query/lifecycle", failures)
+    require(platform, "int GL_GetDrawableInfo( ref_ios_direct_drawable_t *state",
+            "engine platform ABI", failures)
+    require(ref_common, "GL_GetDrawableInfo,", "renderer API initializer", failures)
+
+    setup = between(opengl, "void GL_SetupAttributes", "void wes_init")
+    for token in (
+        "#if XASH_IOS && XASH_GL4ES",
+        "/* SDL's CAEAGLLayer view FBO is the one presented drawable. */\n\t\tsamples = 0;",
+        "REF_GL_MULTISAMPLEBUFFERS, 0",
+        "REF_GL_MULTISAMPLESAMPLES, 0",
+    ):
+        require(setup, token, "iOS GL4ES samples-zero policy", failures)
+    created = between(opengl, "void GL_OnContextCreated", "}")
+    require(opengl, "initialize_gl4es();\n#if XASH_IOS\n\tR_IOSDirectDrawableContextCreated();",
+            "registration before renderer GL", failures)
+    require(opengl, "R_IOSDirectDrawableContextDestroying();\n#endif\n\tclose_gl4es();",
+            "clear before GL4ES destruction", failures)
+
     for marker in (
-        "iOS main-FBO audit policy:",
-        "iOS main-FBO lifecycle:",
-        "iOS main-FBO state:",
-        "iOS native attachment:",
-        "iOS presentation pipeline:",
-        "iOS pixel checkpoint:",
-        "iOS drawable bridge attempt:",
-        "iOS drawable bridge present:",
-        "iOS drawable bridge restore:",
-        "iOS main-FBO audit terminal:",
+        "iOS direct drawable policy:",
+        "iOS direct drawable register:",
+        "iOS direct drawable logical-zero:",
+        "iOS direct drawable present:",
+        "iOS direct drawable lifecycle:",
+        "iOS direct drawable proof:",
     ):
         require(renderer, marker, "required bounded marker", failures)
     for token in (
-        "static const uint32_t activeGaps[] = { 0, 2, 4, 8, 16, 32, 64 }",
-        "ios_main_fbo_audit.records >= REF_IOS_DRAWABLE_BRIDGE_MAX_RECORDS - 1",
-        "gl4es_drawable_bridge_audit(",
-        "state->preconditionMask",
-        "R_IOSDrawableBridge,\n#else\n\tNULL,",
+        "gEngfuncs.GL_SwapBuffers = R_IOSDirectDrawableSwap",
+        "set_external_default_framebuffer( state->viewFramebuffer )",
+        "set_external_default_framebuffer( 0 )",
+        "gl4es_external_default_framebuffer_state(",
+        "state.contextGeneration != ios_direct_drawable.contextGeneration",
+        "state.resizeGeneration != ios_direct_drawable.resizeGeneration",
+        "state.viewFramebuffer != ios_direct_drawable.registeredFramebuffer",
+        "action == REF_IOS_DIRECT_DRAWABLE_CONTEXT_RESTORED",
+        "action == REF_IOS_DIRECT_DRAWABLE_RESIZED",
+        "ios_direct_drawable.records >= REF_IOS_DIRECT_DRAWABLE_MAX_RECORDS",
+        "checksum_changed=%u",
     ):
-        require(renderer, token, "bounded renderer audit", failures)
+        require(renderer, token, "renderer registration/proof path", failures)
+    reject(renderer, r"gl4es_drawable_bridge_(pre|post)|blitMainFBOTo|restoreMainFBOAfterPresent|transferAttempted|PRE_PRESENT",
+           "failed transfer bridge removal", failures)
 
     for token in (
-        "#define SDL_XASH_IOS_DRAWABLE_BRIDGE_VERSION 2",
-        "SDL_XASH_IOS_DRAWABLE_BRIDGE_SDL_SWAP_ENTRY 2",
-        "SDL_XASH_IOS_DRAWABLE_BRIDGE_SDL_POST_RESOLVE 3",
-        "SDL_XASH_IOS_DRAWABLE_BRIDGE_PRE_PRESENT 4",
-        "SDL_XASH_IOS_DRAWABLE_BRIDGE_PRESENT_BEFORE 5",
-        "SDL_XASH_IOS_DRAWABLE_BRIDGE_POST_PRESENT 6",
-        "Uint32 contextGeneration",
-        "Uint32 resizeGeneration",
-        "Uint32 viewFramebuffer",
-        "Uint32 msaaFramebuffer",
-        "Uint32 depthRenderbuffer",
-        "Uint32 requestedSamples",
-        "Uint32 effectiveSamples",
+        "#define SDL_XASH_IOS_DIRECT_DRAWABLE_VERSION 3",
+        "SDL_XASH_IOS_DIRECT_DRAWABLE_CONTEXT_RESTORED 1",
+        "SDL_XASH_IOS_DIRECT_DRAWABLE_RESIZED 2",
+        "SDL_XASH_IOS_DIRECT_DRAWABLE_SWAP_ENTRY 3",
+        "SDL_XASH_IOS_DIRECT_DRAWABLE_PRESENT_BEFORE 4",
+        "SDL_XASH_IOS_DIRECT_DRAWABLE_POST_PRESENT 5",
+        "SDL_XASH_IOS_DIRECT_DRAWABLE_DESTROYING 6",
+        "SDL_XASH_IOSSetDirectDrawableCallback",
     ):
-        require(sdl_header, token, "SDL audit ABI", failures)
+        require(sdl_header, token, "SDL lifecycle ABI", failures)
     for token in (
-        "requestedSamples = multisamples;",
-        "samples = multisamples;",
-        "samples = SDL_min(samples, maxsamples);",
-        "bridge.contextAPI = (Uint32)context.API;",
-        "bridge.contextGeneration = xashContextGeneration;",
-        "bridge.resizeGeneration = xashResizeGeneration;",
-        "bridge.viewFramebuffer = viewFramebuffer;",
-        "bridge.viewRenderbuffer = viewRenderbuffer;",
-        "bridge.msaaFramebuffer = msaaFramebuffer;",
-        "bridge.msaaRenderbuffer = msaaRenderbuffer;",
-        "bridge.depthRenderbuffer = depthRenderbuffer;",
-        "bridge.requestedSamples = (Uint32)SDL_max(0, requestedSamples);",
-        "bridge.effectiveSamples = (Uint32)SDL_max(0, samples);",
+        "state->viewFramebuffer = viewFramebuffer;",
+        "state->viewRenderbuffer = viewRenderbuffer;",
+        "state->contextGeneration = xashContextGeneration;",
+        "state->resizeGeneration = xashResizeGeneration;",
+        "state->requestedSamples = (Uint32)SDL_max(0, requestedSamples);",
+        "state->effectiveSamples = (Uint32)SDL_max(0, samples);",
+        "glBindRenderbuffer(GL_RENDERBUFFER, viewRenderbuffer);",
+        "state.presentResult = [context presentRenderbuffer:GL_RENDERBUFFER];",
+        "SDL_XASH_IOS_DIRECT_DRAWABLE_RESIZED",
+        "SDL_XASH_IOS_DIRECT_DRAWABLE_DESTROYING",
     ):
-        require(sdl_view, token, "live SDL drawable state", failures)
-
+        require(sdl_view, token, "SDL live drawable ownership", failures)
+    require(sdl_gles, "SDL_XASH_IOS_DIRECT_DRAWABLE_CONTEXT_RESTORED",
+            "foreground context reassertion", failures)
     swap = between(sdl_view, "- (void)swapBuffers", "- (void)layoutSubviews")
     order = [swap.find(token) for token in (
-        "SDL_XASH_IOS_DRAWABLE_BRIDGE_SDL_SWAP_ENTRY",
-        "if (msaaFramebuffer)",
-        "SDL_XASH_IOS_DRAWABLE_BRIDGE_SDL_POST_RESOLVE",
-        "SDL_XASH_IOS_DRAWABLE_BRIDGE_PRE_PRESENT",
-        "SDL_XASH_IOS_DRAWABLE_BRIDGE_PRESENT_BEFORE",
+        "SDL_XASH_IOS_DIRECT_DRAWABLE_SWAP_ENTRY",
+        "glBindRenderbuffer(GL_RENDERBUFFER, viewRenderbuffer);",
+        "SDL_XASH_IOS_DIRECT_DRAWABLE_PRESENT_BEFORE",
         "presentRenderbuffer:GL_RENDERBUFFER",
-        "SDL_XASH_IOS_DRAWABLE_BRIDGE_POST_PRESENT",
+        "SDL_XASH_IOS_DIRECT_DRAWABLE_POST_PRESENT",
     )]
     if any(position < 0 for position in order) or order != sorted(order):
-        failures.append("SDL swap order: checkpoints B/C/D/E do not surround the ordinary resolve/present path")
-    if swap.count("glBlitFramebuffer(") != 1 or swap.count("glResolveMultisampleFramebufferAPPLE(") != 1:
-        failures.append("SDL swap policy: ordinary resolve count changed")
-    for field in ("targetFramebuffer", "targetRenderbuffer", "viewFramebuffer",
-                  "viewRenderbuffer", "msaaFramebuffer", "msaaRenderbuffer",
-                  "depthRenderbuffer", "drawableWidth", "drawableHeight"):
-        reject(sdl_view, rf"bridge\.{field}\s*=\s*[1-9][0-9]*\s*;", "hard-coded SDL identity", failures)
-    reject(sdl_view, r"sentinel|yellow[_ -]?bar|SDL_Log", "SDL diagnostics-only policy", failures)
+        failures.append("SDL present path: live drawable callbacks do not surround one normal present")
+    if swap.count("presentRenderbuffer:GL_RENDERBUFFER") != 1:
+        failures.append("SDL present path: expected exactly one presentRenderbuffer call")
+    for field in ("viewFramebuffer", "viewRenderbuffer"):
+        reject(sdl_view, rf"state->{field}\s*=\s*[1-9][0-9]*\s*;",
+               "hard-coded SDL drawable identity", failures)
 
     for token in (
-        "GL4ES_DRAWABLE_AUDIT_VERSION 1",
-        "GL4ES_DRAWABLE_PRE_NO_USEFBO",
-        "GL4ES_DRAWABLE_PRE_NO_MAIN_FBO",
-        "GL4ES_DRAWABLE_PRE_NO_MAIN_TEXTURE",
-        "GL4ES_DRAWABLE_PRE_NO_CURRENT_FBO",
-        "GL4ES_DRAWABLE_PRE_LOGICAL_NOT_ZERO",
-        "GL4ES_DRAWABLE_PRE_NO_TARGET",
-        "GL4ES_DRAWABLE_PRE_SOURCE_MISMATCH",
-        "GL4ES_DRAWABLE_PRE_TARGET_IS_SOURCE",
-        "GL4ES_DRAWABLE_PRE_INVALID_SIZE",
-        "GL4ES_DRAWABLE_PRE_TARGET_INCOMPLETE",
-        "gl4es_drawable_attachment_audit_t",
-        "gl4es_drawable_fbo_audit_t",
-        "gl4es_drawable_audit_t",
-        "gl4es_drawable_bridge_audit",
+        "GL4ES_EXTERNAL_DEFAULT_STATE_VERSION 1",
+        "registered_framebuffer",
+        "logical_current",
+        "logical_read",
+        "logical_draw",
+        "native_draw",
+        "native_read",
+        "framebuffer_status",
+        "set_external_default_framebuffer",
+        "gl4es_external_default_framebuffer_state",
     ):
-        require(gl4es_api, token, "GL4ES audit ABI", failures)
-
-    bridge = between(gl4es_fbo, "int blitMainFBOTo", "int restoreMainFBOAfterPresent")
-    restore = between(gl4es_fbo, "int restoreMainFBOAfterPresent", "#define NATIVE_DRAW_FRAMEBUFFER")
-    audit = between(gl4es_fbo, "#define NATIVE_DRAW_FRAMEBUFFER", "void bindMainFBO")
+        require(gl4es_api, token, "GL4ES external-default ABI", failures)
     for token in (
-        "mask |= GL4ES_DRAWABLE_PRE_NO_USEFBO",
-        "mask |= GL4ES_DRAWABLE_PRE_NO_MAIN_FBO",
-        "mask |= GL4ES_DRAWABLE_PRE_SOURCE_MISMATCH",
-        "mask |= GL4ES_DRAWABLE_PRE_TARGET_INCOMPLETE",
-        "glstate->fbo.current_fb->id != 0",
-        "gl4es_blitTexture(glstate->fbo.mainfbo_tex",
+        "external_default_fbo",
+        "external_default_generation",
+        "external_default_active",
     ):
-        require(bridge, token, "unchanged named bridge guard", failures)
+        require(gl4es_state, token, "context-scoped GL4ES state", failures)
     for token in (
-        "gles_glBindFramebuffer(GL_FRAMEBUFFER, glstate->fbo.mainfbo_fbo);",
-        "gles_glBindRenderbuffer(GL_RENDERBUFFER, expected_renderbuffer);",
-        "expected_renderbuffer != glstate->fbo.current_rb->renderbuffer",
+        "static GLuint gl4es_defaultFramebuffer(void)",
+        "static GLuint gl4es_nativeFramebuffer(const glframebuffer_t *framebuffer)",
+        "GLuint gl4es_getDefaultFBO(void)",
+        "int set_external_default_framebuffer(GLuint framebuffer)",
+        "glstate->fbo.external_default_active = GL_FALSE",
+        "glstate->fbo.external_default_active = GL_TRUE",
+        "glstate->fbo.current_fb = glstate->fbo.fbo_0",
+        "gl4es_nativeFramebuffer(glstate->fbo.fbo_read)",
+        "gl4es_nativeFramebuffer(glstate->fbo.fbo_draw)",
+        "gl4es_nativeFramebuffer(glstate->fbo.current_fb)",
+        "framebuffer = gl4es_defaultFramebuffer();",
+        "gl4es_external_default_framebuffer_state",
+        "state->logical_current || state->logical_read || state->logical_draw",
+        "state->native_draw != state->registered_framebuffer",
+        "state->native_read != state->registered_framebuffer",
+        "state->framebuffer_status != GL_FRAMEBUFFER_COMPLETE",
     ):
-        require(restore, token, "existing bridge restore", failures)
-    for token in (
-        "NATIVE_DRAW_FRAMEBUFFER_BINDING 0x8CA6",
-        "NATIVE_READ_FRAMEBUFFER_BINDING 0x8CAA",
-        "gles_glGetFramebufferAttachmentParameteriv",
-        "GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE",
-        "GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME",
-        "GL_FRAMEBUFFER_ATTACHMENT_TEXTURE_LEVEL",
-        "gles_glGetRenderbufferParameteriv",
-        "GL_RENDERBUFFER_WIDTH",
-        "GL_RENDERBUFFER_HEIGHT",
-        "GL_RENDERBUFFER_INTERNAL_FORMAT",
-        "GL_RENDERBUFFER_SAMPLES",
-        "gles_glReadPixels",
-        "GL4ES_DRAWABLE_QUERY_PRIOR_ERROR",
-        "GL4ES_DRAWABLE_QUERY_RESTORE",
-        "GL4ES_DRAWABLE_QUERY_REQUERY",
-        "gles_glBindFramebuffer(NATIVE_DRAW_FRAMEBUFFER, draw);",
-        "gles_glBindFramebuffer(NATIVE_READ_FRAMEBUFFER, read);",
-        "gles_glBindRenderbuffer(GL_RENDERBUFFER, renderbuffer);",
-        "audit->restored_draw_framebuffer",
-        "audit->restored_read_framebuffer",
-        "audit->restored_renderbuffer",
-        "audit->restored_logical_framebuffer",
-    ):
-        require(audit, token, "native interrogation and exact restore", failures)
-    reject(audit, r"gl4es_blitTexture|glBlitFramebuffer|glResolve|glCopy|glFramebuffer(Texture|Renderbuffer)|glGen(Framebuffers|Renderbuffers|Textures)|glDelete(Framebuffers|Renderbuffers|Textures)|glClear\s*\(",
-           "audit must be read-only", failures)
-    if gl4es_fbo.count("void createMainFBO(") != 1:
-        failures.append("main-FBO creation policy: audit changed the number of creator definitions")
-    reject(renderer + gl4es_main, r"\bcreateMainFBO\s*\(", "main-FBO creation remains unauthorized", failures)
-
-    main_pre = between(gl4es_main, "int gl4es_drawable_bridge_pre", "int gl4es_drawable_bridge_post")
-    main_audit = between(gl4es_main, "int gl4es_drawable_bridge_audit", "#if defined(AMIGAOS4)")
-    require(main_pre, "blitMainFBOTo(target_framebuffer", "existing bridge route", failures)
-    require(main_pre, "precondition_mask", "named bridge preconditions", failures)
-    require(main_audit, "auditDrawableBridge", "audit wrapper", failures)
+        require(gl4es_fbo, token, "central GL4ES logical-zero mapping", failures)
+    if gl4es_fbo.count("gl4es_nativeFramebuffer(") < 10:
+        failures.append("central GL4ES logical-zero mapping: helper coverage is incomplete")
+    require(gl4es_fpe, "gles_glBindFramebuffer(GL_FRAMEBUFFER, gl4es_getDefaultFBO());",
+            "fixed-pipeline temporary unbind mapping", failures)
+    reject(gl4es_fbo + gl4es_fpe, r"gles_glBindFramebuffer\s*\([^\n,]+,\s*0\s*\)",
+           "logical zero must not reach native framebuffer zero", failures)
+    reject(gl4es_fbo, r"gl4es_drawable_bridge_(pre|post)|blitMainFBOTo|restoreMainFBOAfterPresent",
+           "Bundle 60 transfer bridge", failures)
 
     require(deps, f"SDL_REF=${{SDL_REF:-{SDL_REF}}}", "SDL pin", failures)
     require(deps, "sdl2-drawable-bridge-ios.patch", "SDL patch route", failures)
     require(build, f"GL4ES_REF=${{GL4ES_REF:-{GL4ES_REF}}}", "GL4ES pin", failures)
     require(build, "gl4es-drawable-bridge-ios.patch", "GL4ES patch route", failures)
-    require(build, "validate-ios-drawable-bridge.py", "audit validation route", failures)
-    for obsolete in ("sdl2-display-audit-ios.patch", "sdl2-wo43-diagnostics-ios.patch",
-                     "sdl2-wo43-phase-b-correction-ios.patch",
-                     "diffusion-ios-liveness.patch", "diffusion-wo43-diagnostics-ios.patch",
-                     "diffusion-wo43-phase-b-correction-ios.patch"):
-        reject(deps + build + diffusion_build, re.escape(obsolete), "obsolete diagnostic route", failures)
+    require(build, "validate-ios-drawable-bridge.py", "policy validation route", failures)
 
-    active = "\n".join((engine, renderer, sdl_view, gl4es_main, deps, build, diffusion_build))
-    reject(active, r"LIBGL_FB\s*=|setenv\s*\(\s*[\"']LIBGL_FB", "LIBGL_FB policy change", failures)
-    reject(active, r"sentinel_bars|yellow[_ -]?sentinel|normal-scene proof", "sentinel policy", failures)
+    active = "\n".join((api, engine, renderer, opengl, sdl_header, sdl_view, sdl_gles,
+                         gl4es_api, gl4es_fbo, gl4es_fpe, deps, build, diffusion_build))
+    reject(active, r"LIBGL_FB\s*=|setenv\s*\(\s*[\"']LIBGL_FB", "LIBGL_FB/main-FBO route", failures)
+    reject(active, r"sentinel_bars|yellow[_ -]?sentinel|normal-scene proof|menu_bypass",
+           "sentinel/menu bypass", failures)
+    reject(active, r"REF_IOS_DRAWABLE_BRIDGE_VERSION|SDL_XASH_IOS_DRAWABLE_BRIDGE_VERSION|iOS main-FBO audit",
+           "obsolete Bundle 60/64 contract", failures)
     return failures
 
 
 def self_test(files: dict[str, str]) -> list[str]:
     failures: list[str] = []
     cases = (
-        ("main-FBO creation", "renderer", "static void R_IOSMainFBOSwap( void )",
-         "static void R_IOSMainFBOSwap( void )\n{ createMainFBO(640, 480); }"),
-        ("LIBGL_FB injection", "engine", "void GL_SwapBuffers( void )",
-         "const char *x = \"LIBGL_FB=2\";\nvoid GL_SwapBuffers( void )"),
-        ("MSAA policy change", "sdl_view", "samples = multisamples;", "samples = 0;"),
-        ("hard-coded FBO", "sdl_view", "bridge.viewFramebuffer = viewFramebuffer;",
-         "bridge.viewFramebuffer = 7;"),
-        ("new transfer", "gl4es_fbo", "#define NATIVE_DRAW_FRAMEBUFFER 0x8CA9",
-         "#define NATIVE_DRAW_FRAMEBUFFER 0x8CA9\nvoid auditTransfer(void) { gl4es_blitTexture(1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, BLIT_OPAQUE); }"),
-        ("persistent target mutation", "gl4es_fbo", "#define NATIVE_DRAW_FRAMEBUFFER 0x8CA9",
-         "#define NATIVE_DRAW_FRAMEBUFFER 0x8CA9\nvoid auditAttach(void) { glFramebufferTexture2D(0, 0, 0, 0, 0); }"),
+        ("hard-coded FBO", "sdl_view", "state->viewFramebuffer = viewFramebuffer;", "state->viewFramebuffer = 7;"),
+        ("MSAA greater than zero", "opengl", "/* SDL's CAEAGLLayer view FBO is the one presented drawable. */\n\t\tsamples = 0;", "/* invalid active MSAA */\n\t\tsamples = 4;"),
+        ("active transfer", "renderer", "static int R_IOSDrawableBridge", "int gl4es_drawable_bridge_pre(void);\nstatic int R_IOSDrawableBridge"),
+        ("LIBGL_FB", "engine", "void GL_SwapBuffers( void )", "const char *policy = \"LIBGL_FB=2\";\nvoid GL_SwapBuffers( void )"),
+        ("public-bind-only", "gl4es_fbo", "static GLuint gl4es_nativeFramebuffer(const glframebuffer_t *framebuffer)", "static GLuint publicBindOnly(const glframebuffer_t *framebuffer)"),
+        ("native zero", "gl4es_fbo", "void readfboBegin()", "void bad(void){ gles_glBindFramebuffer(GL_FRAMEBUFFER, 0); }\nvoid readfboBegin()"),
+        ("missing clear", "opengl", "R_IOSDirectDrawableContextDestroying();", "missingDirectDrawableClear();"),
+        ("missing foreground re-register", "sdl_gles", "SDL_XASH_IOS_DIRECT_DRAWABLE_CONTEXT_RESTORED", "SDL_XASH_IOS_DIRECT_DRAWABLE_SWAP_ENTRY"),
+        ("stale context generation", "renderer", "state.contextGeneration != ios_direct_drawable.contextGeneration", "false"),
+        ("Bundle 60 bridge", "gl4es_fbo", "void readfboBegin()", "int blitMainFBOTo(void);\nvoid readfboBegin()"),
         ("sentinel", "sdl_view", "- (void)swapBuffers", "void yellow_sentinel(void);\n- (void)swapBuffers"),
-        ("unbounded records", "api", "REF_IOS_DRAWABLE_BRIDGE_MAX_RECORDS 64",
-         "REF_IOS_DRAWABLE_BRIDGE_MAX_RECORDS 0"),
-        ("missing native restore", "gl4es_fbo", "gles_glBindFramebuffer(NATIVE_DRAW_FRAMEBUFFER, draw);",
-         "missingNativeDrawRestore(draw);"),
+        ("unbounded diagnostics", "api", "REF_IOS_DIRECT_DRAWABLE_MAX_RECORDS 32", "REF_IOS_DIRECT_DRAWABLE_MAX_RECORDS 0"),
+        ("menu bypass", "renderer", "static int R_IOSDrawableBridge", "void menu_bypass(void);\nstatic int R_IOSDrawableBridge"),
     )
     for label, key, old, new in cases:
         mutated = dict(files)
@@ -301,12 +287,17 @@ def main() -> int:
     files = {
         "api": read(repository / "engine/ref_api.h"),
         "engine": read(repository / "engine/platform/sdl2/vid_sdl2.c"),
+        "platform": read(repository / "engine/platform/platform.h"),
+        "ref_common": read(repository / "engine/client/dll_int/ref_common.c"),
         "renderer": read(repository / "ref/gl/gl_context.c"),
+        "opengl": read(repository / "ref/gl/gl_opengl.c"),
         "sdl_header": read(sdl / "src/video/uikit/SDL_uikitopengles.h"),
         "sdl_view": read(sdl / "src/video/uikit/SDL_uikitopenglview.m"),
+        "sdl_gles": read(sdl / "src/video/uikit/SDL_uikitopengles.m"),
         "gl4es_api": read(gl4es / "include/gl4esinit.h"),
         "gl4es_fbo": read(gl4es / "src/gl/framebuffers.c"),
-        "gl4es_main": read(gl4es / "src/gl/gl4es.c"),
+        "gl4es_fpe": read(gl4es / "src/gl/fpe.c"),
+        "gl4es_state": read(gl4es / "src/gl/state.h"),
         "deps": read(repository / "scripts/gha/deps_ios.sh"),
         "build": read(repository / "scripts/gha/build_ios.sh"),
         "diffusion_build": read(repository / "scripts/ios/builddiffusion.sh"),
@@ -318,9 +309,9 @@ def main() -> int:
         for failure in failures:
             print(f"error: {failure}", file=sys.stderr)
         return 1
-    print("iOS main-FBO audit policy: diagnostics-only checkpoints A-E, bounded checksums, exact restore")
+    print("iOS direct drawable policy: SDL-owned no-MSAA drawable, central GL4ES logical-zero mapping, one present")
     if len(sys.argv) == 5:
-        print("iOS main-FBO audit rejection tests: creation, environment, MSAA, identity, transfer, mutation, sentinel, bounds, and restore rejected")
+        print("iOS direct drawable rejection tests: identity, MSAA, transfer, environment, mapping, lifecycle, generations, sentinel, bounds, and menu bypass rejected")
     return 0
 
 

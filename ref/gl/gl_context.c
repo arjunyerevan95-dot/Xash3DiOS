@@ -478,79 +478,41 @@ static void R_FillTriAPI( triangleapi_t *api )
 }
 
 #if XASH_IOS && XASH_GL4ES
-typedef struct ios_main_fbo_audit_state_s
+typedef struct ios_direct_drawable_state_s
 {
-	uint64_t context;
+	ref_ios_direct_drawable_t drawable;
 	uint64_t invocation;
-	uint64_t firstActiveInvocation;
-	uint64_t lastSDLSignature;
-	uint64_t lastOwnerSignature;
-	uint64_t lastLifecycleSignature;
+	uint64_t context;
+	uint32_t contextGeneration;
+	uint32_t resizeGeneration;
+	uint32_t registeredFramebuffer;
 	uint32_t menuSamples;
+	uint32_t activeSamples;
+	uint32_t presentSamples;
 	uint32_t records;
-	qboolean activeInvocation;
-	qboolean sampleInvocation;
-	qboolean terminalPending;
-	qboolean terminalPrinted;
+	uint32_t menuChecksum;
+	qboolean menuChecksumValid;
 	qboolean policyPrinted;
-	ref_ios_drawable_bridge_t cachedSDL;
-	ref_ios_drawable_bridge_t frame;
-	gl4es_drawable_audit_t rendererAudit;
-	gl4es_drawable_audit_t presentAudit;
-} ios_main_fbo_audit_state_t;
+	qboolean proofPrinted;
+} ios_direct_drawable_state_t;
 
-static ios_main_fbo_audit_state_t ios_main_fbo_audit;
-static void ( *ios_main_fbo_original_swap )( void );
+static ios_direct_drawable_state_t ios_direct_drawable;
+static void ( *ios_direct_drawable_original_swap )( void );
 
-static qboolean R_IOSMainFBOCanPrint( void )
+static qboolean R_IOSDirectDrawableCanPrint( void )
 {
-	/* Reserve the final record for the one terminal marker. */
-	if( ios_main_fbo_audit.records >= REF_IOS_DRAWABLE_BRIDGE_MAX_RECORDS - 1 )
+	if( ios_direct_drawable.records >= REF_IOS_DIRECT_DRAWABLE_MAX_RECORDS )
 		return false;
-	ios_main_fbo_audit.records++;
+	ios_direct_drawable.records++;
 	return true;
 }
 
-static uint64_t R_IOSMainFBOOwnerSignature( const gl4es_drawable_audit_t *audit )
-{
-	return audit->state_identity ^ ((uint64_t)audit->state_generation << 48 ) ^
-		((uint64_t)audit->native_draw_framebuffer << 32 ) ^
-		((uint64_t)audit->source.color.object_name << 16 ) ^
-		audit->target.color.object_name;
-}
-
-static uint64_t R_IOSMainFBOLifecycleSignature( const gl4es_drawable_audit_t *audit )
-{
-	return ((uint64_t)audit->create_attempts << 48 ) ^
-		((uint64_t)audit->create_successes << 32 ) ^
-		((uint64_t)audit->resize_count << 16 ) ^ audit->delete_count ^
-		((uint64_t)audit->main_framebuffer << 8 );
-}
-
-static uint64_t R_IOSMainFBOSDLSignature( const ref_ios_drawable_bridge_t *state )
-{
-	return state->context ^ ((uint64_t)state->contextGeneration << 56 ) ^
-		((uint64_t)state->resizeGeneration << 48 ) ^
-		((uint64_t)state->viewFramebuffer << 32 ) ^
-		((uint64_t)state->msaaFramebuffer << 16 ) ^ state->viewRenderbuffer;
-}
-
-static void R_IOSMainFBOReset( uint64_t context )
-{
-	memset( &ios_main_fbo_audit, 0, sizeof( ios_main_fbo_audit ));
-	ios_main_fbo_audit.context = context;
-}
-
-static void R_IOSMainFBOFillEngineState( ref_ios_drawable_bridge_t *state )
+static void R_IOSDirectDrawableFillEngineState( ref_ios_direct_drawable_t *state )
 {
 	const model_t *world = gp_cl ? gp_cl->models[1] : NULL;
-	double now = gEngfuncs.pfnTime ? gEngfuncs.pfnTime() : 0.0;
 	int clientState = (int)ENGINE_GET_PARM( PARM_CONNSTATE );
 
-	state->invocation = ios_main_fbo_audit.invocation;
-	state->timestampUsec = (uint64_t)( now * 1000000.0 );
-	state->hostTimeUsec = gp_host ? (uint64_t)( gp_host->realtime * 1000000.0 ) : 0;
-	state->clientTimeUsec = gp_cl ? (uint64_t)( gp_cl->time * 1000000.0 ) : 0;
+	state->invocation = ios_direct_drawable.invocation;
 	state->clientState = clientState;
 	state->enginePhase = clientState == ca_active ? 2 : 1;
 	state->mapName[0] = '\0';
@@ -558,321 +520,245 @@ static void R_IOSMainFBOFillEngineState( ref_ios_drawable_bridge_t *state )
 		Q_strncpy( state->mapName, world->name, sizeof( state->mapName ));
 }
 
-static qboolean R_IOSMainFBOScheduledSample( const ref_ios_drawable_bridge_t *state )
+static qboolean R_IOSDirectDrawableQuery( ref_ios_direct_drawable_t *state )
 {
-	static const uint32_t activeGaps[] = { 0, 2, 4, 8, 16, 32, 64 };
-	uint64_t relative;
-	uint i;
+	if( !gEngfuncs.GL_GetDrawableInfo ||
+		!gEngfuncs.GL_GetDrawableInfo( state, sizeof( *state ) ) )
+		return false;
+	R_IOSDirectDrawableFillEngineState( state );
+	return state->version == REF_IOS_DIRECT_DRAWABLE_VERSION &&
+		state->size >= sizeof( *state );
+}
 
-	if( state->enginePhase != 2 )
+static qboolean R_IOSDirectDrawableRegister( ref_ios_direct_drawable_t *state,
+	const char *reason, qboolean printLifecycle )
+{
+	gl4es_external_default_state_t proof;
+	qboolean valid, printRegister;
+
+	printRegister = printLifecycle || !Q_strcmp( reason, "context-created" );
+
+	valid = state && state->context && state->currentContext &&
+		state->contextMatches && state->viewFramebuffer && state->viewRenderbuffer &&
+		state->drawableWidth && state->drawableHeight &&
+		state->requestedSamples == 0 && state->effectiveSamples == 0;
+	if( !valid || !set_external_default_framebuffer( state->viewFramebuffer ) )
 	{
-		if( ios_main_fbo_audit.menuSamples < REF_IOS_DRAWABLE_BRIDGE_MENU_ATTEMPTS )
+		if( R_IOSDirectDrawableCanPrint() )
+			gEngfuncs.Con_Printf( "iOS direct drawable register: result=failed reason=%s context=0x%llx current=0x%llx match=%u view=%u/%u size=%ux%u samples=%u/%u\n",
+				reason, (unsigned long long)( state ? state->context : 0 ),
+				(unsigned long long)( state ? state->currentContext : 0 ),
+				state ? state->contextMatches : 0, state ? state->viewFramebuffer : 0,
+				state ? state->viewRenderbuffer : 0, state ? state->drawableWidth : 0,
+				state ? state->drawableHeight : 0, state ? state->requestedSamples : 0,
+				state ? state->effectiveSamples : 0 );
+		return false;
+	}
+
+	valid = gl4es_external_default_framebuffer_state( state->drawableWidth,
+		state->drawableHeight, 0, &proof ) != 0;
+	if( printRegister && R_IOSDirectDrawableCanPrint() )
+		gEngfuncs.Con_Printf( "iOS direct drawable register: result=%s reason=%s context=0x%llx context_gen=%u resize_gen=%u view=%u/%u size=%ux%u samples=%u/%u external_gen=%u logical=%u/%u/%u native=%u/%u status=0x%04x\n",
+			valid ? "ok" : "failed", reason, (unsigned long long)state->context,
+			state->contextGeneration, state->resizeGeneration,
+			state->viewFramebuffer, state->viewRenderbuffer,
+			state->drawableWidth, state->drawableHeight,
+			state->requestedSamples, state->effectiveSamples, proof.generation,
+			proof.logical_current, proof.logical_read, proof.logical_draw,
+			proof.native_draw, proof.native_read, proof.framebuffer_status );
+	if( printLifecycle && R_IOSDirectDrawableCanPrint() )
+		gEngfuncs.Con_Printf( "iOS direct drawable lifecycle: reason=%s context=0x%llx context_gen=%u resize_gen=%u view=%u/%u reasserted=%u complete=%u\n",
+			reason, (unsigned long long)state->context, state->contextGeneration,
+			state->resizeGeneration, state->viewFramebuffer, state->viewRenderbuffer,
+			valid ? 1 : 0, valid && proof.framebuffer_status == GL_FRAMEBUFFER_COMPLETE );
+	if( !valid )
+		return false;
+
+	ios_direct_drawable.drawable = *state;
+	ios_direct_drawable.context = state->context;
+	ios_direct_drawable.contextGeneration = state->contextGeneration;
+	ios_direct_drawable.resizeGeneration = state->resizeGeneration;
+	ios_direct_drawable.registeredFramebuffer = state->viewFramebuffer;
+	return true;
+}
+
+static qboolean R_IOSDirectDrawableSampleScheduled( const ref_ios_direct_drawable_t *state )
+{
+	if( state->enginePhase == 2 && Q_strstr( state->mapName, "ch1map0" ) )
+	{
+		if( ios_direct_drawable.activeSamples < REF_IOS_DIRECT_DRAWABLE_ACTIVE_SAMPLES )
 		{
-			ios_main_fbo_audit.menuSamples++;
+			ios_direct_drawable.activeSamples++;
 			return true;
 		}
 		return false;
 	}
-
-	if( !ios_main_fbo_audit.firstActiveInvocation )
-		ios_main_fbo_audit.firstActiveInvocation = state->invocation;
-	relative = state->invocation - ios_main_fbo_audit.firstActiveInvocation;
-	for( i = 0; i < sizeof( activeGaps ) / sizeof( activeGaps[0] ); i++ )
+	if( state->enginePhase != 2 &&
+		ios_direct_drawable.menuSamples < REF_IOS_DIRECT_DRAWABLE_MENU_SAMPLES )
 	{
-		if( relative == activeGaps[i] )
-		{
-			if( relative == 64 )
-				ios_main_fbo_audit.terminalPending = true;
-			return true;
-		}
+		ios_direct_drawable.menuSamples++;
+		return true;
 	}
 	return false;
 }
 
-static void R_IOSMainFBOPrintPolicyAndState( const ref_ios_drawable_bridge_t *state,
-	const gl4es_drawable_audit_t *audit, qboolean lifecycleChanged, qboolean ownerChanged )
+static void R_IOSDirectDrawablePrintProof( const ref_ios_direct_drawable_t *state,
+	const gl4es_external_default_state_t *proof )
 {
-	if( !ios_main_fbo_audit.policyPrinted && R_IOSMainFBOCanPrint() )
+	qboolean active = state->enginePhase == 2 && Q_strstr( state->mapName, "ch1map0" );
+	qboolean changed = false;
+
+	if( !active && proof->checksum_valid && !ios_direct_drawable.menuChecksumValid )
 	{
-		gEngfuncs.Con_Printf( "iOS main-FBO audit policy: version=%u same_invocation=A-R_EndFrame,B-SDL-entry,C-SDL-post-resolve,D-bridge-entry-return,E-present-entry-return menu_samples=%u active_gaps=0,2,4,8,16,32,64 max_records=%u pixels=five-4x4-regions transfer_policy=unchanged\n",
-			REF_IOS_DRAWABLE_BRIDGE_VERSION, REF_IOS_DRAWABLE_BRIDGE_MENU_ATTEMPTS,
-			REF_IOS_DRAWABLE_BRIDGE_MAX_RECORDS );
-		ios_main_fbo_audit.policyPrinted = true;
+		ios_direct_drawable.menuChecksum = proof->checksum;
+		ios_direct_drawable.menuChecksumValid = true;
 	}
-	if( lifecycleChanged && R_IOSMainFBOCanPrint() )
-		gEngfuncs.Con_Printf( "iOS main-FBO lifecycle: inv=%llu gl4es_state=0x%llx generation=%u create_attempts=%u create_success=%u resize=%u delete=%u last_status=0x%04x main=%u/%u/%u/%u size=%ux%u native=%ux%u\n",
-			(unsigned long long)state->invocation, audit->state_identity,
-			audit->state_generation, audit->create_attempts, audit->create_successes,
-			audit->resize_count, audit->delete_count, audit->last_status,
-			audit->main_framebuffer, audit->main_texture, audit->main_depth,
-			audit->main_stencil, audit->main_width, audit->main_height,
-			audit->main_native_width, audit->main_native_height );
-	if( ownerChanged && R_IOSMainFBOCanPrint() )
-		gEngfuncs.Con_Printf( "iOS main-FBO state: inv=%llu phase=%u map=%s host_us=%llu client_us=%llu gl4es_state=0x%llx generation=%u usefb=%u usefbo=%u logical_fb=%u logical_rb=%u default_fb=%u default_rb=%u native_draw=%u native_read=%u native_rb=%u sdl_context=0x%llx api=%u context_gen=%u resize_gen=%u view=%u/%u msaa=%u/%u depth=%u samples=%u/%u drawable=%ux%u\n",
+	if( active && proof->checksum_valid && ios_direct_drawable.menuChecksumValid )
+		changed = proof->checksum != ios_direct_drawable.menuChecksum;
+
+	if( R_IOSDirectDrawableCanPrint() )
+		gEngfuncs.Con_Printf( "iOS direct drawable logical-zero: inv=%llu phase=%u map=%s registered=%u external_gen=%u logical=%u/%u/%u native=%u/%u status=0x%04x checksum=%u/0x%08x\n",
 			(unsigned long long)state->invocation, state->enginePhase,
-			state->mapName[0] ? state->mapName : "-",
-			(unsigned long long)state->hostTimeUsec,
-			(unsigned long long)state->clientTimeUsec, audit->state_identity,
-			audit->state_generation, audit->usefb, audit->usefbo,
-			audit->logical_framebuffer, audit->logical_renderbuffer,
-			audit->default_framebuffer, audit->default_renderbuffer,
-			audit->native_draw_framebuffer, audit->native_read_framebuffer,
-			audit->native_renderbuffer, (unsigned long long)state->context,
-			state->contextAPI, state->contextGeneration, state->resizeGeneration,
-			state->viewFramebuffer, state->viewRenderbuffer,
-			state->msaaFramebuffer, state->msaaRenderbuffer,
-			state->depthRenderbuffer, state->requestedSamples,
-			state->effectiveSamples, state->drawableWidth, state->drawableHeight );
-}
+			state->mapName[0] ? state->mapName : "-", proof->registered_framebuffer,
+			proof->generation, proof->logical_current, proof->logical_read,
+			proof->logical_draw, proof->native_draw, proof->native_read,
+			proof->framebuffer_status, proof->checksum_valid, proof->checksum );
 
-static void R_IOSMainFBOPrintCheckpoint( const char *marker, const char *checkpoint,
-	const ref_ios_drawable_bridge_t *state, const gl4es_drawable_audit_t *audit,
-	const gl4es_drawable_audit_t *before )
-{
-	if( !R_IOSMainFBOCanPrint() )
-		return;
-	gEngfuncs.Con_Printf( "%s inv=%llu checkpoint=%s phase=%u map=%s timestamp_us=%llu host_us=%llu client_us=%llu iOS pixel checkpoint: source=%u/0x%04x/%u/0x%08x target=%u/0x%04x/%u/0x%08x before_source=%u/0x%08x before_target=%u/0x%08x native=%u/%u/%u restored=%u/%u/%u logical=%u/%u src_color=%x/%u/%ux%u/0x%x/%u src_depth=%x/%u/%ux%u/0x%x/%u src_stencil=%x/%u/%ux%u/0x%x/%u dst_color=%x/%u/%ux%u/0x%x/%u dst_depth=%x/%u/%ux%u/0x%x/%u dst_stencil=%x/%u/%ux%u/0x%x/%u equals=view:%u,msaa:%u,target_view:%u bridge=attempted:%u,result:%u,preconditions:0x%08x,failure:%u present=attempted:%u,result:%u restore=result:%u,fb:%u,rb:%u,logical:%u query_failure=%u/0x%04x\n",
-		marker, (unsigned long long)state->invocation, checkpoint,
-		state->enginePhase, state->mapName[0] ? state->mapName : "-",
-		(unsigned long long)state->timestampUsec,
-		(unsigned long long)state->hostTimeUsec,
-		(unsigned long long)state->clientTimeUsec,
-		audit->source.framebuffer, audit->source.status,
-		audit->source.checksum_valid, audit->source.checksum,
-		audit->target.framebuffer, audit->target.status,
-		audit->target.checksum_valid, audit->target.checksum,
-		before ? before->source.checksum_valid : 0,
-		before ? before->source.checksum : 0,
-		before ? before->target.checksum_valid : 0,
-		before ? before->target.checksum : 0,
-		audit->native_draw_framebuffer, audit->native_read_framebuffer,
-		audit->native_renderbuffer, audit->restored_draw_framebuffer,
-		audit->restored_read_framebuffer, audit->restored_renderbuffer,
-		audit->logical_framebuffer, audit->restored_logical_framebuffer,
-		audit->source.color.object_type, audit->source.color.object_name,
-		audit->source.color.width, audit->source.color.height,
-		audit->source.color.internal_format, audit->source.color.samples,
-		audit->source.depth.object_type, audit->source.depth.object_name,
-		audit->source.depth.width, audit->source.depth.height,
-		audit->source.depth.internal_format, audit->source.depth.samples,
-		audit->source.stencil.object_type, audit->source.stencil.object_name,
-		audit->source.stencil.width, audit->source.stencil.height,
-		audit->source.stencil.internal_format, audit->source.stencil.samples,
-		audit->target.color.object_type, audit->target.color.object_name,
-		audit->target.color.width, audit->target.color.height,
-		audit->target.color.internal_format, audit->target.color.samples,
-		audit->target.depth.object_type, audit->target.depth.object_name,
-		audit->target.depth.width, audit->target.depth.height,
-		audit->target.depth.internal_format, audit->target.depth.samples,
-		audit->target.stencil.object_type, audit->target.stencil.object_name,
-		audit->target.stencil.width, audit->target.stencil.height,
-		audit->target.stencil.internal_format, audit->target.stencil.samples,
-		audit->source.framebuffer == state->viewFramebuffer,
-		audit->source.framebuffer == state->msaaFramebuffer,
-		audit->target.framebuffer == state->viewFramebuffer,
-		state->transferAttempted, state->transferResult, state->preconditionMask,
-		state->failureCode, state->presentAttempted, state->presentResult,
-		state->restoreResult, state->restoredFramebuffer,
-		state->restoredRenderbuffer, state->restoredLogicalFramebuffer,
-		audit->query_failure_operation, audit->query_failure_error );
-}
-
-static void R_IOSMainFBOAudit( const ref_ios_drawable_bridge_t *state,
-	gl4es_drawable_audit_t *audit, qboolean pixels )
-{
-	gl4es_drawable_bridge_audit( state->contextAPI, state->viewFramebuffer,
-		state->drawableWidth, state->drawableHeight, pixels ? 1 : 0, audit );
-}
-
-static void R_IOSMainFBOSwap( void )
-{
-	uint64_t ownerSignature, lifecycleSignature;
-	qboolean ownerChanged, lifecycleChanged;
-	ref_ios_drawable_bridge_t *state = &ios_main_fbo_audit.frame;
-
-	if( ios_main_fbo_audit.terminalPrinted || !ios_main_fbo_original_swap )
+	if( active && !ios_direct_drawable.proofPrinted && R_IOSDirectDrawableCanPrint() )
 	{
-		if( ios_main_fbo_original_swap )
-			ios_main_fbo_original_swap();
+		gEngfuncs.Con_Printf( "iOS direct drawable proof: inv=%llu map=%s view=%u logical_native_agree=%u complete=%u checksum_valid=%u menu_checksum_valid=%u checksum_changed=%u checksum=0x%08x menu_checksum=0x%08x\n",
+			(unsigned long long)state->invocation,
+			state->mapName[0] ? state->mapName : "-", state->viewFramebuffer,
+			proof->logical_current == 0 && proof->logical_read == 0 &&
+			proof->logical_draw == 0 && proof->native_draw == state->viewFramebuffer &&
+			proof->native_read == state->viewFramebuffer,
+			proof->framebuffer_status == GL_FRAMEBUFFER_COMPLETE,
+			proof->checksum_valid, ios_direct_drawable.menuChecksumValid,
+			changed, proof->checksum, ios_direct_drawable.menuChecksum );
+		if( changed )
+			ios_direct_drawable.proofPrinted = true;
+	}
+}
+
+static void R_IOSDirectDrawableSwap( void )
+{
+	ref_ios_direct_drawable_t state;
+	gl4es_external_default_state_t proof;
+	qboolean lifecycleChanged, sample;
+
+	if( !ios_direct_drawable_original_swap )
+		return;
+	ios_direct_drawable.invocation++;
+	if( !R_IOSDirectDrawableQuery( &state ) )
+	{
+		if( R_IOSDirectDrawableCanPrint() )
+			gEngfuncs.Con_Printf( "iOS direct drawable lifecycle: reason=query-failed inv=%llu\n",
+				(unsigned long long)ios_direct_drawable.invocation );
+		ios_direct_drawable_original_swap();
 		return;
 	}
 
-	ios_main_fbo_audit.invocation++;
-	ios_main_fbo_audit.activeInvocation = true;
-	*state = ios_main_fbo_audit.cachedSDL;
-	R_IOSMainFBOFillEngineState( state );
-	state->checkpoint = REF_IOS_DRAWABLE_BRIDGE_RENDERER_HANDOFF;
-	ios_main_fbo_audit.sampleInvocation = R_IOSMainFBOScheduledSample( state );
-	R_IOSMainFBOAudit( state, &ios_main_fbo_audit.rendererAudit,
-		ios_main_fbo_audit.sampleInvocation );
-	ownerSignature = R_IOSMainFBOOwnerSignature( &ios_main_fbo_audit.rendererAudit );
-	lifecycleSignature = R_IOSMainFBOLifecycleSignature( &ios_main_fbo_audit.rendererAudit );
-	ownerChanged = ownerSignature != ios_main_fbo_audit.lastOwnerSignature;
-	lifecycleChanged = lifecycleSignature != ios_main_fbo_audit.lastLifecycleSignature;
-	if( ownerChanged || lifecycleChanged )
+	lifecycleChanged = state.context != ios_direct_drawable.context ||
+		state.contextGeneration != ios_direct_drawable.contextGeneration ||
+		state.resizeGeneration != ios_direct_drawable.resizeGeneration ||
+		state.viewFramebuffer != ios_direct_drawable.registeredFramebuffer;
+	if( !R_IOSDirectDrawableRegister( &state,
+		lifecycleChanged ? "swap-lifecycle-change" : "swap-reassert", lifecycleChanged ) )
 	{
-		if( !ios_main_fbo_audit.sampleInvocation )
-			R_IOSMainFBOAudit( state, &ios_main_fbo_audit.rendererAudit, true );
-		ios_main_fbo_audit.sampleInvocation = true;
+		ios_direct_drawable_original_swap();
+		return;
 	}
-	state->auditSample = ios_main_fbo_audit.sampleInvocation;
-	R_IOSMainFBOPrintPolicyAndState( state, &ios_main_fbo_audit.rendererAudit,
-		lifecycleChanged, ownerChanged );
-	if( ios_main_fbo_audit.sampleInvocation )
-		R_IOSMainFBOPrintCheckpoint( "iOS presentation pipeline:", "A-renderer-handoff",
-			state, &ios_main_fbo_audit.rendererAudit, NULL );
-	ios_main_fbo_audit.lastOwnerSignature = ownerSignature;
-	ios_main_fbo_audit.lastLifecycleSignature = lifecycleSignature;
-	ios_main_fbo_original_swap();
-	ios_main_fbo_audit.activeInvocation = false;
+
+	if( !ios_direct_drawable.policyPrinted && R_IOSDirectDrawableCanPrint() )
+	{
+		gEngfuncs.Con_Printf( "iOS direct drawable policy: version=%u requested_samples=0 effective_samples=0 msaa_objects=0 resolve=disabled transfer=none logical_zero=live-sdl-view samples=menu:%u,active:%u max_records=%u\n",
+			REF_IOS_DIRECT_DRAWABLE_VERSION, REF_IOS_DIRECT_DRAWABLE_MENU_SAMPLES,
+			REF_IOS_DIRECT_DRAWABLE_ACTIVE_SAMPLES, REF_IOS_DIRECT_DRAWABLE_MAX_RECORDS );
+		ios_direct_drawable.policyPrinted = true;
+	}
+
+	sample = R_IOSDirectDrawableSampleScheduled( &state );
+	if( sample && gl4es_external_default_framebuffer_state( state.drawableWidth,
+		state.drawableHeight, 1, &proof ) )
+		R_IOSDirectDrawablePrintProof( &state, &proof );
+	ios_direct_drawable.drawable = state;
+	ios_direct_drawable_original_swap();
 }
 
-static void R_IOSMainFBOCopyFrameState( ref_ios_drawable_bridge_t *state )
+void R_IOSDirectDrawableContextCreated( void )
 {
-	state->invocation = ios_main_fbo_audit.frame.invocation;
-	state->timestampUsec = ios_main_fbo_audit.frame.timestampUsec;
-	state->hostTimeUsec = ios_main_fbo_audit.frame.hostTimeUsec;
-	state->clientTimeUsec = ios_main_fbo_audit.frame.clientTimeUsec;
-	state->enginePhase = ios_main_fbo_audit.frame.enginePhase;
-	state->clientState = ios_main_fbo_audit.frame.clientState;
-	state->auditSample = ios_main_fbo_audit.sampleInvocation;
-	Q_strncpy( state->mapName, ios_main_fbo_audit.frame.mapName, sizeof( state->mapName ));
+	ref_ios_direct_drawable_t state;
+
+	memset( &ios_direct_drawable, 0, sizeof( ios_direct_drawable ) );
+	if( !ios_direct_drawable_original_swap )
+		ios_direct_drawable_original_swap = gEngfuncs.GL_SwapBuffers;
+	gEngfuncs.GL_SwapBuffers = R_IOSDirectDrawableSwap;
+	if( R_IOSDirectDrawableQuery( &state ) )
+		R_IOSDirectDrawableRegister( &state, "context-created", true );
+}
+
+void R_IOSDirectDrawableContextDestroying( void )
+{
+	set_external_default_framebuffer( 0 );
+	if( R_IOSDirectDrawableCanPrint() )
+		gEngfuncs.Con_Printf( "iOS direct drawable lifecycle: reason=context-destroying context=0x%llx cleared=1\n",
+			(unsigned long long)ios_direct_drawable.context );
+	if( ios_direct_drawable_original_swap )
+		gEngfuncs.GL_SwapBuffers = ios_direct_drawable_original_swap;
 }
 
 static int R_IOSDrawableBridge( int action, void *opaqueState, size_t stateSize )
 {
-	ref_ios_drawable_bridge_t *state = (ref_ios_drawable_bridge_t *)opaqueState;
-	gl4es_drawable_audit_t before, after;
-	uint64_t sdlSignature;
-	int result = 0;
+	ref_ios_direct_drawable_t *state = (ref_ios_direct_drawable_t *)opaqueState;
+	gl4es_external_default_state_t proof;
+	qboolean lifecycleAction;
 
 	if( !state || stateSize < sizeof( *state ) ||
-		state->version != REF_IOS_DRAWABLE_BRIDGE_VERSION || state->size < sizeof( *state ) )
+		state->version != REF_IOS_DIRECT_DRAWABLE_VERSION || state->size < sizeof( *state ) )
 		return 0;
+	R_IOSDirectDrawableFillEngineState( state );
+	lifecycleAction = action == REF_IOS_DIRECT_DRAWABLE_CONTEXT_RESTORED ||
+		action == REF_IOS_DIRECT_DRAWABLE_RESIZED;
 
-	if( !ios_main_fbo_original_swap )
+	if( action == REF_IOS_DIRECT_DRAWABLE_DESTROYING )
 	{
-		ios_main_fbo_original_swap = gEngfuncs.GL_SwapBuffers;
-		gEngfuncs.GL_SwapBuffers = R_IOSMainFBOSwap;
-		R_IOSMainFBOReset( state->context );
-		ios_main_fbo_audit.cachedSDL = *state;
-		ios_main_fbo_audit.lastSDLSignature = R_IOSMainFBOSDLSignature( state );
-		return 0;
-	}
-
-	if( ios_main_fbo_audit.context != state->context )
-	{
-		R_IOSMainFBOReset( state->context );
-		ios_main_fbo_audit.cachedSDL = *state;
-		ios_main_fbo_audit.lastSDLSignature = R_IOSMainFBOSDLSignature( state );
-		return 0;
-	}
-	if( !ios_main_fbo_audit.activeInvocation || ios_main_fbo_audit.terminalPrinted )
-		return 0;
-
-	R_IOSMainFBOCopyFrameState( state );
-	if( action == REF_IOS_DRAWABLE_BRIDGE_SDL_SWAP_ENTRY )
-	{
-		sdlSignature = R_IOSMainFBOSDLSignature( state );
-		if( sdlSignature != ios_main_fbo_audit.lastSDLSignature &&
-			!ios_main_fbo_audit.sampleInvocation )
-		{
-			ios_main_fbo_audit.sampleInvocation = true;
-			state->auditSample = 1;
-			R_IOSMainFBOAudit( state, &ios_main_fbo_audit.rendererAudit, true );
-			R_IOSMainFBOPrintCheckpoint( "iOS presentation pipeline:", "A-renderer-handoff",
-				state, &ios_main_fbo_audit.rendererAudit, NULL );
-		}
-		ios_main_fbo_audit.lastSDLSignature = sdlSignature;
-		ios_main_fbo_audit.cachedSDL = *state;
-		if( ios_main_fbo_audit.sampleInvocation )
-		{
-			R_IOSMainFBOAudit( state, &after, true );
-			R_IOSMainFBOPrintCheckpoint( "iOS native attachment:", "B-SDL-swap-entry",
-				state, &after, NULL );
-		}
+		set_external_default_framebuffer( 0 );
+		if( R_IOSDirectDrawableCanPrint() )
+			gEngfuncs.Con_Printf( "iOS direct drawable lifecycle: reason=sdl-destroying context=0x%llx cleared=1\n",
+				(unsigned long long)state->context );
 		return 1;
 	}
-
-	if( action == REF_IOS_DRAWABLE_BRIDGE_SDL_POST_RESOLVE )
+	if( lifecycleAction )
+		return R_IOSDirectDrawableRegister( state,
+			action == REF_IOS_DIRECT_DRAWABLE_CONTEXT_RESTORED ? "context-restored" : "resized",
+			true );
+	if( action == REF_IOS_DIRECT_DRAWABLE_SWAP_ENTRY )
+		return R_IOSDirectDrawableRegister( state, "sdl-swap-entry", false );
+	if( action == REF_IOS_DIRECT_DRAWABLE_PRESENT_BEFORE )
 	{
-		if( ios_main_fbo_audit.sampleInvocation )
+		if( !R_IOSDirectDrawableRegister( state, "present-reassert", false ) )
+			return 0;
+		return gl4es_external_default_framebuffer_state( state->drawableWidth,
+			state->drawableHeight, 0, &proof );
+	}
+	if( action == REF_IOS_DIRECT_DRAWABLE_POST_PRESENT )
+	{
+		qboolean printPresent = state->invocation <= 1;
+		if( state->enginePhase == 2 &&
+			ios_direct_drawable.presentSamples < ios_direct_drawable.activeSamples )
 		{
-			R_IOSMainFBOAudit( state, &after, true );
-			R_IOSMainFBOPrintCheckpoint( "iOS presentation pipeline:", "C-SDL-post-resolve",
-				state, &after, NULL );
+			ios_direct_drawable.presentSamples++;
+			printPresent = true;
 		}
-		return 1;
+		if( printPresent &&
+			R_IOSDirectDrawableCanPrint() )
+			gEngfuncs.Con_Printf( "iOS direct drawable present: inv=%llu phase=%u map=%s view=%u/%u attempted=%u result=%u resolve=0 transfer=0 one_present=1\n",
+				(unsigned long long)state->invocation, state->enginePhase,
+				state->mapName[0] ? state->mapName : "-", state->viewFramebuffer,
+				state->viewRenderbuffer, state->presentAttempted, state->presentResult );
+		return state->presentAttempted && state->presentResult;
 	}
-
-	if( action == REF_IOS_DRAWABLE_BRIDGE_PRE_PRESENT )
-	{
-		if( ios_main_fbo_audit.sampleInvocation )
-			R_IOSMainFBOAudit( state, &before, true );
-		state->transferAttempted = 0;
-		state->transferResult = 0;
-		state->failureCode = 0;
-		state->preconditionMask = 0;
-		if( !state->context || !state->currentContext || !state->contextMatches )
-			state->failureCode = 2;
-		else if( !state->targetFramebuffer || !state->targetRenderbuffer ||
-			!state->drawableWidth || !state->drawableHeight )
-			state->failureCode = 3;
-		else
-		{
-			state->transferAttempted = 1;
-			result = gl4es_drawable_bridge_pre( state->targetFramebuffer,
-				state->drawableWidth, state->drawableHeight,
-				&state->sourceFramebuffer, &state->sourceTexture,
-				&state->sourceRenderbuffer, &state->logicalFramebuffer,
-				&state->targetStatus, &state->preconditionMask );
-			state->transferResult = result ? 1 : 0;
-			if( !result ) state->failureCode = 4;
-		}
-		if( ios_main_fbo_audit.sampleInvocation )
-		{
-			R_IOSMainFBOAudit( state, &after, true );
-			R_IOSMainFBOPrintCheckpoint( "iOS drawable bridge attempt:", "D-bridge-entry-return",
-				state, &after, &before );
-		}
-		return result;
-	}
-
-	if( action == REF_IOS_DRAWABLE_BRIDGE_PRESENT_BEFORE )
-	{
-		if( ios_main_fbo_audit.sampleInvocation )
-			R_IOSMainFBOAudit( state, &ios_main_fbo_audit.presentAudit, true );
-		return 1;
-	}
-
-	if( action != REF_IOS_DRAWABLE_BRIDGE_POST_PRESENT )
-		return 0;
-
-	result = gl4es_drawable_bridge_post( state->sourceFramebuffer,
-		state->sourceRenderbuffer, &state->restoredFramebuffer,
-		&state->restoredRenderbuffer, &state->restoredLogicalFramebuffer );
-	state->restoreResult = result ? 1 : 0;
-	if( !result && !state->failureCode ) state->failureCode = 5;
-	if( ios_main_fbo_audit.sampleInvocation )
-	{
-		R_IOSMainFBOAudit( state, &after, true );
-		R_IOSMainFBOPrintCheckpoint( "iOS drawable bridge present: iOS drawable bridge restore:",
-			"E-present-entry-return", state, &after, &ios_main_fbo_audit.presentAudit );
-	}
-	if( ios_main_fbo_audit.terminalPending ||
-		ios_main_fbo_audit.records >= REF_IOS_DRAWABLE_BRIDGE_MAX_RECORDS - 1 )
-	{
-		if( ios_main_fbo_audit.records < REF_IOS_DRAWABLE_BRIDGE_MAX_RECORDS )
-		{
-			ios_main_fbo_audit.records++;
-			gEngfuncs.Con_Printf( "iOS main-FBO audit terminal: result=bounded-stop invocations=%llu records=%u max_records=%u phase=%u map=%s no_renderer_conclusion=1\n",
-				(unsigned long long)ios_main_fbo_audit.invocation,
-				ios_main_fbo_audit.records, REF_IOS_DRAWABLE_BRIDGE_MAX_RECORDS,
-				state->enginePhase, state->mapName[0] ? state->mapName : "-" );
-		}
-		ios_main_fbo_audit.terminalPrinted = true;
-	}
-	return result;
+	return 1;
 }
 #endif
 

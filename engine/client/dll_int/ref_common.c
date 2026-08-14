@@ -412,6 +412,11 @@ static const ref_api_t gEngfuncs =
 	GL_GetAttribute,
 	GL_GetProcAddress,
 	GL_SwapBuffers,
+#if XASH_IOS
+	GL_GetDrawableInfo,
+#else
+	NULL,
+#endif
 
 	SW_CreateBuffer,
 	SW_LockBuffer,

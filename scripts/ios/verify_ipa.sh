@@ -97,18 +97,14 @@ if ! grep -q 'compressed texture buffer overrun' "$GL4ES_RENDERER_STRINGS"; then
 fi
 
 for bridge_marker in \
-	'iOS main-FBO audit policy:' \
-	'iOS main-FBO lifecycle:' \
-	'iOS main-FBO state:' \
-	'iOS native attachment:' \
-	'iOS presentation pipeline:' \
-	'iOS pixel checkpoint:' \
-	'iOS drawable bridge attempt:' \
-	'iOS drawable bridge present:' \
-	'iOS drawable bridge restore:' \
-	'iOS main-FBO audit terminal:'; do
+	'iOS direct drawable policy:' \
+	'iOS direct drawable register:' \
+	'iOS direct drawable logical-zero:' \
+	'iOS direct drawable present:' \
+	'iOS direct drawable lifecycle:' \
+	'iOS direct drawable proof:'; do
 	if ! grep -q "$bridge_marker" "$GL4ES_RENDERER_STRINGS"; then
-		echo "Renderer is missing bounded main-FBO audit marker: $bridge_marker" >&2
+		echo "Renderer is missing direct-drawable proof marker: $bridge_marker" >&2
 		exit 1
 	fi
 done
@@ -116,8 +112,8 @@ done
 SDL_NM="$VERIFY_ROOT/sdl.nm"
 nm -g "$SDL_PATH" > "$SDL_NM"
 
-if ! grep -q '_SDL_XASH_IOSSetDrawableBridgeCallback' "$SDL_NM"; then
-	echo "SDL does not export the live drawable-bridge callback registration" >&2
+if ! grep -q '_SDL_XASH_IOSSetDirectDrawableCallback' "$SDL_NM"; then
+	echo "SDL does not export direct-drawable lifecycle registration" >&2
 	exit 1
 fi
 
@@ -127,8 +123,8 @@ for diagnostic_strings in \
 	"$GL4ES_RENDERER_STRINGS" \
 	"$DIFFUSION_CLIENT_STRINGS" \
 	"$DIFFUSION_MENU_STRINGS"; do
-	if grep -Eqi 'WO43|iOS liveness|sentinel_bars|normal-scene proof|native presentation:|iOS drawable bridge source:|iOS drawable bridge proof:' "$diagnostic_strings"; then
-		echo "Obsolete WO43/sentinel/high-volume diagnostics remain in $(basename "$diagnostic_strings")" >&2
+	if grep -Eqi 'WO43|iOS liveness|sentinel_bars|normal-scene proof|native presentation:|iOS main-FBO audit|iOS drawable bridge (source|attempt|restore|proof):' "$diagnostic_strings"; then
+		echo "Obsolete sentinel/transfer/main-FBO diagnostics remain in $(basename "$diagnostic_strings")" >&2
 		exit 1
 	fi
 done

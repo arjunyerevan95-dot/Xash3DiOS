@@ -1,159 +1,158 @@
 diff --git a/src/video/uikit/SDL_uikitopengles.h b/src/video/uikit/SDL_uikitopengles.h
-index 0533f69..dee2374 100644
+index 0533f69..9534cbf 100644
 --- a/src/video/uikit/SDL_uikitopengles.h
 +++ b/src/video/uikit/SDL_uikitopengles.h
-@@ -27,0 +28,70 @@
-+#define SDL_XASH_IOS_DRAWABLE_BRIDGE_VERSION 2
-+#define SDL_XASH_IOS_DRAWABLE_BRIDGE_RENDERER_HANDOFF 1
-+#define SDL_XASH_IOS_DRAWABLE_BRIDGE_SDL_SWAP_ENTRY 2
-+#define SDL_XASH_IOS_DRAWABLE_BRIDGE_SDL_POST_RESOLVE 3
-+#define SDL_XASH_IOS_DRAWABLE_BRIDGE_PRE_PRESENT 4
-+#define SDL_XASH_IOS_DRAWABLE_BRIDGE_PRESENT_BEFORE 5
-+#define SDL_XASH_IOS_DRAWABLE_BRIDGE_POST_PRESENT 6
+@@ -27,0 +28,40 @@
++#define SDL_XASH_IOS_DIRECT_DRAWABLE_VERSION 3
++#define SDL_XASH_IOS_DIRECT_DRAWABLE_CONTEXT_RESTORED 1
++#define SDL_XASH_IOS_DIRECT_DRAWABLE_RESIZED 2
++#define SDL_XASH_IOS_DIRECT_DRAWABLE_SWAP_ENTRY 3
++#define SDL_XASH_IOS_DIRECT_DRAWABLE_PRESENT_BEFORE 4
++#define SDL_XASH_IOS_DIRECT_DRAWABLE_POST_PRESENT 5
++#define SDL_XASH_IOS_DIRECT_DRAWABLE_DESTROYING 6
 +
-+typedef struct SDL_XASH_IOSDrawableBridgeState
++typedef struct SDL_XASH_IOSDirectDrawableState
 +{
 +    Uint32 version;
 +    Uint32 size;
 +    Uint64 context;
 +    Uint64 currentContext;
 +    Uint32 contextMatches;
-+    Uint32 targetFramebuffer;
-+    Uint32 targetRenderbuffer;
-+    Uint32 drawableWidth;
-+    Uint32 drawableHeight;
-+    Uint32 sourceFramebuffer;
-+    Uint32 sourceTexture;
-+    Uint32 sourceRenderbuffer;
-+    Uint32 logicalFramebuffer;
-+    Uint32 targetStatus;
-+    Uint32 transferAttempted;
-+    Uint32 transferResult;
-+    Uint32 proofSample;
-+    Uint32 checksumBeforeValid;
-+    Uint32 checksumBefore;
-+    Uint32 checksumAfterValid;
-+    Uint32 checksumAfter;
-+    Uint32 checksumChanged;
-+    Uint32 presentAttempted;
-+    Uint32 presentResult;
-+    Uint32 restoredFramebuffer;
-+    Uint32 restoredRenderbuffer;
-+    Uint32 restoredLogicalFramebuffer;
-+    Uint32 restoreResult;
-+    Uint32 failureCode;
-+    Uint64 invocation;
-+    Uint64 timestampUsec;
-+    Uint64 hostTimeUsec;
-+    Uint64 clientTimeUsec;
-+    Uint32 checkpoint;
-+    Uint32 auditSample;
-+    Uint32 enginePhase;
-+    Uint32 clientState;
-+    char mapName[64];
 +    Uint32 contextAPI;
 +    Uint32 contextGeneration;
 +    Uint32 resizeGeneration;
 +    Uint32 viewFramebuffer;
 +    Uint32 viewRenderbuffer;
-+    Uint32 msaaFramebuffer;
-+    Uint32 msaaRenderbuffer;
-+    Uint32 depthRenderbuffer;
++    Uint32 drawableWidth;
++    Uint32 drawableHeight;
 +    Uint32 requestedSamples;
 +    Uint32 effectiveSamples;
-+    Uint32 preconditionMask;
-+    Uint32 queryFailureOperation;
-+    Uint32 queryFailureError;
-+} SDL_XASH_IOSDrawableBridgeState;
++    Uint32 action;
++    Uint32 presentAttempted;
++    Uint32 presentResult;
++    Uint64 invocation;
++    Uint32 enginePhase;
++    Uint32 clientState;
++    char mapName[64];
++} SDL_XASH_IOSDirectDrawableState;
 +
-+typedef int (SDLCALL *SDL_XASH_IOSDrawableBridgeCallback)(int action,
++typedef int (SDLCALL *SDL_XASH_IOSDirectDrawableCallback)(int action,
 +                                                           void *state,
 +                                                           size_t stateSize);
 +
-+extern DECLSPEC int SDLCALL SDL_XASH_IOSSetDrawableBridgeCallback(
-+    SDL_XASH_IOSDrawableBridgeCallback callback);
++extern DECLSPEC int SDLCALL SDL_XASH_IOSSetDirectDrawableCallback(
++    SDL_XASH_IOSDirectDrawableCallback callback);
++
+diff --git a/src/video/uikit/SDL_uikitopengles.m b/src/video/uikit/SDL_uikitopengles.m
+index 988966d..697b272 100644
+--- a/src/video/uikit/SDL_uikitopengles.m
++++ b/src/video/uikit/SDL_uikitopengles.m
+@@ -228 +228 @@ void UIKit_GL_RestoreCurrentContext(void)
+-        EAGLContext *context = (__bridge EAGLContext *) SDL_GL_GetCurrentContext();
++        SDLEAGLContext *context = (__bridge SDLEAGLContext *) SDL_GL_GetCurrentContext();
+@@ -231,0 +232,3 @@ void UIKit_GL_RestoreCurrentContext(void)
++        if (context != NULL) {
++            [context.sdlView xashNotifyDirectDrawable:SDL_XASH_IOS_DIRECT_DRAWABLE_CONTEXT_RESTORED];
++        }
+diff --git a/src/video/uikit/SDL_uikitopenglview.h b/src/video/uikit/SDL_uikitopenglview.h
+index 70abdc9..316d2d4 100644
+--- a/src/video/uikit/SDL_uikitopenglview.h
++++ b/src/video/uikit/SDL_uikitopenglview.h
+@@ -59,0 +60,2 @@
++- (void)xashNotifyDirectDrawable:(int)action;
 +
 diff --git a/src/video/uikit/SDL_uikitopenglview.m b/src/video/uikit/SDL_uikitopenglview.m
-index c36f060..e4345ce 100644
+index c36f060..2019e7b 100644
 --- a/src/video/uikit/SDL_uikitopenglview.m
 +++ b/src/video/uikit/SDL_uikitopenglview.m
-@@ -24,0 +25 @@
+@@ -26,0 +27 @@
 +#include <stdint.h>
 @@ -27,0 +29 @@
 +#include "SDL_uikitopengles.h"
 @@ -29,0 +32,10 @@
-+static SDL_XASH_IOSDrawableBridgeCallback xashDrawableBridgeCallback;
-+static Uint32 xashBridgeContextGenerationCounter;
++static SDL_XASH_IOSDirectDrawableCallback xashDirectDrawableCallback;
++static Uint32 xashDirectDrawableContextCounter;
 +
-+DECLSPEC int SDLCALL SDL_XASH_IOSSetDrawableBridgeCallback(
-+    SDL_XASH_IOSDrawableBridgeCallback callback)
++DECLSPEC int SDLCALL SDL_XASH_IOSSetDirectDrawableCallback(
++    SDL_XASH_IOSDirectDrawableCallback callback)
 +{
-+    xashDrawableBridgeCallback = callback;
++    xashDirectDrawableCallback = callback;
 +    return 0;
 +}
 +
-@@ -48,0 +61,4 @@
-+
+@@ -46,0 +59,4 @@
 +    int requestedSamples;
++
 +    Uint32 xashContextGeneration;
 +    Uint32 xashResizeGeneration;
-@@ -79,0 +96 @@
+@@ -80,0 +97,3 @@
 +        requestedSamples = multisamples;
-@@ -81,0 +99,2 @@
-+        xashContextGeneration = ++xashBridgeContextGenerationCounter;
++        xashContextGeneration = ++xashDirectDrawableContextCounter;
 +        xashResizeGeneration = 1;
-@@ -250,0 +270 @@
+@@ -250,0 +270,32 @@
 +    ++xashResizeGeneration;
-@@ -281,0 +302,29 @@
-+    SDL_XASH_IOSDrawableBridgeState bridge;
-+    const BOOL bridgeRegistered = xashDrawableBridgeCallback != NULL;
++}
 +
-+    SDL_zero(bridge);
-+    bridge.version = SDL_XASH_IOS_DRAWABLE_BRIDGE_VERSION;
-+    bridge.size = sizeof(bridge);
-+    bridge.context = (Uint64)(uintptr_t)context;
-+    bridge.currentContext = (Uint64)(uintptr_t)[EAGLContext currentContext];
-+    bridge.contextMatches = context && [EAGLContext currentContext] == context;
-+    bridge.contextAPI = (Uint32)context.API;
-+    bridge.contextGeneration = xashContextGeneration;
-+    bridge.resizeGeneration = xashResizeGeneration;
-+    bridge.targetFramebuffer = viewFramebuffer;
-+    bridge.targetRenderbuffer = viewRenderbuffer;
-+    bridge.viewFramebuffer = viewFramebuffer;
-+    bridge.viewRenderbuffer = viewRenderbuffer;
-+    bridge.msaaFramebuffer = msaaFramebuffer;
-+    bridge.msaaRenderbuffer = msaaRenderbuffer;
-+    bridge.depthRenderbuffer = depthRenderbuffer;
-+    bridge.requestedSamples = (Uint32)SDL_max(0, requestedSamples);
-+    bridge.effectiveSamples = (Uint32)SDL_max(0, samples);
-+    bridge.drawableWidth = backingWidth;
-+    bridge.drawableHeight = backingHeight;
++- (void)xashFillDirectDrawable:(SDL_XASH_IOSDirectDrawableState *)state
++                         action:(int)action
++{
++    SDL_zero(*state);
++    state->version = SDL_XASH_IOS_DIRECT_DRAWABLE_VERSION;
++    state->size = sizeof(*state);
++    state->context = (Uint64)(uintptr_t)context;
++    state->currentContext = (Uint64)(uintptr_t)[EAGLContext currentContext];
++    state->contextMatches = context && [EAGLContext currentContext] == context;
++    state->contextAPI = (Uint32)context.API;
++    state->contextGeneration = xashContextGeneration;
++    state->resizeGeneration = xashResizeGeneration;
++    state->viewFramebuffer = viewFramebuffer;
++    state->viewRenderbuffer = viewRenderbuffer;
++    state->drawableWidth = backingWidth;
++    state->drawableHeight = backingHeight;
++    state->requestedSamples = (Uint32)SDL_max(0, requestedSamples);
++    state->effectiveSamples = (Uint32)SDL_max(0, samples);
++    state->action = (Uint32)action;
++}
 +
-+    if (bridgeRegistered) {
-+        xashDrawableBridgeCallback(SDL_XASH_IOS_DRAWABLE_BRIDGE_SDL_SWAP_ENTRY,
-+                                   &bridge, sizeof(bridge));
++- (void)xashNotifyDirectDrawable:(int)action
++{
++    SDL_XASH_IOSDirectDrawableState state;
++    if (!xashDirectDrawableCallback) {
++        return;
++    }
++    [self xashFillDirectDrawable:&state action:action];
++    xashDirectDrawableCallback(action, &state, sizeof(state));
+@@ -281,0 +333,9 @@
++    SDL_XASH_IOSDirectDrawableState state;
++    const BOOL callbackRegistered = xashDirectDrawableCallback != NULL;
++
++    [self xashFillDirectDrawable:&state action:SDL_XASH_IOS_DIRECT_DRAWABLE_SWAP_ENTRY];
++    if (callbackRegistered) {
++        xashDirectDrawableCallback(SDL_XASH_IOS_DIRECT_DRAWABLE_SWAP_ENTRY,
++                                   &state, sizeof(state));
 +    }
 +
-@@ -310,0 +360,13 @@
-+    if (bridgeRegistered) {
-+        xashDrawableBridgeCallback(SDL_XASH_IOS_DRAWABLE_BRIDGE_SDL_POST_RESOLVE,
-+                                   &bridge, sizeof(bridge));
-+        xashDrawableBridgeCallback(SDL_XASH_IOS_DRAWABLE_BRIDGE_PRE_PRESENT,
-+                                   &bridge, sizeof(bridge));
-+
-+        /* SDL owns the CAEAGLLayer color renderbuffer. Make it the explicit
-+         * presentable object after GL4ES has filled the view framebuffer. */
-+        glBindRenderbuffer(GL_RENDERBUFFER, viewRenderbuffer);
-+        xashDrawableBridgeCallback(SDL_XASH_IOS_DRAWABLE_BRIDGE_PRESENT_BEFORE,
-+                                   &bridge, sizeof(bridge));
-+    }
-+
-@@ -314 +376,7 @@
+@@ -311,4 +371,15 @@
+-    /* viewRenderbuffer should always be bound here. Code that binds something
+-     * else is responsible for rebinding viewRenderbuffer, to reduce duplicate
+-     * state changes. */
 -    [context presentRenderbuffer:GL_RENDERBUFFER];
-+    bridge.presentAttempted = 1;
-+    bridge.presentResult = [context presentRenderbuffer:GL_RENDERBUFFER];
-+
-+    if (bridgeRegistered) {
-+        xashDrawableBridgeCallback(SDL_XASH_IOS_DRAWABLE_BRIDGE_POST_PRESENT,
-+                                   &bridge, sizeof(bridge));
++    /* SDL owns the CAEAGLLayer renderbuffer. Bind it explicitly so presentation
++     * never depends on a renderer's last renderbuffer binding. */
++    glBindRenderbuffer(GL_RENDERBUFFER, viewRenderbuffer);
++    state.action = SDL_XASH_IOS_DIRECT_DRAWABLE_PRESENT_BEFORE;
++    if (callbackRegistered) {
++        xashDirectDrawableCallback(SDL_XASH_IOS_DIRECT_DRAWABLE_PRESENT_BEFORE,
++                                   &state, sizeof(state));
 +    }
++    state.presentAttempted = 1;
++    state.presentResult = [context presentRenderbuffer:GL_RENDERBUFFER];
++    state.action = SDL_XASH_IOS_DIRECT_DRAWABLE_POST_PRESENT;
++    if (callbackRegistered) {
++        xashDirectDrawableCallback(SDL_XASH_IOS_DIRECT_DRAWABLE_POST_PRESENT,
++                                   &state, sizeof(state));
++    }
+@@ -334,0 +406 @@
++        [self xashNotifyDirectDrawable:SDL_XASH_IOS_DIRECT_DRAWABLE_RESIZED];
+@@ -372,0 +445 @@
++        [self xashNotifyDirectDrawable:SDL_XASH_IOS_DIRECT_DRAWABLE_DESTROYING];

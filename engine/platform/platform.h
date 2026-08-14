@@ -368,6 +368,9 @@ void      GL_UpdateSwapInterval( void );
 int GL_SetAttribute( int attr, int val );
 int GL_GetAttribute( int attr, int *val );
 void GL_SwapBuffers( void );
+#if XASH_IOS
+int GL_GetDrawableInfo( ref_ios_direct_drawable_t *state, size_t stateSize );
+#endif
 void *SW_LockBuffer( void );
 void SW_UnlockBuffer( void );
 qboolean SW_CreateBuffer( int width, int height, uint *stride, uint *bpp, uint *r, uint *g, uint *b );

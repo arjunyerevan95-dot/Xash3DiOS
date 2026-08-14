@@ -77,7 +77,8 @@ GNU General Public License for more details.
 //     Pools that opt into MEM_SMALL_ALLOC_OPT use a compact 16/24-byte header for allocations
 //     <= 255 bytes, dropping per-allocation filename/fileline tracking.
 // 18. Added the optional iOS drawable bridge callback for explicit renderer-to-SDL presentation.
-#define REF_API_VERSION 18
+// 19. Added a versioned engine-to-renderer query for the live iOS SDL drawable.
+#define REF_API_VERSION 19
 
 #define TF_SKY		(TF_SKYSIDE|TF_NOMIPMAP|TF_ALLOW_NEAREST)
 #define TF_FONT		(TF_NOMIPMAP|TF_CLAMP|TF_ALLOW_NEAREST)
@@ -207,6 +208,46 @@ enum
 	XASH_TEXTURE3,		// g-cont. 4 units should be enough
 	MAX_TEXTURE_UNITS = 32	// can't access to all over units without GLSL or cg
 };
+
+#define REF_IOS_DIRECT_DRAWABLE_VERSION 3
+#define REF_IOS_DIRECT_DRAWABLE_MAX_RECORDS 32
+#define REF_IOS_DIRECT_DRAWABLE_MENU_SAMPLES 2
+#define REF_IOS_DIRECT_DRAWABLE_ACTIVE_SAMPLES 3
+
+typedef enum ref_ios_direct_drawable_action_e
+{
+	REF_IOS_DIRECT_DRAWABLE_CONTEXT_RESTORED = 1,
+	REF_IOS_DIRECT_DRAWABLE_RESIZED,
+	REF_IOS_DIRECT_DRAWABLE_SWAP_ENTRY,
+	REF_IOS_DIRECT_DRAWABLE_PRESENT_BEFORE,
+	REF_IOS_DIRECT_DRAWABLE_POST_PRESENT,
+	REF_IOS_DIRECT_DRAWABLE_DESTROYING
+} ref_ios_direct_drawable_action_t;
+
+typedef struct ref_ios_direct_drawable_s
+{
+	uint32_t version;
+	uint32_t size;
+	uint64_t context;
+	uint64_t currentContext;
+	uint32_t contextMatches;
+	uint32_t contextAPI;
+	uint32_t contextGeneration;
+	uint32_t resizeGeneration;
+	uint32_t viewFramebuffer;
+	uint32_t viewRenderbuffer;
+	uint32_t drawableWidth;
+	uint32_t drawableHeight;
+	uint32_t requestedSamples;
+	uint32_t effectiveSamples;
+	uint32_t action;
+	uint32_t presentAttempted;
+	uint32_t presentResult;
+	uint64_t invocation;
+	uint32_t enginePhase;
+	uint32_t clientState;
+	char mapName[64];
+} ref_ios_direct_drawable_t;
 
 enum // r_speeds counters
 {
@@ -473,6 +514,7 @@ typedef struct ref_api_s
 	int   (*GL_GetAttribute)( int attr, int *value );
 	void *(*GL_GetProcAddress)( const char *name );
 	void (*GL_SwapBuffers)( void );
+	int (*GL_GetDrawableInfo)( ref_ios_direct_drawable_t *state, size_t stateSize );
 
 	// SW
 	qboolean (*SW_CreateBuffer)( int width, int height, uint *stride, uint *bpp, uint *r, uint *g, uint *b );
@@ -521,76 +563,6 @@ typedef struct ref_api_s
 } ref_api_t;
 
 struct mip_s;
-
-#define REF_IOS_DRAWABLE_BRIDGE_VERSION 2
-#define REF_IOS_DRAWABLE_BRIDGE_MAX_RECORDS 64
-#define REF_IOS_DRAWABLE_BRIDGE_MENU_ATTEMPTS 3
-#define REF_IOS_DRAWABLE_BRIDGE_MAP_GAPS 6
-
-typedef enum ref_ios_drawable_bridge_action_e
-{
-	REF_IOS_DRAWABLE_BRIDGE_RENDERER_HANDOFF = 1,
-	REF_IOS_DRAWABLE_BRIDGE_SDL_SWAP_ENTRY,
-	REF_IOS_DRAWABLE_BRIDGE_SDL_POST_RESOLVE,
-	REF_IOS_DRAWABLE_BRIDGE_PRE_PRESENT,
-	REF_IOS_DRAWABLE_BRIDGE_PRESENT_BEFORE,
-	REF_IOS_DRAWABLE_BRIDGE_POST_PRESENT
-} ref_ios_drawable_bridge_action_t;
-
-typedef struct ref_ios_drawable_bridge_s
-{
-	uint32_t version;
-	uint32_t size;
-	uint64_t context;
-	uint64_t currentContext;
-	uint32_t contextMatches;
-	uint32_t targetFramebuffer;
-	uint32_t targetRenderbuffer;
-	uint32_t drawableWidth;
-	uint32_t drawableHeight;
-	uint32_t sourceFramebuffer;
-	uint32_t sourceTexture;
-	uint32_t sourceRenderbuffer;
-	uint32_t logicalFramebuffer;
-	uint32_t targetStatus;
-	uint32_t transferAttempted;
-	uint32_t transferResult;
-	uint32_t proofSample;
-	uint32_t checksumBeforeValid;
-	uint32_t checksumBefore;
-	uint32_t checksumAfterValid;
-	uint32_t checksumAfter;
-	uint32_t checksumChanged;
-	uint32_t presentAttempted;
-	uint32_t presentResult;
-	uint32_t restoredFramebuffer;
-	uint32_t restoredRenderbuffer;
-	uint32_t restoredLogicalFramebuffer;
-	uint32_t restoreResult;
-	uint32_t failureCode;
-	uint64_t invocation;
-	uint64_t timestampUsec;
-	uint64_t hostTimeUsec;
-	uint64_t clientTimeUsec;
-	uint32_t checkpoint;
-	uint32_t auditSample;
-	uint32_t enginePhase;
-	uint32_t clientState;
-	char mapName[64];
-	uint32_t contextAPI;
-	uint32_t contextGeneration;
-	uint32_t resizeGeneration;
-	uint32_t viewFramebuffer;
-	uint32_t viewRenderbuffer;
-	uint32_t msaaFramebuffer;
-	uint32_t msaaRenderbuffer;
-	uint32_t depthRenderbuffer;
-	uint32_t requestedSamples;
-	uint32_t effectiveSamples;
-	uint32_t preconditionMask;
-	uint32_t queryFailureOperation;
-	uint32_t queryFailureError;
-} ref_ios_drawable_bridge_t;
 
 // render callbacks
 typedef struct ref_interface_s
@@ -725,7 +697,7 @@ typedef struct ref_interface_s
 	// vgui drawing implementation
 	void	(*VGUI_SetupDrawing)( qboolean rect );
 
-	// iOS GL4ES-to-SDL drawable ownership bridge; NULL/no-op for other renderers
+	// iOS GL4ES direct-drawable lifecycle callback; NULL/no-op for other renderers
 	int	(*R_IOSDrawableBridge)( int action, void *state, size_t stateSize );
 } ref_interface_t;
 

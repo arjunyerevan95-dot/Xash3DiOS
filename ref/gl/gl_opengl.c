@@ -5,6 +5,11 @@
 #include "gl4es/include/gl4eshint.h"
 #endif // XASH_GL4ES
 
+#if XASH_IOS && XASH_GL4ES
+void R_IOSDirectDrawableContextCreated( void );
+void R_IOSDirectDrawableContextDestroying( void );
+#endif
+
 CVAR_DEFINE( gl_extensions, "gl_allow_extensions", "1", FCVAR_GLCONFIG|FCVAR_READ_ONLY, "allow gl_extensions" );
 CVAR_DEFINE( gl_texture_anisotropy, "gl_anisotropy", "8", FCVAR_GLCONFIG, "textures anisotropic filter" );
 CVAR_DEFINE_AUTO( gl_texture_lodbias, "0.0", FCVAR_GLCONFIG, "LOD bias for mipmapped textures (perfomance|quality)" );
@@ -1304,6 +1309,9 @@ void R_Shutdown( void )
 	Mem_FreePool( &r_temppool );
 
 #if XASH_GL4ES
+#if XASH_IOS
+	R_IOSDirectDrawableContextDestroying();
+#endif
 	close_gl4es();
 #endif // XASH_GL4ES
 
@@ -1484,6 +1492,11 @@ void GL_SetupAttributes( int safegl )
 			samples = 0; // don't use, because invalid parameter is passed
 		}
 
+#if XASH_IOS && XASH_GL4ES
+		/* SDL's CAEAGLLayer view FBO is the one presented drawable. */
+		samples = 0;
+#endif
+
 		if( samples )
 		{
 			gEngfuncs.GL_SetAttribute( REF_GL_MULTISAMPLEBUFFERS, 1 );
@@ -1552,6 +1565,9 @@ void GL_OnContextCreated( void )
 	set_getprocaddress( GL4ES_GetProcAddress );
 	set_getmainfbsize( GL4ES_GetMainFBSize );
 	initialize_gl4es();
+#if XASH_IOS
+	R_IOSDirectDrawableContextCreated();
+#endif
 
 	// merge glBegin/glEnd in beams and console
 	pglHint( GL_BEGINEND_HINT_GL4ES, 1 );
