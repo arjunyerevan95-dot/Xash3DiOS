@@ -352,6 +352,7 @@ typedef enum
 } rserr_t;
 
 struct vidmode_s;
+typedef struct ref_ios_direct_drawable_s ref_ios_direct_drawable_t;
 typedef enum window_mode_e window_mode_t;
 typedef enum ref_window_type_e ref_window_type_t;
 typedef enum ref_graphic_apis_e ref_graphic_apis_t;
