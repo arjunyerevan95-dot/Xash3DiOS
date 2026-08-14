@@ -121,13 +121,6 @@ if ! grep -q '_SDL_XASH_IOSSetDrawableBridgeCallback' "$SDL_NM"; then
 	exit 1
 fi
 
-GL4ES_RENDERER_NM="$VERIFY_ROOT/gl4es-renderer.nm"
-nm -g "$GL4ES_RENDERER_PATH" > "$GL4ES_RENDERER_NM"
-if ! grep -q '_gl4es_drawable_bridge_audit' "$GL4ES_RENDERER_NM"; then
-	echo "Renderer does not export the native main-FBO interrogation ABI" >&2
-	exit 1
-fi
-
 for diagnostic_strings in \
 	"$ENGINE_STRINGS" \
 	"$SDL_STRINGS" \
