@@ -478,6 +478,8 @@ static void R_FillTriAPI( triangleapi_t *api )
 }
 
 #if XASH_IOS && XASH_GL4ES
+#define IOS_GL_FRAMEBUFFER_COMPLETE 0x8CD5u
+
 typedef struct ios_direct_drawable_state_s
 {
 	ref_ios_direct_drawable_t drawable;
@@ -570,7 +572,7 @@ static qboolean R_IOSDirectDrawableRegister( ref_ios_direct_drawable_t *state,
 		gEngfuncs.Con_Printf( "iOS direct drawable lifecycle: reason=%s context=0x%llx context_gen=%u resize_gen=%u view=%u/%u reasserted=%u complete=%u\n",
 			reason, (unsigned long long)state->context, state->contextGeneration,
 			state->resizeGeneration, state->viewFramebuffer, state->viewRenderbuffer,
-			valid ? 1 : 0, valid && proof.framebuffer_status == GL_FRAMEBUFFER_COMPLETE );
+			valid ? 1 : 0, valid && proof.framebuffer_status == IOS_GL_FRAMEBUFFER_COMPLETE );
 	if( !valid )
 		return false;
 
@@ -632,7 +634,7 @@ static void R_IOSDirectDrawablePrintProof( const ref_ios_direct_drawable_t *stat
 			proof->logical_current == 0 && proof->logical_read == 0 &&
 			proof->logical_draw == 0 && proof->native_draw == state->viewFramebuffer &&
 			proof->native_read == state->viewFramebuffer,
-			proof->framebuffer_status == GL_FRAMEBUFFER_COMPLETE,
+			proof->framebuffer_status == IOS_GL_FRAMEBUFFER_COMPLETE,
 			proof->checksum_valid, ios_direct_drawable.menuChecksumValid,
 			changed, proof->checksum, ios_direct_drawable.menuChecksum );
 		if( changed )
