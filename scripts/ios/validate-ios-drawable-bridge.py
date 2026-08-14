@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the bounded iOS GL4ES-to-SDL drawable ownership bridge."""
+"""Validate Work Order 45 Phase B's diagnostics-only iOS main-FBO audit."""
 
 from __future__ import annotations
 
@@ -21,9 +21,7 @@ def revision(path: pathlib.Path) -> str:
     result = subprocess.run(
         ["git", "-c", f"safe.directory={path.resolve().as_posix()}", "-C", str(path),
          "rev-parse", "HEAD"],
-        check=True,
-        capture_output=True,
-        text=True,
+        check=True, capture_output=True, text=True,
     )
     return result.stdout.strip()
 
@@ -38,9 +36,9 @@ def reject(text: str, pattern: str, label: str, failures: list[str]) -> None:
         failures.append(f"{label}: forbidden pattern {pattern!r}")
 
 
-def function(text: str, name: str, next_name: str) -> str:
-    start = text.find(name)
-    end = text.find(next_name, start + len(name))
+def between(text: str, start_token: str, end_token: str) -> str:
+    start = text.find(start_token)
+    end = text.find(end_token, start + len(start_token))
     if start < 0 or end < 0:
         return ""
     return text[start:end]
@@ -62,111 +60,214 @@ def validate(files: dict[str, str]) -> list[str]:
 
     for token in (
         "#define REF_API_VERSION 18",
+        "#define REF_IOS_DRAWABLE_BRIDGE_VERSION 2",
         "REF_IOS_DRAWABLE_BRIDGE_MAX_RECORDS 64",
-        "REF_IOS_DRAWABLE_BRIDGE_PROOF_TRANSFERS 3",
-        "R_IOSDrawableBridge",
+        "REF_IOS_DRAWABLE_BRIDGE_MENU_ATTEMPTS 3",
+        "REF_IOS_DRAWABLE_BRIDGE_MAP_GAPS 6",
+        "REF_IOS_DRAWABLE_BRIDGE_RENDERER_HANDOFF",
+        "REF_IOS_DRAWABLE_BRIDGE_SDL_SWAP_ENTRY",
+        "REF_IOS_DRAWABLE_BRIDGE_SDL_POST_RESOLVE",
+        "REF_IOS_DRAWABLE_BRIDGE_PRE_PRESENT",
+        "REF_IOS_DRAWABLE_BRIDGE_PRESENT_BEFORE",
+        "REF_IOS_DRAWABLE_BRIDGE_POST_PRESENT",
+        "contextGeneration",
+        "resizeGeneration",
+        "requestedSamples",
+        "effectiveSamples",
+        "preconditionMask",
     ):
-        require(api, token, "engine ABI", failures)
+        require(api, token, "engine audit ABI", failures)
 
     require(engine, "SDL_XASH_IOSSetDrawableBridgeCallback", "engine-to-SDL registration", failures)
     require(engine, "ref.dllFuncs.R_IOSDrawableBridge", "engine-to-SDL registration", failures)
-    require(renderer, "#if XASH_IOS && XASH_GL4ES", "renderer scope", failures)
-    require(renderer, "gl4es_drawable_bridge_pre", "renderer pre-present callback", failures)
-    require(renderer, "gl4es_drawable_bridge_post", "renderer post-present callback", failures)
-    require(renderer, "state->sourceRenderbuffer", "renderer renderbuffer restore contract", failures)
-    require(renderer, "iOS drawable bridge policy:", "bounded policy marker", failures)
-    require(renderer, "iOS drawable bridge terminal:", "bounded terminal marker", failures)
-    require(renderer, "R_IOSDrawableBridge,\n#else\n\tNULL,", "non-GL4ES no-op", failures)
-
-    require(sdl_header, "SDL_XASH_IOSDrawableBridgeState", "SDL bridge contract", failures)
+    require(renderer, "gEngfuncs.GL_SwapBuffers = R_IOSMainFBOSwap", "renderer-handoff hook", failures)
+    require(renderer, "R_IOSMainFBOPrintCheckpoint( \"iOS presentation pipeline:\", \"A-renderer-handoff\"",
+            "renderer checkpoint A", failures)
+    for marker in (
+        "iOS main-FBO audit policy:",
+        "iOS main-FBO lifecycle:",
+        "iOS main-FBO state:",
+        "iOS native attachment:",
+        "iOS presentation pipeline:",
+        "iOS pixel checkpoint:",
+        "iOS drawable bridge attempt:",
+        "iOS drawable bridge present:",
+        "iOS drawable bridge restore:",
+        "iOS main-FBO audit terminal:",
+    ):
+        require(renderer, marker, "required bounded marker", failures)
     for token in (
-        "bridge.context = (Uint64)(uintptr_t)context;",
-        "bridge.currentContext = (Uint64)(uintptr_t)[EAGLContext currentContext];",
-        "bridge.targetFramebuffer = viewFramebuffer;",
-        "bridge.targetRenderbuffer = viewRenderbuffer;",
-        "bridge.drawableWidth = backingWidth;",
-        "bridge.drawableHeight = backingHeight;",
+        "static const uint32_t activeGaps[] = { 0, 2, 4, 8, 16, 32, 64 }",
+        "ios_main_fbo_audit.records >= REF_IOS_DRAWABLE_BRIDGE_MAX_RECORDS - 1",
+        "gl4es_drawable_bridge_audit(",
+        "state->preconditionMask",
+        "R_IOSDrawableBridge,\n#else\n\tNULL,",
+    ):
+        require(renderer, token, "bounded renderer audit", failures)
+
+    for token in (
+        "#define SDL_XASH_IOS_DRAWABLE_BRIDGE_VERSION 2",
+        "SDL_XASH_IOS_DRAWABLE_BRIDGE_SDL_SWAP_ENTRY 2",
+        "SDL_XASH_IOS_DRAWABLE_BRIDGE_SDL_POST_RESOLVE 3",
+        "SDL_XASH_IOS_DRAWABLE_BRIDGE_PRE_PRESENT 4",
+        "SDL_XASH_IOS_DRAWABLE_BRIDGE_PRESENT_BEFORE 5",
+        "SDL_XASH_IOS_DRAWABLE_BRIDGE_POST_PRESENT 6",
+        "Uint32 contextGeneration",
+        "Uint32 resizeGeneration",
+        "Uint32 viewFramebuffer",
+        "Uint32 msaaFramebuffer",
+        "Uint32 depthRenderbuffer",
+        "Uint32 requestedSamples",
+        "Uint32 effectiveSamples",
+    ):
+        require(sdl_header, token, "SDL audit ABI", failures)
+    for token in (
+        "requestedSamples = multisamples;",
+        "samples = multisamples;",
+        "samples = SDL_min(samples, maxsamples);",
+        "bridge.contextAPI = (Uint32)context.API;",
+        "bridge.contextGeneration = xashContextGeneration;",
+        "bridge.resizeGeneration = xashResizeGeneration;",
+        "bridge.viewFramebuffer = viewFramebuffer;",
+        "bridge.viewRenderbuffer = viewRenderbuffer;",
+        "bridge.msaaFramebuffer = msaaFramebuffer;",
+        "bridge.msaaRenderbuffer = msaaRenderbuffer;",
+        "bridge.depthRenderbuffer = depthRenderbuffer;",
+        "bridge.requestedSamples = (Uint32)SDL_max(0, requestedSamples);",
+        "bridge.effectiveSamples = (Uint32)SDL_max(0, samples);",
     ):
         require(sdl_view, token, "live SDL drawable state", failures)
 
-    pre = sdl_view.find("SDL_XASH_IOS_DRAWABLE_BRIDGE_PRE_PRESENT")
-    present_bind = sdl_view.find("glBindRenderbuffer(GL_RENDERBUFFER, viewRenderbuffer);", pre)
-    present = sdl_view.find("presentRenderbuffer:GL_RENDERBUFFER", present_bind)
-    post = sdl_view.find("SDL_XASH_IOS_DRAWABLE_BRIDGE_POST_PRESENT", present)
-    if not (0 <= pre < present_bind < present < post):
-        failures.append("SDL swap order: expected pre-transfer, view renderbuffer bind, present, post-restore")
-    require(sdl_view, "xashBridgeTransfers < XASH_BRIDGE_PROOF_TRANSFERS", "bounded checksum proof", failures)
-    require(sdl_view, "XASH_BRIDGE_PROOF_TRANSFERS 3", "bounded checksum proof", failures)
+    swap = between(sdl_view, "- (void)swapBuffers", "- (void)layoutSubviews")
+    order = [swap.find(token) for token in (
+        "SDL_XASH_IOS_DRAWABLE_BRIDGE_SDL_SWAP_ENTRY",
+        "if (msaaFramebuffer)",
+        "SDL_XASH_IOS_DRAWABLE_BRIDGE_SDL_POST_RESOLVE",
+        "SDL_XASH_IOS_DRAWABLE_BRIDGE_PRE_PRESENT",
+        "SDL_XASH_IOS_DRAWABLE_BRIDGE_PRESENT_BEFORE",
+        "presentRenderbuffer:GL_RENDERBUFFER",
+        "SDL_XASH_IOS_DRAWABLE_BRIDGE_POST_PRESENT",
+    )]
+    if any(position < 0 for position in order) or order != sorted(order):
+        failures.append("SDL swap order: checkpoints B/C/D/E do not surround the ordinary resolve/present path")
+    if swap.count("glBlitFramebuffer(") != 1 or swap.count("glResolveMultisampleFramebufferAPPLE(") != 1:
+        failures.append("SDL swap policy: ordinary resolve count changed")
+    for field in ("targetFramebuffer", "targetRenderbuffer", "viewFramebuffer",
+                  "viewRenderbuffer", "msaaFramebuffer", "msaaRenderbuffer",
+                  "depthRenderbuffer", "drawableWidth", "drawableHeight"):
+        reject(sdl_view, rf"bridge\.{field}\s*=\s*[1-9][0-9]*\s*;", "hard-coded SDL identity", failures)
+    reject(sdl_view, r"sentinel|yellow[_ -]?bar|SDL_Log", "SDL diagnostics-only policy", failures)
 
-    for field in ("targetFramebuffer", "targetRenderbuffer", "drawableWidth", "drawableHeight"):
-        reject(sdl_view, rf"bridge\.{field}\s*=\s*[1-9][0-9]*\s*;", "hard-coded SDL target", failures)
-    reject(sdl_view, r"sentinel|yellow[_ -]?bar|SDL_Log", "SDL diagnostic policy", failures)
-
-    require(gl4es_api, "gl4es_drawable_bridge_pre", "GL4ES public bridge API", failures)
-    require(gl4es_api, "gl4es_drawable_bridge_post", "GL4ES public bridge API", failures)
-    pre_function = function(gl4es_main, "int gl4es_drawable_bridge_pre", "int gl4es_drawable_bridge_post")
-    post_function = function(gl4es_main, "int gl4es_drawable_bridge_post", "#if defined(AMIGAOS4)")
-    require(pre_function, "gl4es_flush()", "GL4ES flush boundary", failures)
-    require(pre_function, "bitmap_flush()", "GL4ES bitmap flush boundary", failures)
-    require(pre_function, "blitMainFBOTo(target_framebuffer", "target-aware GL4ES route", failures)
-    require(post_function, "restoreMainFBOAfterPresent", "post-present restore", failures)
-    reject(pre_function + post_function, r"gl4es_(pre|post)_swap", "stock framebuffer-zero route", failures)
-
-    blit = function(gl4es_fbo, "int blitMainFBOTo", "int restoreMainFBOAfterPresent")
-    restore = function(gl4es_fbo, "int restoreMainFBOAfterPresent", "void bindMainFBO")
     for token in (
-        "gles_glBindFramebuffer(GL_FRAMEBUFFER, target);",
-        "gles_glCheckFramebufferStatus(GL_FRAMEBUFFER)",
-        "gles_glGetIntegerv(GL_FRAMEBUFFER_BINDING, &native_source)",
-        "gles_glGetIntegerv(GL_RENDERBUFFER_BINDING, &native_renderbuffer)",
-        "gl4es_blitTexture(glstate->fbo.mainfbo_tex",
-        "glstate->fbo.current_fb->id != 0",
+        "GL4ES_DRAWABLE_AUDIT_VERSION 1",
+        "GL4ES_DRAWABLE_PRE_NO_USEFBO",
+        "GL4ES_DRAWABLE_PRE_NO_MAIN_FBO",
+        "GL4ES_DRAWABLE_PRE_NO_MAIN_TEXTURE",
+        "GL4ES_DRAWABLE_PRE_NO_CURRENT_FBO",
+        "GL4ES_DRAWABLE_PRE_LOGICAL_NOT_ZERO",
+        "GL4ES_DRAWABLE_PRE_NO_TARGET",
+        "GL4ES_DRAWABLE_PRE_SOURCE_MISMATCH",
+        "GL4ES_DRAWABLE_PRE_TARGET_IS_SOURCE",
+        "GL4ES_DRAWABLE_PRE_INVALID_SIZE",
+        "GL4ES_DRAWABLE_PRE_TARGET_INCOMPLETE",
+        "gl4es_drawable_attachment_audit_t",
+        "gl4es_drawable_fbo_audit_t",
+        "gl4es_drawable_audit_t",
+        "gl4es_drawable_bridge_audit",
     ):
-        require(blit, token, "explicit GL4ES target transfer", failures)
-    require(restore, "gles_glBindFramebuffer(GL_FRAMEBUFFER, glstate->fbo.mainfbo_fbo);",
-            "GL4ES native framebuffer restore", failures)
-    require(restore, "gles_glBindRenderbuffer(GL_RENDERBUFFER, expected_renderbuffer);",
-            "GL4ES native renderbuffer restore", failures)
-    require(restore, "gles_glGetIntegerv(GL_FRAMEBUFFER_BINDING, &native_framebuffer)",
-            "GL4ES framebuffer restore proof", failures)
-    require(restore, "gles_glGetIntegerv(GL_RENDERBUFFER_BINDING, &native_renderbuffer)",
-            "GL4ES renderbuffer restore proof", failures)
-    require(restore, "expected_renderbuffer != glstate->fbo.current_rb->renderbuffer",
-            "GL4ES renderbuffer identity invariant", failures)
-    require(restore, "glstate->fbo.current_fb->id != 0", "GL4ES logical-zero invariant", failures)
-    reject(blit, r"glBindFramebuffer\s*\([^\n]*,\s*0\s*\)", "stock framebuffer-zero target", failures)
+        require(gl4es_api, token, "GL4ES audit ABI", failures)
+
+    bridge = between(gl4es_fbo, "int blitMainFBOTo", "int restoreMainFBOAfterPresent")
+    restore = between(gl4es_fbo, "int restoreMainFBOAfterPresent", "#define NATIVE_DRAW_FRAMEBUFFER")
+    audit = between(gl4es_fbo, "#define NATIVE_DRAW_FRAMEBUFFER", "void bindMainFBO")
+    for token in (
+        "mask |= GL4ES_DRAWABLE_PRE_NO_USEFBO",
+        "mask |= GL4ES_DRAWABLE_PRE_NO_MAIN_FBO",
+        "mask |= GL4ES_DRAWABLE_PRE_SOURCE_MISMATCH",
+        "mask |= GL4ES_DRAWABLE_PRE_TARGET_INCOMPLETE",
+        "glstate->fbo.current_fb->id != 0",
+        "gl4es_blitTexture(glstate->fbo.mainfbo_tex",
+    ):
+        require(bridge, token, "unchanged named bridge guard", failures)
+    for token in (
+        "gles_glBindFramebuffer(GL_FRAMEBUFFER, glstate->fbo.mainfbo_fbo);",
+        "gles_glBindRenderbuffer(GL_RENDERBUFFER, expected_renderbuffer);",
+        "expected_renderbuffer != glstate->fbo.current_rb->renderbuffer",
+    ):
+        require(restore, token, "existing bridge restore", failures)
+    for token in (
+        "NATIVE_DRAW_FRAMEBUFFER_BINDING 0x8CA6",
+        "NATIVE_READ_FRAMEBUFFER_BINDING 0x8CAA",
+        "gles_glGetFramebufferAttachmentParameteriv",
+        "GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE",
+        "GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME",
+        "GL_FRAMEBUFFER_ATTACHMENT_TEXTURE_LEVEL",
+        "gles_glGetRenderbufferParameteriv",
+        "GL_RENDERBUFFER_WIDTH",
+        "GL_RENDERBUFFER_HEIGHT",
+        "GL_RENDERBUFFER_INTERNAL_FORMAT",
+        "GL_RENDERBUFFER_SAMPLES",
+        "gles_glReadPixels",
+        "GL4ES_DRAWABLE_QUERY_PRIOR_ERROR",
+        "GL4ES_DRAWABLE_QUERY_RESTORE",
+        "GL4ES_DRAWABLE_QUERY_REQUERY",
+        "gles_glBindFramebuffer(NATIVE_DRAW_FRAMEBUFFER, draw);",
+        "gles_glBindFramebuffer(NATIVE_READ_FRAMEBUFFER, read);",
+        "gles_glBindRenderbuffer(GL_RENDERBUFFER, renderbuffer);",
+        "audit->restored_draw_framebuffer",
+        "audit->restored_read_framebuffer",
+        "audit->restored_renderbuffer",
+        "audit->restored_logical_framebuffer",
+    ):
+        require(audit, token, "native interrogation and exact restore", failures)
+    reject(audit, r"gl4es_blitTexture|glBlitFramebuffer|glResolve|glCopy|glFramebuffer(Texture|Renderbuffer)|glGen(Framebuffers|Renderbuffers|Textures)|glDelete(Framebuffers|Renderbuffers|Textures)|glClear\s*\(",
+           "audit must be read-only", failures)
+    if gl4es_fbo.count("void createMainFBO(") != 1:
+        failures.append("main-FBO creation policy: audit changed the number of creator definitions")
+    reject(renderer + gl4es_main, r"\bcreateMainFBO\s*\(", "main-FBO creation remains unauthorized", failures)
+
+    main_pre = between(gl4es_main, "int gl4es_drawable_bridge_pre", "int gl4es_drawable_bridge_post")
+    main_audit = between(gl4es_main, "int gl4es_drawable_bridge_audit", "#if defined(AMIGAOS4)")
+    require(main_pre, "blitMainFBOTo(target_framebuffer", "existing bridge route", failures)
+    require(main_pre, "precondition_mask", "named bridge preconditions", failures)
+    require(main_audit, "auditDrawableBridge", "audit wrapper", failures)
 
     require(deps, f"SDL_REF=${{SDL_REF:-{SDL_REF}}}", "SDL pin", failures)
     require(deps, "sdl2-drawable-bridge-ios.patch", "SDL patch route", failures)
-    for obsolete in ("sdl2-display-audit-ios.patch", "sdl2-wo43-diagnostics-ios.patch",
-                     "sdl2-wo43-phase-b-correction-ios.patch"):
-        reject(deps, re.escape(obsolete), "obsolete SDL diagnostic route", failures)
     require(build, f"GL4ES_REF=${{GL4ES_REF:-{GL4ES_REF}}}", "GL4ES pin", failures)
     require(build, "gl4es-drawable-bridge-ios.patch", "GL4ES patch route", failures)
-    require(build, "validate-ios-drawable-bridge.py", "bridge policy validation route", failures)
-    for obsolete in ("diffusion-ios-liveness.patch", "diffusion-wo43-diagnostics-ios.patch",
+    require(build, "validate-ios-drawable-bridge.py", "audit validation route", failures)
+    for obsolete in ("sdl2-display-audit-ios.patch", "sdl2-wo43-diagnostics-ios.patch",
+                     "sdl2-wo43-phase-b-correction-ios.patch",
+                     "diffusion-ios-liveness.patch", "diffusion-wo43-diagnostics-ios.patch",
                      "diffusion-wo43-phase-b-correction-ios.patch"):
-        reject(diffusion_build, re.escape(obsolete), "obsolete Diffusion diagnostic route", failures)
+        reject(deps + build + diffusion_build, re.escape(obsolete), "obsolete diagnostic route", failures)
 
-    active = "\n".join((engine, renderer, deps, build, diffusion_build))
-    reject(active, r"WO43|sentinel_bars|liveness frame|GL_INVALID_OPERATION audit",
-           "removed high-volume diagnostic", failures)
+    active = "\n".join((engine, renderer, sdl_view, gl4es_main, deps, build, diffusion_build))
+    reject(active, r"LIBGL_FB\s*=|setenv\s*\(\s*[\"']LIBGL_FB", "LIBGL_FB policy change", failures)
+    reject(active, r"sentinel_bars|yellow[_ -]?sentinel|normal-scene proof", "sentinel policy", failures)
     return failures
 
 
 def self_test(files: dict[str, str]) -> list[str]:
     failures: list[str] = []
     cases = (
-        ("hard-coded target", "sdl_view", "bridge.targetFramebuffer = viewFramebuffer;",
-         "bridge.targetFramebuffer = 7;"),
-        ("hard-coded geometry", "sdl_view", "bridge.drawableWidth = backingWidth;",
-         "bridge.drawableWidth = 1024;"),
-        ("stock pre-swap", "gl4es_main", "if (glstate->list.active) gl4es_flush();",
-         "gl4es_pre_swap();\n    if (glstate->list.active) gl4es_flush();"),
-        ("sentinel", "sdl_view", "- (void)swapBuffers", "void xashDrawSentinel(void);\n- (void)swapBuffers"),
-        ("missing restore", "gl4es_main", "return restoreMainFBOAfterPresent(", "return missingRestore("),
-        ("unbounded record policy", "api", "REF_IOS_DRAWABLE_BRIDGE_MAX_RECORDS 64",
+        ("main-FBO creation", "renderer", "static void R_IOSMainFBOSwap( void )",
+         "static void R_IOSMainFBOSwap( void )\n{ createMainFBO(640, 480); }"),
+        ("LIBGL_FB injection", "engine", "void GL_SwapBuffers( void )",
+         "const char *x = \"LIBGL_FB=2\";\nvoid GL_SwapBuffers( void )"),
+        ("MSAA policy change", "sdl_view", "samples = multisamples;", "samples = 0;"),
+        ("hard-coded FBO", "sdl_view", "bridge.viewFramebuffer = viewFramebuffer;",
+         "bridge.viewFramebuffer = 7;"),
+        ("new transfer", "gl4es_fbo", "#define NATIVE_DRAW_FRAMEBUFFER 0x8CA9",
+         "#define NATIVE_DRAW_FRAMEBUFFER 0x8CA9\nvoid auditTransfer(void) { gl4es_blitTexture(1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, BLIT_OPAQUE); }"),
+        ("persistent target mutation", "gl4es_fbo", "#define NATIVE_DRAW_FRAMEBUFFER 0x8CA9",
+         "#define NATIVE_DRAW_FRAMEBUFFER 0x8CA9\nvoid auditAttach(void) { glFramebufferTexture2D(0, 0, 0, 0, 0); }"),
+        ("sentinel", "sdl_view", "- (void)swapBuffers", "void yellow_sentinel(void);\n- (void)swapBuffers"),
+        ("unbounded records", "api", "REF_IOS_DRAWABLE_BRIDGE_MAX_RECORDS 64",
          "REF_IOS_DRAWABLE_BRIDGE_MAX_RECORDS 0"),
+        ("missing native restore", "gl4es_fbo", "gles_glBindFramebuffer(NATIVE_DRAW_FRAMEBUFFER, draw);",
+         "missingNativeDrawRestore(draw);"),
     )
     for label, key, old, new in cases:
         mutated = dict(files)
@@ -189,7 +290,6 @@ def main() -> int:
     sdl = pathlib.Path(sys.argv[2]).resolve()
     gl4es = pathlib.Path(sys.argv[3]).resolve()
     failures: list[str] = []
-
     try:
         if revision(sdl) != SDL_REF:
             failures.append(f"SDL revision is not pinned to {SDL_REF}")
@@ -214,15 +314,13 @@ def main() -> int:
     failures.extend(validate(files))
     if len(sys.argv) == 5:
         failures.extend(self_test(files))
-
     if failures:
         for failure in failures:
             print(f"error: {failure}", file=sys.stderr)
         return 1
-
-    print("iOS drawable bridge policy: live SDL target, GL4ES transfer/restore, bounded proof")
+    print("iOS main-FBO audit policy: diagnostics-only checkpoints A-E, bounded checksums, exact restore")
     if len(sys.argv) == 5:
-        print("iOS drawable bridge rejection tests: all forbidden mutations rejected")
+        print("iOS main-FBO audit rejection tests: creation, environment, MSAA, identity, transfer, mutation, sentinel, bounds, and restore rejected")
     return 0
 
 

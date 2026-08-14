@@ -1,11 +1,15 @@
 diff --git a/src/video/uikit/SDL_uikitopengles.h b/src/video/uikit/SDL_uikitopengles.h
-index 0533f69..bb63327 100644
+index 0533f69..dee2374 100644
 --- a/src/video/uikit/SDL_uikitopengles.h
 +++ b/src/video/uikit/SDL_uikitopengles.h
-@@ -27,0 +28,44 @@
-+#define SDL_XASH_IOS_DRAWABLE_BRIDGE_VERSION 1
-+#define SDL_XASH_IOS_DRAWABLE_BRIDGE_PRE_PRESENT 1
-+#define SDL_XASH_IOS_DRAWABLE_BRIDGE_POST_PRESENT 2
+@@ -27,0 +28,70 @@
++#define SDL_XASH_IOS_DRAWABLE_BRIDGE_VERSION 2
++#define SDL_XASH_IOS_DRAWABLE_BRIDGE_RENDERER_HANDOFF 1
++#define SDL_XASH_IOS_DRAWABLE_BRIDGE_SDL_SWAP_ENTRY 2
++#define SDL_XASH_IOS_DRAWABLE_BRIDGE_SDL_POST_RESOLVE 3
++#define SDL_XASH_IOS_DRAWABLE_BRIDGE_PRE_PRESENT 4
++#define SDL_XASH_IOS_DRAWABLE_BRIDGE_PRESENT_BEFORE 5
++#define SDL_XASH_IOS_DRAWABLE_BRIDGE_POST_PRESENT 6
 +
 +typedef struct SDL_XASH_IOSDrawableBridgeState
 +{
@@ -38,6 +42,28 @@ index 0533f69..bb63327 100644
 +    Uint32 restoredLogicalFramebuffer;
 +    Uint32 restoreResult;
 +    Uint32 failureCode;
++    Uint64 invocation;
++    Uint64 timestampUsec;
++    Uint64 hostTimeUsec;
++    Uint64 clientTimeUsec;
++    Uint32 checkpoint;
++    Uint32 auditSample;
++    Uint32 enginePhase;
++    Uint32 clientState;
++    char mapName[64];
++    Uint32 contextAPI;
++    Uint32 contextGeneration;
++    Uint32 resizeGeneration;
++    Uint32 viewFramebuffer;
++    Uint32 viewRenderbuffer;
++    Uint32 msaaFramebuffer;
++    Uint32 msaaRenderbuffer;
++    Uint32 depthRenderbuffer;
++    Uint32 requestedSamples;
++    Uint32 effectiveSamples;
++    Uint32 preconditionMask;
++    Uint32 queryFailureOperation;
++    Uint32 queryFailureError;
 +} SDL_XASH_IOSDrawableBridgeState;
 +
 +typedef int (SDLCALL *SDL_XASH_IOSDrawableBridgeCallback)(int action,
@@ -48,19 +74,16 @@ index 0533f69..bb63327 100644
 +    SDL_XASH_IOSDrawableBridgeCallback callback);
 +
 diff --git a/src/video/uikit/SDL_uikitopenglview.m b/src/video/uikit/SDL_uikitopenglview.m
-index c36f060..260bc24 100644
+index c36f060..e4345ce 100644
 --- a/src/video/uikit/SDL_uikitopenglview.m
 +++ b/src/video/uikit/SDL_uikitopenglview.m
 @@ -24,0 +25 @@
 +#include <stdint.h>
 @@ -27,0 +29 @@
 +#include "SDL_uikitopengles.h"
-@@ -29,0 +32,24 @@
-+#define XASH_BRIDGE_SAMPLE_EDGE 4
-+#define XASH_BRIDGE_SAMPLE_COUNT 5
-+#define XASH_BRIDGE_PROOF_TRANSFERS 3
-+
+@@ -29,0 +32,10 @@
 +static SDL_XASH_IOSDrawableBridgeCallback xashDrawableBridgeCallback;
++static Uint32 xashBridgeContextGenerationCounter;
 +
 +DECLSPEC int SDLCALL SDL_XASH_IOSSetDrawableBridgeCallback(
 +    SDL_XASH_IOSDrawableBridgeCallback callback)
@@ -69,120 +92,63 @@ index c36f060..260bc24 100644
 +    return 0;
 +}
 +
-+static Uint32 XASH_BridgeHashBytes(Uint32 hash, const GLubyte *bytes, size_t count)
-+{
-+    size_t i;
+@@ -48,0 +61,4 @@
 +
-+    for (i = 0; i < count; ++i) {
-+        hash ^= bytes[i];
-+        hash *= 16777619u;
-+    }
-+    return hash;
-+}
-+
-@@ -48,0 +75,2 @@
-+
-+    Uint32 xashBridgeTransfers;
-@@ -279,0 +308,56 @@
-+- (Uint32)xashBridgeDrawableChecksumWithStatus:(GLenum *)statusOut
-+{
-+    const GLint points[XASH_BRIDGE_SAMPLE_COUNT][2] = {
-+        { 8, 8 },
-+        { backingWidth - XASH_BRIDGE_SAMPLE_EDGE - 8, 8 },
-+        { 8, backingHeight - XASH_BRIDGE_SAMPLE_EDGE - 8 },
-+        { backingWidth - XASH_BRIDGE_SAMPLE_EDGE - 8,
-+          backingHeight - XASH_BRIDGE_SAMPLE_EDGE - 8 },
-+        { backingWidth / 2, backingHeight / 2 }
-+    };
-+    GLubyte pixels[XASH_BRIDGE_SAMPLE_EDGE * XASH_BRIDGE_SAMPLE_EDGE * 4];
-+    GLint previousFramebuffer = 0;
-+    GLint previousDrawFramebuffer = 0;
-+    GLint previousReadFramebuffer = 0;
-+    Uint32 hash = 2166136261u;
-+    GLenum status;
-+    int i;
-+
-+    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &previousFramebuffer);
-+    if (context.API >= kEAGLRenderingAPIOpenGLES3) {
-+        glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &previousDrawFramebuffer);
-+        glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &previousReadFramebuffer);
-+    }
-+
-+    glBindFramebuffer(GL_FRAMEBUFFER, viewFramebuffer);
-+    status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-+    if (status == GL_FRAMEBUFFER_COMPLETE &&
-+        backingWidth >= XASH_BRIDGE_SAMPLE_EDGE &&
-+        backingHeight >= XASH_BRIDGE_SAMPLE_EDGE) {
-+        for (i = 0; i < XASH_BRIDGE_SAMPLE_COUNT; ++i) {
-+            GLint x = SDL_max(0, SDL_min(points[i][0],
-+                                         backingWidth - XASH_BRIDGE_SAMPLE_EDGE));
-+            GLint y = SDL_max(0, SDL_min(points[i][1],
-+                                         backingHeight - XASH_BRIDGE_SAMPLE_EDGE));
-+
-+            glReadPixels(x, y, XASH_BRIDGE_SAMPLE_EDGE, XASH_BRIDGE_SAMPLE_EDGE,
-+                         GL_RGBA, GL_UNSIGNED_BYTE, pixels);
-+            hash = XASH_BridgeHashBytes(hash, pixels, sizeof(pixels));
-+        }
-+    } else {
-+        hash = 0;
-+    }
-+
-+    if (context.API >= kEAGLRenderingAPIOpenGLES3) {
-+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, (GLuint)previousDrawFramebuffer);
-+        glBindFramebuffer(GL_READ_FRAMEBUFFER, (GLuint)previousReadFramebuffer);
-+    } else {
-+        glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)previousFramebuffer);
-+    }
-+
-+    if (statusOut) {
-+        *statusOut = status;
-+    }
-+    return hash;
-+}
-+
-@@ -281,0 +366,6 @@
++    int requestedSamples;
++    Uint32 xashContextGeneration;
++    Uint32 xashResizeGeneration;
+@@ -79,0 +96 @@
++        requestedSamples = multisamples;
+@@ -81,0 +99,2 @@
++        xashContextGeneration = ++xashBridgeContextGenerationCounter;
++        xashResizeGeneration = 1;
+@@ -250,0 +270 @@
++    ++xashResizeGeneration;
+@@ -281,0 +302,29 @@
 +    SDL_XASH_IOSDrawableBridgeState bridge;
 +    const BOOL bridgeRegistered = xashDrawableBridgeCallback != NULL;
-+    const BOOL proofSample = bridgeRegistered &&
-+        xashBridgeTransfers < XASH_BRIDGE_PROOF_TRANSFERS;
-+    GLenum checksumStatus = 0;
 +
-@@ -310,0 +401,34 @@
 +    SDL_zero(bridge);
 +    bridge.version = SDL_XASH_IOS_DRAWABLE_BRIDGE_VERSION;
 +    bridge.size = sizeof(bridge);
 +    bridge.context = (Uint64)(uintptr_t)context;
 +    bridge.currentContext = (Uint64)(uintptr_t)[EAGLContext currentContext];
 +    bridge.contextMatches = context && [EAGLContext currentContext] == context;
++    bridge.contextAPI = (Uint32)context.API;
++    bridge.contextGeneration = xashContextGeneration;
++    bridge.resizeGeneration = xashResizeGeneration;
 +    bridge.targetFramebuffer = viewFramebuffer;
 +    bridge.targetRenderbuffer = viewRenderbuffer;
++    bridge.viewFramebuffer = viewFramebuffer;
++    bridge.viewRenderbuffer = viewRenderbuffer;
++    bridge.msaaFramebuffer = msaaFramebuffer;
++    bridge.msaaRenderbuffer = msaaRenderbuffer;
++    bridge.depthRenderbuffer = depthRenderbuffer;
++    bridge.requestedSamples = (Uint32)SDL_max(0, requestedSamples);
++    bridge.effectiveSamples = (Uint32)SDL_max(0, samples);
 +    bridge.drawableWidth = backingWidth;
 +    bridge.drawableHeight = backingHeight;
-+    bridge.proofSample = proofSample;
-+
-+    if (proofSample) {
-+        bridge.checksumBefore = [self xashBridgeDrawableChecksumWithStatus:&checksumStatus];
-+        bridge.checksumBeforeValid = checksumStatus == GL_FRAMEBUFFER_COMPLETE;
-+    }
 +
 +    if (bridgeRegistered) {
++        xashDrawableBridgeCallback(SDL_XASH_IOS_DRAWABLE_BRIDGE_SDL_SWAP_ENTRY,
++                                   &bridge, sizeof(bridge));
++    }
++
+@@ -310,0 +360,13 @@
++    if (bridgeRegistered) {
++        xashDrawableBridgeCallback(SDL_XASH_IOS_DRAWABLE_BRIDGE_SDL_POST_RESOLVE,
++                                   &bridge, sizeof(bridge));
 +        xashDrawableBridgeCallback(SDL_XASH_IOS_DRAWABLE_BRIDGE_PRE_PRESENT,
 +                                   &bridge, sizeof(bridge));
-+
-+        if (bridge.proofSample && bridge.transferResult) {
-+            bridge.checksumAfter = [self xashBridgeDrawableChecksumWithStatus:&checksumStatus];
-+            bridge.checksumAfterValid = checksumStatus == GL_FRAMEBUFFER_COMPLETE;
-+            bridge.checksumChanged = bridge.checksumBeforeValid &&
-+                                     bridge.checksumAfterValid &&
-+                                     bridge.checksumBefore != bridge.checksumAfter;
-+        }
 +
 +        /* SDL owns the CAEAGLLayer color renderbuffer. Make it the explicit
 +         * presentable object after GL4ES has filled the view framebuffer. */
 +        glBindRenderbuffer(GL_RENDERBUFFER, viewRenderbuffer);
++        xashDrawableBridgeCallback(SDL_XASH_IOS_DRAWABLE_BRIDGE_PRESENT_BEFORE,
++                                   &bridge, sizeof(bridge));
 +    }
 +
-@@ -314 +438,10 @@
+@@ -314 +376,7 @@
 -    [context presentRenderbuffer:GL_RENDERBUFFER];
 +    bridge.presentAttempted = 1;
 +    bridge.presentResult = [context presentRenderbuffer:GL_RENDERBUFFER];
@@ -190,7 +156,4 @@ index c36f060..260bc24 100644
 +    if (bridgeRegistered) {
 +        xashDrawableBridgeCallback(SDL_XASH_IOS_DRAWABLE_BRIDGE_POST_PRESENT,
 +                                   &bridge, sizeof(bridge));
-+        if (bridge.proofSample) {
-+            ++xashBridgeTransfers;
-+        }
 +    }

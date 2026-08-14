@@ -522,13 +522,18 @@ typedef struct ref_api_s
 
 struct mip_s;
 
-#define REF_IOS_DRAWABLE_BRIDGE_VERSION 1
+#define REF_IOS_DRAWABLE_BRIDGE_VERSION 2
 #define REF_IOS_DRAWABLE_BRIDGE_MAX_RECORDS 64
-#define REF_IOS_DRAWABLE_BRIDGE_PROOF_TRANSFERS 3
+#define REF_IOS_DRAWABLE_BRIDGE_MENU_ATTEMPTS 3
+#define REF_IOS_DRAWABLE_BRIDGE_MAP_GAPS 6
 
 typedef enum ref_ios_drawable_bridge_action_e
 {
-	REF_IOS_DRAWABLE_BRIDGE_PRE_PRESENT = 1,
+	REF_IOS_DRAWABLE_BRIDGE_RENDERER_HANDOFF = 1,
+	REF_IOS_DRAWABLE_BRIDGE_SDL_SWAP_ENTRY,
+	REF_IOS_DRAWABLE_BRIDGE_SDL_POST_RESOLVE,
+	REF_IOS_DRAWABLE_BRIDGE_PRE_PRESENT,
+	REF_IOS_DRAWABLE_BRIDGE_PRESENT_BEFORE,
 	REF_IOS_DRAWABLE_BRIDGE_POST_PRESENT
 } ref_ios_drawable_bridge_action_t;
 
@@ -563,6 +568,28 @@ typedef struct ref_ios_drawable_bridge_s
 	uint32_t restoredLogicalFramebuffer;
 	uint32_t restoreResult;
 	uint32_t failureCode;
+	uint64_t invocation;
+	uint64_t timestampUsec;
+	uint64_t hostTimeUsec;
+	uint64_t clientTimeUsec;
+	uint32_t checkpoint;
+	uint32_t auditSample;
+	uint32_t enginePhase;
+	uint32_t clientState;
+	char mapName[64];
+	uint32_t contextAPI;
+	uint32_t contextGeneration;
+	uint32_t resizeGeneration;
+	uint32_t viewFramebuffer;
+	uint32_t viewRenderbuffer;
+	uint32_t msaaFramebuffer;
+	uint32_t msaaRenderbuffer;
+	uint32_t depthRenderbuffer;
+	uint32_t requestedSamples;
+	uint32_t effectiveSamples;
+	uint32_t preconditionMask;
+	uint32_t queryFailureOperation;
+	uint32_t queryFailureError;
 } ref_ios_drawable_bridge_t;
 
 // render callbacks

@@ -1,28 +1,131 @@
 diff --git a/include/gl4esinit.h b/include/gl4esinit.h
-index 79cbb344..4793eaa6 100644
+index 79cbb344..3ac465b5 100644
 --- a/include/gl4esinit.h
 +++ b/include/gl4esinit.h
-@@ -27,0 +28,12 @@ void* APIENTRY_GL4ES gl4es_GetProcAddress(const char *name);
-+// Embedder-owned drawable bridge for LIBGL_FB=2. The caller supplies the
-+// actual native destination; GL4ES keeps logical framebuffer zero unchanged.
+@@ -27,0 +28,94 @@ void* APIENTRY_GL4ES gl4es_GetProcAddress(const char *name);
++#define GL4ES_DRAWABLE_AUDIT_VERSION 1
++#define GL4ES_DRAWABLE_PRE_NO_USEFBO        (1u << 0)
++#define GL4ES_DRAWABLE_PRE_NO_MAIN_FBO       (1u << 1)
++#define GL4ES_DRAWABLE_PRE_NO_MAIN_TEXTURE   (1u << 2)
++#define GL4ES_DRAWABLE_PRE_NO_CURRENT_FBO    (1u << 3)
++#define GL4ES_DRAWABLE_PRE_LOGICAL_NOT_ZERO  (1u << 4)
++#define GL4ES_DRAWABLE_PRE_NO_TARGET         (1u << 5)
++#define GL4ES_DRAWABLE_PRE_SOURCE_MISMATCH   (1u << 6)
++#define GL4ES_DRAWABLE_PRE_TARGET_IS_SOURCE  (1u << 7)
++#define GL4ES_DRAWABLE_PRE_INVALID_SIZE      (1u << 8)
++#define GL4ES_DRAWABLE_PRE_TARGET_INCOMPLETE (1u << 9)
++
++#define GL4ES_DRAWABLE_QUERY_PRIOR_ERROR 1
++#define GL4ES_DRAWABLE_QUERY_SAVE_STATE 2
++#define GL4ES_DRAWABLE_QUERY_FBO_STATUS 3
++#define GL4ES_DRAWABLE_QUERY_ATTACHMENT 4
++#define GL4ES_DRAWABLE_QUERY_RENDERBUFFER 5
++#define GL4ES_DRAWABLE_QUERY_PIXELS 6
++#define GL4ES_DRAWABLE_QUERY_RESTORE 7
++#define GL4ES_DRAWABLE_QUERY_REQUERY 8
++
++typedef struct gl4es_drawable_attachment_audit_s {
++    unsigned int object_type;
++    unsigned int object_name;
++    unsigned int texture_level;
++    unsigned int width;
++    unsigned int height;
++    unsigned int internal_format;
++    unsigned int samples;
++} gl4es_drawable_attachment_audit_t;
++
++typedef struct gl4es_drawable_fbo_audit_s {
++    unsigned int framebuffer;
++    unsigned int status;
++    gl4es_drawable_attachment_audit_t color;
++    gl4es_drawable_attachment_audit_t depth;
++    gl4es_drawable_attachment_audit_t stencil;
++    unsigned int checksum_valid;
++    unsigned int checksum;
++} gl4es_drawable_fbo_audit_t;
++
++typedef struct gl4es_drawable_audit_s {
++    unsigned int version;
++    unsigned int size;
++    unsigned long long state_identity;
++    unsigned int state_generation;
++    unsigned int usefb;
++    unsigned int usefbo;
++    unsigned int logical_framebuffer;
++    unsigned int logical_renderbuffer;
++    unsigned int default_framebuffer;
++    unsigned int default_renderbuffer;
++    unsigned int main_framebuffer;
++    unsigned int main_texture;
++    unsigned int main_depth;
++    unsigned int main_stencil;
++    unsigned int main_width;
++    unsigned int main_height;
++    unsigned int main_native_width;
++    unsigned int main_native_height;
++    unsigned int create_attempts;
++    unsigned int create_successes;
++    unsigned int resize_count;
++    unsigned int delete_count;
++    unsigned int last_status;
++    unsigned int native_draw_framebuffer;
++    unsigned int native_read_framebuffer;
++    unsigned int native_renderbuffer;
++    gl4es_drawable_fbo_audit_t source;
++    gl4es_drawable_fbo_audit_t target;
++    unsigned int restored_draw_framebuffer;
++    unsigned int restored_read_framebuffer;
++    unsigned int restored_renderbuffer;
++    unsigned int restored_logical_framebuffer;
++    unsigned int query_failure_operation;
++    unsigned int query_failure_error;
++} gl4es_drawable_audit_t;
++
++// Embedder-owned drawable bridge. The existing transfer remains guarded by
++// the GL4ES main-FBO contract; audit calls only interrogate and restore state.
 +int gl4es_drawable_bridge_pre(unsigned int target_framebuffer,
 +    unsigned int drawable_width, unsigned int drawable_height,
 +    unsigned int *source_framebuffer, unsigned int *source_texture,
 +    unsigned int *source_renderbuffer, unsigned int *logical_framebuffer,
-+    unsigned int *target_status);
++    unsigned int *target_status, unsigned int *precondition_mask);
 +int gl4es_drawable_bridge_post(unsigned int expected_source_framebuffer,
 +    unsigned int expected_source_renderbuffer,
 +    unsigned int *restored_framebuffer, unsigned int *restored_renderbuffer,
 +    unsigned int *logical_framebuffer);
++int gl4es_drawable_bridge_audit(unsigned int native_api,
++    unsigned int target_framebuffer, unsigned int drawable_width,
++    unsigned int drawable_height, unsigned int sample_pixels,
++    gl4es_drawable_audit_t *audit);
 +
 diff --git a/src/gl/framebuffers.c b/src/gl/framebuffers.c
-index 93194fcf..3d3dc9f9 100644
+index 93194fcf..5c61e34c 100644
 --- a/src/gl/framebuffers.c
 +++ b/src/gl/framebuffers.c
-@@ -1338,0 +1339,84 @@ void blitMainFBO(int x, int y, int width, int height) {
+@@ -10,0 +11,3 @@
++#include "../../include/gl4esinit.h"
++
++#include <stdint.h>
+@@ -26,0 +30,8 @@ int wrap_npot(GLenum wrap);
++static GLuint drawable_audit_create_attempts;
++static GLuint drawable_audit_create_successes;
++static GLuint drawable_audit_resize_count;
++static GLuint drawable_audit_delete_count;
++static GLenum drawable_audit_last_status;
++static const void *drawable_audit_state_identity;
++static GLuint drawable_audit_state_generation;
++
+@@ -1225,0 +1237 @@ void createMainFBO(int width, int height) {
++    drawable_audit_create_attempts++;
+@@ -1232,0 +1245 @@ void createMainFBO(int width, int height) {
++        drawable_audit_resize_count++;
+@@ -1280,0 +1294 @@ void createMainFBO(int width, int height) {
++    drawable_audit_last_status = status;
+@@ -1298,0 +1313 @@ void createMainFBO(int width, int height) {
++        drawable_audit_create_successes++;
+@@ -1338,0 +1354,293 @@ void blitMainFBO(int x, int y, int width, int height) {
 +int blitMainFBOTo(GLuint target, int width, int height, GLuint *source,
 +    GLuint *source_texture, GLuint *source_renderbuffer, GLuint *logical,
-+    GLenum *target_status) {
++    GLenum *target_status, GLuint *precondition_mask) {
 +    LOAD_GLES2_OR_OES(glBindFramebuffer);
 +    LOAD_GLES2_OR_OES(glCheckFramebufferStatus);
 +    LOAD_GLES(glGetIntegerv);
@@ -38,17 +141,27 @@ index 93194fcf..3d3dc9f9 100644
 +        ? glstate->fbo.current_fb->id : 0;
 +    if (target_status) *target_status = 0;
 +
-+    if (!globals4es.usefbo || !glstate->fbo.mainfbo_fbo ||
-+        !glstate->fbo.mainfbo_tex || !glstate->fbo.current_fb ||
-+        glstate->fbo.current_fb->id != 0 || !target ||
-+        native_source != glstate->fbo.mainfbo_fbo ||
-+        target == glstate->fbo.mainfbo_fbo || width <= 0 || height <= 0)
++    GLuint mask = 0;
++    if (!globals4es.usefbo) mask |= GL4ES_DRAWABLE_PRE_NO_USEFBO;
++    if (!glstate->fbo.mainfbo_fbo) mask |= GL4ES_DRAWABLE_PRE_NO_MAIN_FBO;
++    if (!glstate->fbo.mainfbo_tex) mask |= GL4ES_DRAWABLE_PRE_NO_MAIN_TEXTURE;
++    if (!glstate->fbo.current_fb) mask |= GL4ES_DRAWABLE_PRE_NO_CURRENT_FBO;
++    else if (glstate->fbo.current_fb->id != 0) mask |= GL4ES_DRAWABLE_PRE_LOGICAL_NOT_ZERO;
++    if (!target) mask |= GL4ES_DRAWABLE_PRE_NO_TARGET;
++    if (glstate->fbo.mainfbo_fbo && native_source != glstate->fbo.mainfbo_fbo)
++        mask |= GL4ES_DRAWABLE_PRE_SOURCE_MISMATCH;
++    if (glstate->fbo.mainfbo_fbo && target == glstate->fbo.mainfbo_fbo)
++        mask |= GL4ES_DRAWABLE_PRE_TARGET_IS_SOURCE;
++    if (width <= 0 || height <= 0) mask |= GL4ES_DRAWABLE_PRE_INVALID_SIZE;
++    if (precondition_mask) *precondition_mask = mask;
++    if (mask)
 +        return 0;
 +
 +    gles_glBindFramebuffer(GL_FRAMEBUFFER, target);
 +    GLenum status = gles_glCheckFramebufferStatus(GL_FRAMEBUFFER);
 +    if (target_status) *target_status = status;
 +    if (status != GL_FRAMEBUFFER_COMPLETE) {
++        if (precondition_mask) *precondition_mask |= GL4ES_DRAWABLE_PRE_TARGET_INCOMPLETE;
 +        gles_glBindFramebuffer(GL_FRAMEBUFFER, glstate->fbo.mainfbo_fbo);
 +        return 0;
 +    }
@@ -104,33 +217,242 @@ index 93194fcf..3d3dc9f9 100644
 +        native_renderbuffer == expected_renderbuffer;
 +}
 +
++#define NATIVE_DRAW_FRAMEBUFFER 0x8CA9
++#define NATIVE_READ_FRAMEBUFFER 0x8CA8
++#define NATIVE_DRAW_FRAMEBUFFER_BINDING 0x8CA6
++#define NATIVE_READ_FRAMEBUFFER_BINDING 0x8CAA
++
++static void drawableAuditError(gl4es_drawable_audit_t *audit, GLuint operation,
++    GLenum error) {
++    if (error != GL_NO_ERROR && !audit->query_failure_operation) {
++        audit->query_failure_operation = operation;
++        audit->query_failure_error = error;
++    }
++}
++
++static void drawableAuditAttachment(GLenum attachment,
++    gl4es_drawable_attachment_audit_t *result, GLuint native_api,
++    gl4es_drawable_audit_t *audit) {
++    LOAD_GLES2_OR_OES(glGetFramebufferAttachmentParameteriv);
++    LOAD_GLES2_OR_OES(glBindRenderbuffer);
++    LOAD_GLES2_OR_OES(glGetRenderbufferParameteriv);
++    LOAD_GLES(glGetError);
++    GLint value = 0;
++
++    gles_glGetFramebufferAttachmentParameteriv(GL_FRAMEBUFFER, attachment,
++        GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE, &value);
++    result->object_type = value;
++    gles_glGetFramebufferAttachmentParameteriv(GL_FRAMEBUFFER, attachment,
++        GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME, &value);
++    result->object_name = value;
++    if (result->object_type == GL_TEXTURE) {
++        value = 0;
++        gles_glGetFramebufferAttachmentParameteriv(GL_FRAMEBUFFER, attachment,
++            GL_FRAMEBUFFER_ATTACHMENT_TEXTURE_LEVEL, &value);
++        result->texture_level = value;
++        if (result->object_name == glstate->fbo.mainfbo_tex) {
++            result->width = glstate->fbo.mainfbo_nwidth;
++            result->height = glstate->fbo.mainfbo_nheight;
++            result->internal_format = globals4es.fbo_noalpha ? GL_RGB : GL_RGBA;
++        }
++    }
++    drawableAuditError(audit, GL4ES_DRAWABLE_QUERY_ATTACHMENT, gles_glGetError());
++    if (result->object_type == GL_RENDERBUFFER && result->object_name) {
++        gles_glBindRenderbuffer(GL_RENDERBUFFER, result->object_name);
++        gles_glGetRenderbufferParameteriv(GL_RENDERBUFFER,
++            GL_RENDERBUFFER_WIDTH, &value);
++        result->width = value;
++        gles_glGetRenderbufferParameteriv(GL_RENDERBUFFER,
++            GL_RENDERBUFFER_HEIGHT, &value);
++        result->height = value;
++        gles_glGetRenderbufferParameteriv(GL_RENDERBUFFER,
++            GL_RENDERBUFFER_INTERNAL_FORMAT, &value);
++        result->internal_format = value;
++        if (native_api >= 3) {
++            gles_glGetRenderbufferParameteriv(GL_RENDERBUFFER,
++                GL_RENDERBUFFER_SAMPLES, &value);
++            result->samples = value;
++        }
++        drawableAuditError(audit, GL4ES_DRAWABLE_QUERY_RENDERBUFFER, gles_glGetError());
++    }
++}
++
++static GLuint drawableAuditChecksum(int width, int height,
++    gl4es_drawable_audit_t *audit, GLuint *valid) {
++    LOAD_GLES(glReadPixels);
++    LOAD_GLES(glGetError);
++    GLubyte pixels[5][4 * 4 * 4];
++    int x[5] = { 0, width > 4 ? width - 4 : 0, 0,
++        width > 4 ? width - 4 : 0, width > 4 ? (width - 4) / 2 : 0 };
++    int y[5] = { 0, 0, height > 4 ? height - 4 : 0,
++        height > 4 ? height - 4 : 0, height > 4 ? (height - 4) / 2 : 0 };
++    int rw = width < 4 ? width : 4;
++    int rh = height < 4 ? height : 4;
++    GLuint hash = 2166136261u;
++    int i, j;
++
++    *valid = 0;
++    if (rw <= 0 || rh <= 0)
++        return 0;
++    memset(pixels, 0, sizeof(pixels));
++    for (i = 0; i < 5; i++)
++        gles_glReadPixels(x[i], y[i], rw, rh, GL_RGBA, GL_UNSIGNED_BYTE, pixels[i]);
++    GLenum error = gles_glGetError();
++    drawableAuditError(audit, GL4ES_DRAWABLE_QUERY_PIXELS, error);
++    if (error != GL_NO_ERROR)
++        return 0;
++    for (i = 0; i < 5; i++)
++        for (j = 0; j < rw * rh * 4; j++) {
++            hash ^= pixels[i][j];
++            hash *= 16777619u;
++        }
++    *valid = 1;
++    return hash;
++}
++
++static void drawableAuditFramebuffer(GLuint framebuffer, int width, int height,
++    GLuint native_api, GLuint sample_pixels, gl4es_drawable_fbo_audit_t *result,
++    gl4es_drawable_audit_t *audit) {
++    LOAD_GLES2_OR_OES(glBindFramebuffer);
++    LOAD_GLES2_OR_OES(glCheckFramebufferStatus);
++    LOAD_GLES(glGetError);
++
++    result->framebuffer = framebuffer;
++    gles_glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
++    result->status = gles_glCheckFramebufferStatus(GL_FRAMEBUFFER);
++    drawableAuditError(audit, GL4ES_DRAWABLE_QUERY_FBO_STATUS, gles_glGetError());
++    drawableAuditAttachment(GL_COLOR_ATTACHMENT0, &result->color, native_api, audit);
++    drawableAuditAttachment(GL_DEPTH_ATTACHMENT, &result->depth, native_api, audit);
++    drawableAuditAttachment(GL_STENCIL_ATTACHMENT, &result->stencil, native_api, audit);
++    if (sample_pixels && result->status == GL_FRAMEBUFFER_COMPLETE && width > 0 && height > 0) {
++        result->checksum = drawableAuditChecksum(width, height, audit,
++            &result->checksum_valid);
++    }
++}
++
++int auditDrawableBridge(GLuint native_api, GLuint target, int width, int height,
++    GLuint sample_pixels, void *opaque_audit) {
++    LOAD_GLES2_OR_OES(glBindFramebuffer);
++    LOAD_GLES2_OR_OES(glBindRenderbuffer);
++    LOAD_GLES(glGetIntegerv);
++    LOAD_GLES(glGetError);
++    gl4es_drawable_audit_t *audit = (gl4es_drawable_audit_t *)opaque_audit;
++    GLint draw = 0, read = 0, renderbuffer = 0;
++
++    if (!audit || !glstate)
++        return 0;
++    memset(audit, 0, sizeof(*audit));
++    audit->version = GL4ES_DRAWABLE_AUDIT_VERSION;
++    audit->size = sizeof(*audit);
++    drawableAuditError(audit, GL4ES_DRAWABLE_QUERY_PRIOR_ERROR, gles_glGetError());
++    if (drawable_audit_state_identity != glstate) {
++        drawable_audit_state_identity = glstate;
++        drawable_audit_state_generation++;
++    }
++    audit->state_identity = (unsigned long long)(uintptr_t)glstate;
++    audit->state_generation = drawable_audit_state_generation;
++    audit->usefb = globals4es.usefb;
++    audit->usefbo = globals4es.usefbo;
++    audit->logical_framebuffer = glstate->fbo.current_fb ? glstate->fbo.current_fb->id : 0;
++    audit->logical_renderbuffer = glstate->fbo.current_rb ? glstate->fbo.current_rb->renderbuffer : 0;
++    audit->default_framebuffer = glstate->fbo.fbo_0 ? glstate->fbo.fbo_0->id : 0;
++    audit->default_renderbuffer = glstate->fbo.default_rb ? glstate->fbo.default_rb->renderbuffer : 0;
++    audit->main_framebuffer = glstate->fbo.mainfbo_fbo;
++    audit->main_texture = glstate->fbo.mainfbo_tex;
++    audit->main_depth = glstate->fbo.mainfbo_dep;
++    audit->main_stencil = glstate->fbo.mainfbo_ste;
++    audit->main_width = glstate->fbo.mainfbo_width;
++    audit->main_height = glstate->fbo.mainfbo_height;
++    audit->main_native_width = glstate->fbo.mainfbo_nwidth;
++    audit->main_native_height = glstate->fbo.mainfbo_nheight;
++    audit->create_attempts = drawable_audit_create_attempts;
++    audit->create_successes = drawable_audit_create_successes;
++    audit->resize_count = drawable_audit_resize_count;
++    audit->delete_count = drawable_audit_delete_count;
++    audit->last_status = drawable_audit_last_status;
++
++    if (native_api >= 3) {
++        gles_glGetIntegerv(NATIVE_DRAW_FRAMEBUFFER_BINDING, &draw);
++        gles_glGetIntegerv(NATIVE_READ_FRAMEBUFFER_BINDING, &read);
++    } else {
++        gles_glGetIntegerv(GL_FRAMEBUFFER_BINDING, &draw);
++        read = draw;
++    }
++    gles_glGetIntegerv(GL_RENDERBUFFER_BINDING, &renderbuffer);
++    drawableAuditError(audit, GL4ES_DRAWABLE_QUERY_SAVE_STATE, gles_glGetError());
++    audit->native_draw_framebuffer = draw;
++    audit->native_read_framebuffer = read;
++    audit->native_renderbuffer = renderbuffer;
++
++    drawableAuditFramebuffer(draw, width, height, native_api, sample_pixels,
++        &audit->source, audit);
++    drawableAuditFramebuffer(target, width, height, native_api, sample_pixels,
++        &audit->target, audit);
++
++    if (native_api >= 3) {
++        gles_glBindFramebuffer(NATIVE_DRAW_FRAMEBUFFER, draw);
++        gles_glBindFramebuffer(NATIVE_READ_FRAMEBUFFER, read);
++    } else {
++        gles_glBindFramebuffer(GL_FRAMEBUFFER, draw);
++    }
++    gles_glBindRenderbuffer(GL_RENDERBUFFER, renderbuffer);
++    drawableAuditError(audit, GL4ES_DRAWABLE_QUERY_RESTORE, gles_glGetError());
++    if (native_api >= 3) {
++        gles_glGetIntegerv(NATIVE_DRAW_FRAMEBUFFER_BINDING, &draw);
++        gles_glGetIntegerv(NATIVE_READ_FRAMEBUFFER_BINDING, &read);
++    } else {
++        gles_glGetIntegerv(GL_FRAMEBUFFER_BINDING, &draw);
++        read = draw;
++    }
++    gles_glGetIntegerv(GL_RENDERBUFFER_BINDING, &renderbuffer);
++    drawableAuditError(audit, GL4ES_DRAWABLE_QUERY_REQUERY, gles_glGetError());
++    audit->restored_draw_framebuffer = draw;
++    audit->restored_read_framebuffer = read;
++    audit->restored_renderbuffer = renderbuffer;
++    audit->restored_logical_framebuffer = glstate->fbo.current_fb ? glstate->fbo.current_fb->id : 0;
++    return audit->native_draw_framebuffer == audit->restored_draw_framebuffer &&
++        audit->native_read_framebuffer == audit->restored_read_framebuffer &&
++        audit->native_renderbuffer == audit->restored_renderbuffer &&
++        audit->logical_framebuffer == audit->restored_logical_framebuffer;
++}
++
+@@ -1364,0 +1673,2 @@ void deleteMainFBO(void *state) {
++    int had_main_fbo = glstate->fbo.mainfbo_dep || glstate->fbo.mainfbo_ste ||
++        glstate->fbo.mainfbo_tex || glstate->fbo.mainfbo_fbo;
+@@ -1381,0 +1692,2 @@ void deleteMainFBO(void *state) {
++    if (had_main_fbo)
++        drawable_audit_delete_count++;
 diff --git a/src/gl/framebuffers.h b/src/gl/framebuffers.h
-index a917658a..3755f373 100644
+index a917658a..958824ea 100644
 --- a/src/gl/framebuffers.h
 +++ b/src/gl/framebuffers.h
-@@ -49,0 +50,6 @@ void unbindMainFBO();
+@@ -49,0 +50,8 @@ void unbindMainFBO();
 +int blitMainFBOTo(GLuint target, int width, int height, GLuint *source,
 +    GLuint *source_texture, GLuint *source_renderbuffer, GLuint *logical,
-+    GLenum *target_status);
++    GLenum *target_status, GLuint *precondition_mask);
 +int restoreMainFBOAfterPresent(GLuint expected_source,
 +    GLuint expected_renderbuffer, GLuint *restored,
 +    GLuint *restored_renderbuffer, GLuint *logical);
++int auditDrawableBridge(GLuint native_api, GLuint target, int width, int height,
++    GLuint sample_pixels, void *audit);
 diff --git a/src/gl/gl4es.c b/src/gl/gl4es.c
-index 674eaa5e..ad462c2d 100644
+index 674eaa5e..bf7d50ed 100644
 --- a/src/gl/gl4es.c
 +++ b/src/gl/gl4es.c
-@@ -1212,0 +1213,22 @@ void gl4es_use_scratch_indices(int use) {
+@@ -1,0 +2 @@
++#include "../../include/gl4esinit.h"
+@@ -1212,0 +1214,30 @@ void gl4es_use_scratch_indices(int use) {
 +int gl4es_drawable_bridge_pre(unsigned int target_framebuffer,
 +    unsigned int drawable_width, unsigned int drawable_height,
 +    unsigned int *source_framebuffer, unsigned int *source_texture,
 +    unsigned int *source_renderbuffer, unsigned int *logical_framebuffer,
-+    unsigned int *target_status) {
++    unsigned int *target_status, unsigned int *precondition_mask) {
 +    if (glstate->list.active) gl4es_flush();
 +    if (glstate->raster.bm_drawing) bitmap_flush();
 +
 +    return blitMainFBOTo(target_framebuffer, drawable_width, drawable_height,
 +        source_framebuffer, source_texture, source_renderbuffer,
-+        logical_framebuffer, target_status);
++        logical_framebuffer, target_status, precondition_mask);
 +}
 +
 +int gl4es_drawable_bridge_post(unsigned int expected_source_framebuffer,
@@ -140,5 +462,13 @@ index 674eaa5e..ad462c2d 100644
 +    return restoreMainFBOAfterPresent(expected_source_framebuffer,
 +        expected_source_renderbuffer,
 +        restored_framebuffer, restored_renderbuffer, logical_framebuffer);
++}
++
++int gl4es_drawable_bridge_audit(unsigned int native_api,
++    unsigned int target_framebuffer, unsigned int drawable_width,
++    unsigned int drawable_height, unsigned int sample_pixels,
++    gl4es_drawable_audit_t *audit) {
++    return auditDrawableBridge(native_api, target_framebuffer,
++        drawable_width, drawable_height, sample_pixels, audit);
 +}
 +
