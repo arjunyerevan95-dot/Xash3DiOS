@@ -660,3 +660,81 @@ Remaining risks: direct rendering trades effective 4x MSAA for a simpler ownersh
 Durable ledger path and commit: `Documentation/XASH3DIOS_PORTING_STATE.md`. This report is published in one documentation-only `[skip ci]` commit. The exact commit is recorded in the authoritative Google Docs mirror and final handoff because a Git commit cannot contain its own hash.
 
 Stop state: Work Order 46 Phase A ends at **Outcome A** for orchestrator review. Do not implement the direct-drawable repair, modify SDL/GL4ES/renderer/gameplay code, build or publish a candidate, run GitHub Actions, retrieve or upload an IPA, use tempfile.org, contact Arjun, request evidence or device testing, or begin Phase B.
+
+## Work Order 46 Phase B - bundle version 69 direct SDL drawable
+
+Candidate/run and acceptance status: **bundle version 69, build-qualified direct-drawable candidate; not device-accepted**. Run 39 remains the accepted device baseline. Bundle 64 remains diagnostics-only evidence and was not rebuilt or proposed for another test. No device test, log, or other user evidence was requested.
+
+Commits and exact pinned inputs:
+
+- Behavioral implementation: `93881a0513c648ec5d20d1f96efb8f8a03347c00` (`fix(ios): render GL4ES logical zero into SDL drawable`).
+- Bounded build fixes permitted by the Phase-B stop rules: `de230a982084afbfa6910b92ffeac8f34ab185e1` defines the framebuffer-completeness API token locally without changing runtime policy; `4caad99dbb7e0fdaed050dd21fad2095655ce6b0` forward-declares the versioned drawable state so the pre-existing `common.h -> system.h -> platform.h` include cycle can compile. Candidate head: `4caad99dbb7e0fdaed050dd21fad2095655ce6b0`.
+- Exact source pins remain Diffusion `14d156bf3a6993c172697fac83a937836c3b5561`, SDL `5d249570393f7a37e037abf22cd6012a4cc56a71`, GL4ES `81547d986798e876de8b434193920b606a72363f`, and Diffusion-MainUI `8c68de2f2325a0130953719efc3ae413eb24e01a`.
+
+Workflow URL/ID and result:
+
+- Sole qualifying candidate workflow: canonical push [iOS Proof of Life run 31819158442](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/31819158442), bundle/run number 69, head `4caad99dbb7e0fdaed050dd21fad2095655ce6b0`, result `success`; unsigned arm64 IPA job `94827992981`. Checkout, pinned dependency installation and patching, engine/Half-Life/Diffusion/menu builds, IPA contract verification, and artifact upload all succeeded.
+- Push run `31809914937` (bundle 65, behavioral head) passed policy/rejection validation and compiled the pinned GL4ES patch, then failed renderer compilation because `GL_FRAMEBUFFER_COMPLETE` was not visible in that translation unit. It uploaded no artifact and is not a candidate. Automatic PR duplicate `31809919200` was cancelled.
+- Push run `31810459430` (bundle 67) compiled and linked `libref_gl4es.dylib`, then failed the engine build because the new platform prototype encountered its typedef before `ref_api.h` in the include cycle. It uploaded no artifact and is not a candidate. Automatic PR duplicate `31810464886` was cancelled.
+- The bundle-69 open-PR duplicate `31819161529` was cancelled. All Build & Deploy Engine invocations created by these pushes were automatically skipped. Exactly one qualifying artifact was retained.
+
+Artifact and IPA:
+
+- Retained artifact `Xash3DiOS-arm64-unsigned`, ID `9226352131`, archive size 8,564,353 bytes: https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/31819158442/artifacts/9226352131
+- Actual IPA `xash3d-fwgs-ios-arm64.ipa`: 8,661,301 bytes; SHA-256 `2F99ABC90CDA21EAF7B9A3373C9633EF17BB1192EA1DB88EA698727A6224900A`.
+- Tempfile delivery page: https://tempfile.org/81D5ufEaQwE/ ; direct download: https://tempfile.org/81D5ufEaQwE/download ; reported expiry `2026-08-16 16:40:08 UTC`. API metadata and security readback confirmed the exact filename, byte size, SHA-256, existence, and `safe`/no-warning scan result. The first local POST connection was terminated by the worker execution timeout before it returned any response or file ID; the documented bounded retry created this single confirmed publication object. No second confirmed tempfile object is known or reported.
+
+Exact files changed:
+
+- `engine/ref_api.h`: advances the renderer API and defines the version-3 direct-drawable state/action contract plus the platform query slot.
+- `engine/client/dll_int/ref_common.c`: supplies the iOS platform drawable query through the renderer import table; non-iOS builds retain `NULL`.
+- `engine/platform/platform.h`: declares the query and forward-declares its state type. This additional authorized integration file is necessary because platform/video entry points are declared here and the engine include cycle reaches it before `ref_api.h`.
+- `engine/platform/sdl2/vid_sdl2.c`: dynamically queries the live UIKit drawable FBO/color renderbuffer, current EAGL-context identity, size, sample state, and context/resize generation through `SDL_SysWMinfo`; it registers the callback before swap and unregisters it before SDL context destruction.
+- `ref/gl/gl_opengl.c`: forces requested iOS+GL4ES SDL samples to zero, installs the mapping immediately after `initialize_gl4es` and before renderer GL hints/calls, and clears it before `close_gl4es`.
+- `ref/gl/gl_context.c`: retires the Bundle-60 texture transfer and broad Bundle-64 audit; revalidates/reasserts the live mapping at bounded lifecycle/swap points and emits only the authorized policy, register, logical-zero, lifecycle, present, and proof records.
+- `scripts/ios/gl4es-drawable-bridge-ios.patch`: adds context-scoped external-default state and central logical-zero/native mapping helpers to the exact GL4ES pin, covering public binding, read/write helpers, read/draw push-pop, current-FBO state, save/restore, and audited fallback paths while leaving ordinary nonzero renderer FBO semantics unchanged.
+- `scripts/ios/sdl2-drawable-bridge-ios.patch`: adds the version-3 direct-drawable callback to the exact SDL pin, keeps SDL as view-object owner, restores/reasserts lifecycle state, binds the view color renderbuffer, and performs exactly one normal presentation with the iOS+GL4ES active path at zero samples.
+- `scripts/ios/validate-ios-drawable-bridge.py`: enforces the complete Work Order 46 direct-drawable contract and rejection fixtures.
+- `scripts/ios/verify_ipa.sh`: verifies the new marker/API contract and rejects obsolete transfer/main-FBO diagnostics.
+- `Documentation/XASH3DIOS_PORTING_STATE.md`: this durable report only in the following documentation-only `[skip ci]` commit.
+
+Verified prior failure boundary: Run 64 proved that Diffusion and Xash continued through `ch1map0`, gameplay frames, foliage, shader 48, later `ch1map1`, and successful EAGL presentations while the view checksum and visible difficulty image remained stale. GL4ES logical-zero restores fell through to native FBO 0; SDL owned live MSAA FBO 2 and view FBO 1; SDL's GLES 3 resolve assumed FBO 2 was still READ, then attempted its blit from incomplete native FBO 0, yielding `GL_INVALID_FRAMEBUFFER_OPERATION` and presenting unchanged but valid FBO-1 pixels.
+
+Structural cause: GL4ES and SDL had incompatible default-framebuffer ownership contracts. GL4ES logical zero mapped to native zero because the compiled SDL/NOEGL route has no GL4ES main FBO, while SDL's actual iOS drawable was a generated nonzero FBO. With SDL MSAA enabled, expected Diffusion logical-main restores could change raw read/draw bindings without changing GL4ES's logical cache, invalidating SDL's implicit resolve-source assumption.
+
+Why the implementation satisfies the authorized invariants:
+
+1. SDL remains sole owner of the CAEAGLLayer-backed view FBO, color renderbuffer, and depth/stencil storage; GL4ES stores only a context-scoped external-default identity.
+2. `XASH_IOS && XASH_GL4ES` forces requested/effective samples to zero. The active direct path creates no SDL MSAA object and performs no resolve, blit, copy, sentinel, or post-render transfer.
+3. A central GL4ES helper maps every audited meaning of logical framebuffer zero to the registered live SDL view FBO, including public binds, read/write helpers, read/draw push-pop, current-FBO and save/restore paths. Nonzero renderer FBO behavior is preserved.
+4. The renderer proof records compare GL4ES logical current/read/draw zero with native read/draw equality to the live view FBO and validate completeness after initial registration and sampled restores; the validator rejects a public-bind-only hook or any remaining audited logical-zero-to-native-zero path.
+5. Identity is queried dynamically only after the correct EAGL context is current, never hard-coded, installed before renderer GL use, revalidated for resize/context/foreground lifecycle, reasserted at swap, and cleared before destruction.
+6. The implementation does not set `LIBGL_FB`, create/alias `mainfbo_fbo`, claim SDL storage, or retain the Bundle-60 transfer. The SDL no-MSAA path binds the live view renderbuffer and calls one normal `presentRenderbuffer`.
+7. Diffusion gameplay, renderer FBOs, materials/shaders, real menu callbacks, touch, audio, difficulty callback, map load, foliage, viewport/scissor/masks, and non-iOS behavior were not disabled or bypassed.
+
+Validation performed:
+
+- Codebase Memory graph discovery/call tracing was followed by direct inspection of the exact repository and pinned/applied SDL and GL4ES sources.
+- Both replacement patches applied cleanly with `--unidiff-zero` against SDL `5d249570393f7a37e037abf22cd6012a4cc56a71` and GL4ES `81547d986798e876de8b434193920b606a72363f` after the existing base patch.
+- `python -m py_compile scripts/ios/validate-ios-drawable-bridge.py` passed. Validator positive/self-tests passed and explicitly rejected hard-coded IDs, nonzero MSAA, transfer/resolve/copy, `LIBGL_FB`/main-FBO policy, public-bind-only mapping, native-zero fallback, missing clear or foreground re-register, stale generations, Bundle-60 transfer, sentinel/menu bypass, and unbounded diagnostics. `git diff --check` passed.
+- CI compiled and linked the complete arm64 engine plus Half-Life, Diffusion client/server/menu, SDL, and GL4ES targets and passed the IPA contract and artifact steps.
+- Independent artifact readback verified `CFBundleVersion=69`, `CFBundleExecutable=xash`, thin 64-bit Mach-O arm64 headers for `xash`, `libref_gl4es.dylib`, and the client/server/menu modules, the embedded direct-drawable marker families, exact size, and SHA-256. Tempfile server-side readback matched the local hash and size.
+
+Expected log markers:
+
+```text
+iOS direct drawable policy:
+iOS direct drawable register:
+iOS direct drawable logical-zero:
+iOS direct drawable present:
+iOS direct drawable lifecycle:
+iOS direct drawable proof:
+```
+
+The policy must report `requested_samples=0 effective_samples=0 msaa_objects=0 resolve=disabled transfer=none`; registration and logical-zero records must identify the dynamic live nonzero view FBO and show logical/native agreement plus completeness; present must report `resolve=0 transfer=0 one_present=1`; bounded proof samples are two menu and three active-map samples with a hard maximum of 32 records and must show a checksum change from the menu baseline by first active `ch1map0` frames.
+
+Remaining risks: this build is not device-accepted. Direct rendering intentionally trades the device's previous effective 4x MSAA for one-owner presentation and may expose aliasing. A device-only EAGL lifecycle race, resize-generation mismatch, or un-audited logical-zero helper could still violate the contract. The checksum/visible-scene acceptance condition remains unproven until orchestrator-authorized evidence. The known later `ch1map0` to `ch1map1` termination and `glUniform4fv` active-extent issue are unchanged and outside Work Order 46 Phase B.
+
+Durable ledger path and commit: `Documentation/XASH3DIOS_PORTING_STATE.md`. This report is published in one documentation-only `[skip ci]` commit. Its exact hash is recorded in the authoritative Google Docs ledger and final handoff because a Git commit cannot contain its own hash.
+
+Stop state: Work Order 46 Phase B implementation, structural/rejection validation, one qualifying bundle-69 candidate, one retained artifact, independent IPA verification, one confirmed tempfile.org publication, and both ledger reports are complete. Stop for orchestrator review. Do not contact Arjun, request evidence/logs/device testing, diagnose a future run, implement another renderer/gameplay change, or begin another phase or work order.
