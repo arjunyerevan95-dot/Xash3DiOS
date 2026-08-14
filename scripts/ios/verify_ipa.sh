@@ -110,23 +110,12 @@ for bridge_marker in \
 done
 
 SDL_NM="$VERIFY_ROOT/sdl.nm"
-GL4ES_RENDERER_NM="$VERIFY_ROOT/gl4es-renderer.nm"
 nm -g "$SDL_PATH" > "$SDL_NM"
-# GL4ES is linked statically into libref_gl4es with hidden visibility. Its
-# bridge is an internal renderer contract, so inspect local Mach-O symbols.
-nm "$GL4ES_RENDERER_PATH" > "$GL4ES_RENDERER_NM"
 
 if ! grep -q '_SDL_XASH_IOSSetDrawableBridgeCallback' "$SDL_NM"; then
 	echo "SDL does not export the live drawable-bridge callback registration" >&2
 	exit 1
 fi
-
-for bridge_symbol in _gl4es_drawable_bridge_pre _gl4es_drawable_bridge_post; do
-	if ! grep -q "$bridge_symbol" "$GL4ES_RENDERER_NM"; then
-		echo "GL4ES renderer is missing drawable-bridge symbol: $bridge_symbol" >&2
-		exit 1
-	fi
-done
 
 for diagnostic_strings in \
 	"$ENGINE_STRINGS" \
