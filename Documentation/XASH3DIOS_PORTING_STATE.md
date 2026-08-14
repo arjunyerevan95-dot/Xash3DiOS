@@ -370,3 +370,125 @@ Single device test proposed for orchestrator review only — **not requested fro
 Durable ledger path and commit: `Documentation/XASH3DIOS_PORTING_STATE.md`. This report is the content of the immediately following documentation-only `[skip ci]` commit. Its exact ledger commit is recorded in the authoritative Google Doc and final worker handoff because a commit cannot contain its own hash.
 
 Stop state: Work Order 44 Phase B is implemented, locally validated, built, artifact-verified, uploaded, and reported. Stop for orchestrator review. Do not request device testing, diagnose unreviewed future evidence, change the renderer or gameplay, or begin another work order.
+
+## Work order 45 Phase A - GL4ES main-FBO lifecycle and drawable-source ownership audit
+
+Candidate/run and acceptance status: **Outcome B, audit only**. Bundle version 60 is rejected device evidence and is not rebuilt, republished, uploaded, or proposed for another test. This phase creates no candidate, workflow, artifact, IPA, SHA-256, or expected runtime marker. The accepted device baseline remains Run 39.
+
+Repository and evidence boundary:
+
+- Audited repository head: `f20d5b8aaafb501e7ce31c805f97bca4c6f5532a`; Bundle-60 behavioral head: `cff801017b8682f1172fde5627ad7fd34b60152b`; Bundle-60 build head: `dbb8a3d85296cbf5ecde7b840db14375bda0ac7a`.
+- Exact pinned inputs: Diffusion `14d156bf3a6993c172697fac83a937836c3b5561`; SDL `5d249570393f7a37e037abf22cd6012a4cc56a71`; GL4ES `81547d986798e876de8b434193920b606a72363f`; Diffusion-MainUI `8c68de2f2325a0130953719efc3ae413eb24e01a`.
+- Authoritative device result: `DEVICE RESULT 44-B60 - REJECTED`, recording `Xashrec2(1).mp4`, and log `engine(20260814-063601).log`. The recording shows the difficulty screen unchanged through about 112.5 seconds while audio and processing continue. The log reaches `ch1map0`, records at least three returned custom-renderer frames, and continues through foliage work and shader 48.
+- Exact first bridge sample: `context match=1; source_fb=2; source_tex=0; source_rb=1; target_fb=1; target_rb=1; drawable=2868x1320; logical_fb=0; target_status=0x0000; transferred=0; failure=4`; the before checksum is valid, no after checksum exists, `changed=0`, presentation is attempted and succeeds, and the terminal record is `result=failure samples=1 success=0 failure=1`.
+- The Google Docs ledger exposes those authoritative names, recording properties, and exact records, but not a Drive object URL for either raw Bundle-60 file. A Drive search for the exact names resolves only the ledger. This audit therefore does not claim an independent byte-for-byte replay of the raw files and does not request them; that missing raw identity is treated as an evidence limit.
+
+### Corrected interpretation of Bundle 60's first failure
+
+The Work Order 44 statement that native FBO 2 was proven to be GL4ES's texture-backed `mainfbo_fbo` was false. In the implemented bridge, `source_fb` is assigned from raw `GL_FRAMEBUFFER_BINDING`, while `source_tex` is assigned separately from `glstate->fbo.mainfbo_tex` (`scripts/ios/gl4es-drawable-bridge-ios.patch`; exact applied source `build/wo44-gl4es-applytest3/src/gl/framebuffers.c:1339-1362`). The log never reports `glstate->fbo.mainfbo_fbo`. Thus `source_fb=2` proves only that native FBO 2 was bound when the callback ran; it does not establish its owner or attachment.
+
+Failure code 4 is the wrapper's aggregate for a false return from `gl4es_drawable_bridge_pre`. The helper initializes `target_status` to zero and evaluates one compound guard before it binds or checks the target. Consequently `target_status=0x0000` is **not** evidence that FBO 1 was incomplete; the target status query was never reached. The first exact failure boundary is:
+
+```text
+SDL UIKit swapBuffers
+  -> callback PRE_PRESENT with live EAGL context, view FBO 1/RB 1, 2868x1320
+  -> GL4ES flushes pending list/bitmap work
+  -> blitMainFBOTo reads native FBO 2/RB 1 and logical FBO 0
+  -> the pre-transfer main-FBO guard fails
+  -> no target bind, no transfer, and no after checksum
+  -> SDL rebinds RB 1 and presentRenderbuffer succeeds
+```
+
+Source inspection proves why the assumed main-FBO side of that guard cannot be satisfied on this build route:
+
+1. `3rdparty/gl4es/wscript:21-24` compiles only `gl/*.c`, `gl/*/*.c`, and `glx/hardext.c`. It deliberately excludes `src/glx/glx.c` and defines `NOEGL`, `NO_INIT_CONSTRUCTOR`, `DEFAULT_ES=2`, and `STATICLIB`.
+2. The only non-definition calls to `createMainFBO` in the pinned GL4ES source are in the excluded `src/glx/glx.c:1475-1486` make-current path and `src/glx/glx.c:1563-1582` swap/resize path. There is no caller in the compiled source set.
+3. Xash requests an ES 3 backing context on iOS and calls `initialize_gl4es` explicitly after installing SDL-backed proc-address and main-size callbacks (`ref/gl/gl_opengl.c:1376-1386,1511-1555`). It never calls `createMainFBO`.
+4. `initialize_gl4es` zeroes `globals4es`. Without a compile-time `LIBGL_FB`, it reads the process environment; only value 2 enables `usefb=1,usefbo=1` (`init.c:85-95,124-158`). Repository source, scripts, workflow configuration, and plist/project inputs contain no `LIBGL_FB` setter or `LIBGL_FB=2` define. Even an externally injected value 2 would enable the flags but would not restore the excluded creation caller.
+5. `gl_init` creates GL4ES's logical framebuffer-zero and default-renderbuffer bookkeeping and initializes their current pointers, but the `mainfbo_fbo`, `mainfbo_tex`, depth, and stencil object names remain zero (`glstate.c:396-429,621-627`). The sole creation function allocates a texture, depth/stencil renderbuffers, and an FBO, attaches the texture to color 0, checks completeness, and deletes/zeros all objects on failure (`framebuffers.c:1209-1305`). `deleteMainFBO` also zeros every owned object (`framebuffers.c:1443-1465`). There is no supported persistent state in which a successfully created GL4ES main FBO retains a nonzero FBO while its recorded texture is zero.
+6. `LIBGL_FBOFORCETEX` defaults to 1, but it affects wrapper handling of ordinary renderbuffer color attachments. It neither creates the GL4ES main FBO nor changes `createMainFBO`, which always directly allocates and attaches a texture. It cannot explain or repair this boundary.
+
+The source-proven model is therefore: GL4ES logical framebuffer 0 exists as bookkeeping, but the compiled SDL/NOEGL path has no GL4ES main-FBO object lifecycle. At the first Bundle-60 callback the GL4ES-owned source texture is zero, so the texture-blit bridge cannot run. Native FBO 2 belongs to some other native lifecycle.
+
+### SDL UIKit ownership and remaining ambiguity
+
+Pinned SDL creates the CAEAGLLayer-backed view renderbuffer first, then view FBO 1 with a color-renderbuffer attachment (`SDL_uikitopenglview.m:148-170`). If runtime `samples > 0`, it next creates an MSAA framebuffer and a multisample color renderbuffer, attaches the renderbuffer to that FBO, and leaves the MSAA FBO bound (`:172-218`). `drawableFramebuffer` returns the MSAA FBO when present and the view FBO otherwise (`:226-249`). On swap it resolves MSAA into view FBO 1, rebinds the MSAA draw FBO, calls the bridge, explicitly rebinds view RB 1, and presents (`:364-447`). Resize reallocates renderbuffer storage without replacing the object names (`:252-279`); destruction deletes and zeros view, depth, and MSAA objects (`:475-500`).
+
+Xash's `gl_msaa_samples` default is 0, but user configuration may select 2/4/8/16 and `GL_SetupAttributes` then requests SDL multisampling (`engine/client/dll_int/ref_common.c:39`; `ref/gl/gl_opengl.c:1473-1500`). Bundle 60 did not record the runtime sample count, SDL `msaaFramebuffer`/`msaaRenderbuffer` names, or FBO-2 attachment. Therefore FBO 2 is consistent with SDL's renderbuffer-backed MSAA draw FBO if multisampling was active. It is also consistent with a renderer-created native FBO that happened to be current. The current evidence cannot distinguish those owners.
+
+The observed `logical_fb=0` does not contradict raw native FBO 2. GL4ES tracks the logical current framebuffer separately. SDL and other native code can raw-bind a native framebuffer without updating GL4ES's logical pointer; SDL's MSAA resolve path explicitly does so. GL4ES's process-global `glstate` pointer is not thread-local, and Bundle 60 logs only the EAGL-context equality, not the GL4ES state identity or lifecycle generation. A context/state recreation is not supported by current evidence, but it is not instrumented well enough to eliminate completely.
+
+Rejected explanations:
+
+- **Successful GL4ES allocation followed by texture deletion:** rejected. The only GL4ES delete path zeros both the texture and FBO; the create-failure path calls it.
+- **`glGenTextures` returned zero while main FBO 2 remained valid:** rejected. The resulting color attachment cannot establish the required texture-backed main FBO; incomplete creation deletes and zeros the owned objects.
+- **A valid GL4ES texture exists but its name is unavailable:** rejected. The bridge reads the owning field directly; there is no hidden alternate name in the main-FBO lifecycle.
+- **`LIBGL_FBOFORCETEX` should synthesize the missing source:** rejected. That policy applies to ordinary wrapper FBO renderbuffer attachment conversion, not main-FBO creation.
+- **FBO 2 is proven SDL MSAA:** not established. SDL's allocation order makes it plausible, but runtime samples and object equality were not logged.
+- **FBO 2 is proven a Diffusion/custom-renderer FBO:** not established. Attachment type/name and object owner were not logged.
+- **FBO 1 was incomplete:** rejected as an inference from `target_status=0`; the status query did not run. The valid pre-checksum and successful presentation instead support a usable SDL view target.
+
+### Complete presentation path and why later state is unknown
+
+The live path is Diffusion/Xash rendering -> `R_EndFrame` -> engine `GL_SwapBuffers` -> `SDL_GL_SwapWindow` -> UIKit `swapBuffers` -> optional SDL MSAA resolve -> registered `R_IOSDrawableBridge(PRE_PRESENT)` -> `gl4es_drawable_bridge_pre` -> SDL view-renderbuffer bind -> `presentRenderbuffer` -> `R_IOSDrawableBridge(POST_PRESENT)`. GL4ES's GLX make-current and swap functions, including their create/resize/delete/main-FBO calls, are not part of this compiled or invoked route.
+
+After the first failed proof sample, `ref/gl/gl_context.c:615-625` sets `terminalPrinted`. The PRE callback still executes on later swaps, but `proofSample` becomes false and the source/proof records are suppressed; SDL's proof counter also cannot produce a new GL4ES diagnostic sample after that terminal state. Thus the authoritative log proves only the first pre-map snapshot. Continued gameplay, foliage, shader, and present work proves liveness, but it does not prove whether FBO 2's owner, attachment, completeness, dimensions, or binding changed later. The unchanged recording is consistent with repeated failure, but it is not a per-frame attachment audit.
+
+### Source-supported transfer inventory, not an authorized repair
+
+No transfer should be selected until source ownership is observed:
+
+- If the actual rendered source has a texture color attachment, the existing GL4ES textured-blit machinery can draw that texture into SDL's view FBO, subject to explicit dimensions, orientation, viewport/scissor/color-mask preservation, and proof that the texture is not simultaneously sampled and written.
+- If the source is a renderbuffer-backed GLES 3 FBO, `glBlitFramebuffer` can copy or resolve into SDL's single-sample view FBO when format, dimensions, sample counts, read/draw bindings, and completeness are compatible. The device uses an ES 3 backing context, but the code must use native GLES capabilities without corrupting GL4ES's logical state.
+- If FBO 2 is SDL's own MSAA FBO, SDL already owns the correct resolve into view FBO 1 before the bridge. Treating it as a GL4ES texture source is structurally wrong; the diagnostic must instead determine why the resolved drawable retained the menu image.
+- An ES 2 renderbuffer has no general texture-sampling path. Apple MSAA resolve or copy-to-texture routes have stricter ownership, format, and orientation hazards and are not justified as a generic fallback by current evidence.
+- Stock `gl4es_pre_swap` is not a solution: its GLX route is excluded, and its generic destination is native FBO 0 rather than SDL's generated view FBO 1.
+
+### Smallest authorized next boundary - diagnostics-only Phase B proposal
+
+Outcome B requires one bounded observation candidate before any behavioral repair. The smallest adequate boundary is to retain the existing no-op-on-failure bridge and add read-only lifecycle/attachment snapshots; it must not create a GL4ES main FBO, change `LIBGL_FB`, change MSAA, select a transfer, bind a new rendering target persistently, alter gameplay, or change menu behavior.
+
+Proposed exact future files:
+
+- `engine/ref_api.h`: version the bridge record and append engine-visible audit fields.
+- `ref/gl/gl_context.c`: count every bridge invocation across the terminal condition; log first, state-change, first active-map, and bounded later samples; emit the precondition mask and one terminal summary without suppressing later observation after an early failure.
+- `scripts/ios/gl4es-drawable-bridge-ios.patch`: expose `usefb/usefbo`, GL4ES state identity/generation, logical/current/default objects, all `mainfbo_*` names/dimensions, create/resize/delete counters and last status; split the compound guard into a bit mask; query raw native attachment state while restoring all bindings.
+- `scripts/ios/sdl2-drawable-bridge-ios.patch`: expose EAGL API/context identity, view/MSAA/depth FBO/RB names, requested/effective samples, drawable dimensions, and raw color/depth/stencil attachment type/name/status for source and target; preserve read/draw framebuffer and renderbuffer bindings around queries.
+- `scripts/ios/validate-ios-drawable-bridge.py`: require the bounded observation contract, mutation-test each precondition bit and binding restore, and reject behavioral FBO creation/transfer-policy changes.
+- `scripts/ios/verify_ipa.sh`: require only the new bounded audit policy/marker contract and continue rejecting the old high-volume Work Order 43 markers and sentinel.
+- `Documentation/XASH3DIOS_PORTING_STATE.md`: record the eventual authorized Phase-B candidate and device outcome.
+
+The raw attachment observation must use native GLES queries, not GL4ES's translated logical query: save draw/read FBO and renderbuffer bindings; bind only the queried FBO transiently; record `glCheckFramebufferStatus`; query `GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE` and `GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME` for color/depth/stencil; for renderbuffer attachments query width, height, internal format, and sample count; record known texture identity and owning dimensions where the owner exposes them; then restore and re-query the exact original native and logical state. SDL object equality (`source == msaaFramebuffer`, `source == viewFramebuffer`) must be reported directly.
+
+Proposed bounded markers:
+
+```text
+iOS main-FBO audit policy:
+iOS main-FBO lifecycle:
+iOS main-FBO state:
+iOS native attachment:
+iOS drawable bridge attempt:
+iOS drawable bridge present:
+iOS drawable bridge restore:
+iOS main-FBO audit terminal:
+```
+
+Every sampled attempt must include a monotonic invocation number, engine connection/active phase, EAGL context and GL4ES state generation, `usefb/usefbo`, logical/native draw/read/RB bindings, GL4ES main FBO/texture/depth/stencil names and dimensions, SDL view/MSAA/depth identities and effective samples, source/target attachment type/name/status/dimensions/samples, a named precondition bit mask, transfer attempted/result, destination checksum before/after when a transfer is already valid, presentation result, and post-present restore result. Emit at most: one policy line; lifecycle events only on init/create/resize/delete/context change; the first three menu attempts; the first active-map attempt; the next six active-map attempts at increasing invocation gaps or on state change; one present/restore anomaly; and one terminal summary, with a hard cap of 64 records per context. This is sufficient to prove whether the later source becomes texture-backed, remains SDL MSAA/renderbuffer-backed, changes owner, or never exists.
+
+Phase-B proof gate: a behavioral repair remains forbidden until one observation run identifies the source owner and attachment at both the early menu and active-map boundaries, proves the matching lifecycle and context, and demonstrates a source-supported transfer with explicit state-restore invariants. If the observed source is SDL MSAA and its resolve into view FBO 1 succeeds without checksum change, the next audit must move upstream to the draw ownership before changing presentation. If a stable texture-backed renderer source is proven, a target-aware textured transfer may be proposed. If a distinct renderbuffer-backed renderer source is proven on GLES 3, a bounded native blit/resolve may be proposed. None is implemented here.
+
+Why this satisfies Work Order 45 Phase A: it corrects the unsupported FBO-2 ownership claim, proves the actual compiled main-FBO lifecycle defect and exact first failure boundary, traces SDL and GL4ES ownership through create/resize/swap/delete, separates compile-time and runtime configuration, eliminates source-inconsistent alternatives, explains why Bundle 60 cannot answer later-frame ownership, inventories only source-supported transfer classes, and defines a single-run discriminator without making a renderer/gameplay change.
+
+Validation performed: Codebase Memory was used only for discovery; every material claim was checked in repository source and exact pinned/applied SDL and GL4ES trees. Pinned revisions and local/remote branch heads were verified. Compiled GL4ES source globs and every `createMainFBO`/`deleteMainFBO` caller were enumerated. Repository/workflow/environment setters for `LIBGL_FB`, `LIBGL_FBOFORCETEX`, and MSAA were searched. The bridge guard, terminal suppression, SDL create/resize/resolve/present/delete paths, GL4ES logical/native bind mapping, main-FBO create/failure/delete path, and engine context initialization were read directly. No source, patch, build script, gameplay, renderer, workflow, or artifact was changed or run by this phase; only this durable ledger is changed. `git diff --check` is required before the documentation-only publication.
+
+Expected new log markers: none from Phase A. The marker list above is a proposal for orchestrator authorization only.
+
+Remaining risks: the raw Bundle-60 file objects are not connector-addressable from the ledger, runtime MSAA count and FBO-2 attachment remain unknown, a later source-state change is unobserved, and GL4ES state/context recreation is not instrumented. The stale-drawable symptom remains real, but its safe transfer mechanism is unresolved. Any immediate `LIBGL_FB=2`, `createMainFBO`, hard-coded FBO-2, texture-blit, native-blit, MSAA-disable, menu, or renderer patch would exceed the proof gate.
+
+Exact files changed by Work Order 45 Phase A: `Documentation/XASH3DIOS_PORTING_STATE.md` only.
+
+Workflow/artifact/IPA/SHA-256: not run or produced; forbidden by this audit-only phase.
+
+Durable ledger path and commit: `Documentation/XASH3DIOS_PORTING_STATE.md`. This section is published in one documentation-only `[skip ci]` commit. The exact commit is recorded in the authoritative Google Docs mirror and final handoff because a commit cannot contain its own hash.
+
+Stop state: Work Order 45 Phase A ends at **Outcome B** for orchestrator review. Do not implement the proposed diagnostics, create or publish a candidate, run GitHub Actions, retrieve or upload an IPA, use tempfile.org, contact Arjun, request evidence or device testing, revive Bundle 60, diagnose a future run, or begin another work order.
