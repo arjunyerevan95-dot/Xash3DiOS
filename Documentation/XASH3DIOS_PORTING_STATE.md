@@ -285,3 +285,88 @@ Exact files changed by Work Order 44 Phase A: `Documentation/XASH3DIOS_PORTING_S
 Durable ledger commit: populated by the documentation-only `[skip ci]` publication commit containing this report. Both the repository ledger and authoritative Google Doc must be read back after publication.
 
 Stop state: Work Order 44 Phase A stops after the two subsystem traces and decision table for orchestrator review. Do not implement the bridge or uniform fix, create a candidate, run Actions, retrieve/upload an IPA, contact Arjun, request testing or evidence, or begin another work order.
+
+## Work order 44 Phase B — target-aware GL4ES-to-SDL drawable bridge
+
+Candidate/run and acceptance status: bundle version 60 is the single Work Order 44 Phase-B behavioral candidate. It is locally and CI build-qualified, but it is **not device-tested or accepted**. The accepted device baseline remains Run 39 until the orchestrator evaluates new device evidence.
+
+Commits:
+
+- Behavioral implementation: `cff801017b8682f1172fde5627ad7fd34b60152b`.
+- Final build head: `dbb8a3d85296cbf5ecde7b840db14375bda0ac7a`. The two commits after the behavioral implementation only corrected artifact-verifier assumptions about hidden/static GL4ES helper symbols and LTO inlining; they did not alter runtime behavior.
+- Exact pinned inputs retained: Diffusion `14d156bf3a6993c172697fac83a937836c3b5561`; SDL `5d249570393f7a37e037abf22cd6012a4cc56a71`; GL4ES `81547d986798e876de8b434193920b606a72363f`; Diffusion-MainUI `8c68de2f2325a0130953719efc3ae413eb24e01a`.
+
+Workflow and artifact:
+
+- Sole retained qualifying workflow: GitHub Actions run `31765624536`, run number 60, direct-push event, successful, head `dbb8a3d85296cbf5ecde7b840db14375bda0ac7a`: `https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/31765624536`.
+- Retained artifact ID `9206294601`, `Xash3DiOS-arm64-unsigned`, archive size 8,562,952 bytes: `https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/31765624536/artifacts/9206294601`.
+- Actual IPA: `xash3d-fwgs-ios-arm64.ipa`, 8,660,812 bytes, SHA-256 `F19BBA87A9AFEF721948800F607FB00230B621746A3C2E6EDAA86E5DF77B6111`.
+- tempfile.org page: `https://tempfile.org/6mHp8rG2s7H/`; direct download: `https://tempfile.org/6mHp8rG2s7H/download`; reported expiry `2026-08-16 03:51:44 UTC`. API readback confirmed the exact filename, size, hash, existence, and safe scan result.
+- Automatic/superseded qualification attempts were removed or canceled rather than retained: initial push run `31762687538` canceled/deleted; PR run `31762690104` failed only because the verifier required a hidden GL4ES symbol and was deleted; push run `31764261049` failed only because LTO inlined the post helper and was deleted; PR duplicates `31764263431` and `31765627060` were canceled/deleted. These verifier-only follow-ups did not create additional behavioral candidates. Skipped nonqualifying workflow entries may remain in Actions history.
+
+Exact files changed by the Phase-B behavioral implementation:
+
+- `engine/client/cl_main.c`
+- `engine/client/cl_scrn.c`
+- `engine/client/cl_view.c`
+- `engine/client/dll_int/cl_game.c`
+- `engine/client/dll_int/cl_gameui.c`
+- `engine/common/common.h`
+- `engine/common/host.c`
+- `engine/platform/platform.h`
+- `engine/platform/sdl2/vid_sdl2.c`
+- `engine/ref_api.h`
+- `ref/gl/gl_context.c`
+- `ref/gl/gl_rmain.c`
+- `scripts/gha/build_ios.sh`
+- `scripts/gha/deps_ios.sh`
+- `scripts/ios/builddiffusion.sh`
+- `scripts/ios/gl4es-drawable-bridge-ios.patch`
+- `scripts/ios/sdl2-drawable-bridge-ios.patch`
+- `scripts/ios/validate-diffusion-ios-policy.py`
+- `scripts/ios/validate-ios-drawable-bridge.py`
+- `scripts/ios/verify_ipa.sh`
+
+The verifier-only follow-up commits changed only `scripts/ios/verify_ipa.sh`.
+
+Verified failure boundary: Work Order 44 Phase A established that the normal scene was rendered into GL4ES's texture-backed native main FBO 2 while SDL UIKit presented its separate CAEAGLLayer drawable FBO/renderbuffer 1. The live drawable checksum retained the stale difficulty-menu image even though map loading, rendering, swaps, and successful `presentRenderbuffer` calls continued. The iOS `NOEGL` SDL route bypassed GL4ES's GLX pre/post-swap path, and stock `gl4es_pre_swap` targets native FBO 0 rather than SDL's live nonzero view FBO. Therefore the structural cause was a missing target-aware GL4ES-to-SDL drawable transfer at the embedded presentation boundary.
+
+Implemented structural repair and ordering:
+
+1. Reference API 18 appends a versioned iOS drawable-bridge callback with a bounded 64-record-per-context contract; non-GL4ES paths register no callback.
+2. SDL UIKit supplies the live current EAGL context, `viewFramebuffer`, `viewRenderbuffer`, and live backing width/height. No FBO, renderbuffer, or geometry value is hard-coded.
+3. After SDL's optional MSAA resolve and immediately before presentation, the pre-present callback verifies context/target/geometry, flushes pending GL4ES display-list and bitmap work, requires logical framebuffer 0 and the actual GL4ES native main FBO source, raw-binds the explicit nonzero SDL destination, validates it, and uses GL4ES's existing GLES2-compatible textured-blit machinery.
+4. The live SDL view renderbuffer is rebound and presented. The actual `presentRenderbuffer` result is passed to the post-present callback.
+5. Post-present checks the expected source native FBO/renderbuffer and logical framebuffer state, restores the native GL4ES main FBO and expected renderbuffer, re-queries them, and reports success only when the native and logical state match the invariant.
+
+Why this satisfies the order: it repairs the precise ownership interface proved missing in Phase A while preserving the renderer, real Diffusion menu callbacks, touch controls, map loading, shaders, animated-model shader sharing, one-bone rigid path, and Half-Life behavior. It does not route stock pre-swap to FBO 0, does not add a sentinel, does not bypass the menu or 3-D rendering, and does not attempt the separately forbidden uniform or map-transition fixes.
+
+Diagnostic policy: the old Work Order 43 high-volume renderer/swap/present instrumentation is no longer active in engine/reference/build routes. Phase B emits only one policy/context record; source/target/geometry and before/after five-region checksum proof for at most the first three transfers; one successful-present record; one restore record; and one terminal summary, with a hard maximum of 64 records per context and no per-frame log flushing. Historical patch files remain in the repository for provenance but are not applied, and the IPA verifier rejects their runtime markers and the sentinel marker.
+
+Expected bounded log markers:
+
+- `iOS drawable bridge policy:`
+- `iOS drawable bridge source:`
+- `iOS drawable bridge proof:`
+- `iOS drawable bridge present:`
+- `iOS drawable bridge restore:`
+- `iOS drawable bridge terminal:`
+
+Local and CI validation:
+
+- The SDL bridge patch passed `--check` and applied cleanly against exact SDL `5d249570393f7a37e037abf22cd6012a4cc56a71`.
+- The GL4ES bridge patch passed `--check` and applied cleanly after the accepted base iOS patch against exact GL4ES `81547d986798e876de8b434193920b606a72363f`.
+- Accepted Diffusion patches applied against the exact pinned tree; the Windows checkout required whitespace-tolerant validation for one shader patch because of line-ending conversion, while CI applied the pinned patch route normally.
+- Python scripts compiled; the bridge validator passed its positive policy audit and rejected mutations for hard-coded targets, hard-coded geometry, stock pre-swap routing, sentinel insertion, missing restore, and unbounded diagnostics.
+- The existing Diffusion validator reconfirmed the shared animated shader key/layout and preserved one-bone rigid path.
+- `git diff --check` passed. A local Unix/iOS build was unavailable on the Windows worker, so compilation and binary checks were performed by the qualifying macOS Actions job.
+- CI successfully checked out every exact revision, built the arm64 engine plus Half-Life and Diffusion client/server/menu targets with `XASH_IOS=1`, validated bundle version 60 and minimum iOS 12.0, found 13 Mach-O files and 11 game dylibs, ran the policy mutation tests, verified bridge markers and the absence of forbidden diagnostics/sentinel strings, packaged the unsigned IPA, and uploaded the retained artifact.
+- The downloaded IPA was independently listed and hashed after retrieval; tempfile.org API readback matched its filename, byte size, and SHA-256.
+
+Remaining risks: this candidate has not run on a device. A successful target checksum change proves different pixels reached the SDL drawable, but device evidence is still required to establish visible scene presentation. The bridge may expose a later independent rendering defect or the already-unresolved first `ch1map0` to `ch1map1` termination. The known `glUniform4fv` active-extent error remains deliberately unfixed, and the missing transition save remains a handled fallback rather than this work order's target.
+
+Single device test proposed for orchestrator review only — **not requested from Arjun by the worker**: install bundle version 60, launch with `-dev 2 -log -game diffusion -ref gl4es`, select New Game and a difficulty once, observe whether the stale difficulty image is replaced by the 3-D scene, then continue through the first `ch1map0` to `ch1map1` transition and preserve `engine.log` plus any matching app crash or Jetsam report. The orchestrator alone decides whether to issue this test.
+
+Durable ledger path and commit: `Documentation/XASH3DIOS_PORTING_STATE.md`. This report is the content of the immediately following documentation-only `[skip ci]` commit. Its exact ledger commit is recorded in the authoritative Google Doc and final worker handoff because a commit cannot contain its own hash.
+
+Stop state: Work Order 44 Phase B is implemented, locally validated, built, artifact-verified, uploaded, and reported. Stop for orchestrator review. Do not request device testing, diagnose unreviewed future evidence, change the renderer or gameplay, or begin another work order.
