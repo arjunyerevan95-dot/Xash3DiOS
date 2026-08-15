@@ -122,6 +122,37 @@ for trace_marker in \
 	fi
 done
 
+for topology_marker in \
+	'WO49 topology policy:' \
+	'WO49 topology producer:' \
+	'WO49 topology ingress:' \
+	'WO49 topology route:' \
+	'WO49 topology realized:' \
+	'WO49 topology mismatch:' \
+	'WO49 topology absence:' \
+	'WO49 topology summary:'; do
+	if ! grep -q "$topology_marker" "$GL4ES_RENDERER_STRINGS"; then
+		echo "Renderer is missing WO49 topology marker: $topology_marker" >&2
+		exit 1
+	fi
+done
+
+for topology_api in \
+	'gl4es_iOSWO49TopologyProducer' \
+	'gl4es_iOSWO49TopologyArm' \
+	'gl4es_iOSWO49TopologyFinish' \
+	'gl4es_iOSWO49TopologyAbsence'; do
+	if ! grep -q "$topology_api" "$GL4ES_RENDERER_STRINGS"; then
+		echo "Renderer is missing WO49 topology API: $topology_api" >&2
+		exit 1
+	fi
+done
+
+if ! grep -q 'gl4es_iOSWO49TopologyProducer' "$DIFFUSION_CLIENT_STRINGS"; then
+	echo "Diffusion client is missing the WO49 pre-shader producer bridge" >&2
+	exit 1
+fi
+
 for bridge_marker in \
 	'iOS direct drawable policy:' \
 	'iOS direct drawable register:' \

@@ -1,0 +1,1204 @@
+diff --git a/src/gl/indextrace.h b/src/gl/indextrace.h
+index 40d97a2b..11768b37 100644
+--- a/src/gl/indextrace.h
++++ b/src/gl/indextrace.h
+@@ -3,6 +3,59 @@
+ 
+ #include "gles.h"
+ 
++#define IOS_WO49_TOPOLOGY_VERSION 1u
++#define IOS_WO49_TOPOLOGY_TOKEN_CAP 4u
++#define IOS_WO49_TOPOLOGY_ATTR_CAP 16u
++
++typedef struct ios_wo49_topology_attr_desc_s {
++    unsigned int index;
++    unsigned int enabled;
++    unsigned int size;
++    unsigned int type;
++    unsigned int normalized;
++    unsigned int integer;
++    unsigned int stride;
++    unsigned long long offset;
++} ios_wo49_topology_attr_desc_t;
++
++typedef struct ios_wo49_topology_producer_desc_s {
++    unsigned int version;
++    unsigned int size;
++    unsigned long long frame;
++    const char *producer;
++    const char *model;
++    unsigned long long cacheIdentity;
++    unsigned long long instanceIdentity;
++    unsigned long long meshIdentity;
++    unsigned int aggregateVerts;
++    unsigned int numVerts;
++    unsigned int numElems;
++    unsigned int mode;
++    unsigned int indexType;
++    unsigned int indexSource;
++    unsigned int indexMin;
++    unsigned int indexMax;
++    unsigned int indexChecksum;
++    int baseVertex;
++    unsigned int rangeStart;
++    unsigned int rangeEnd;
++    unsigned int layout;
++    unsigned int stride;
++    unsigned int vao;
++    unsigned int vbo;
++    unsigned int ebo;
++    unsigned long long vboBytes;
++    unsigned long long eboBytes;
++    unsigned long long vertexUploadOffset;
++    unsigned long long indexUploadOffset;
++    unsigned int vertexChecksum;
++    unsigned int positionChecksum;
++    unsigned long long highestLocalVertex;
++    unsigned long long highestPackedVertexByte;
++    unsigned int attrCount;
++    ios_wo49_topology_attr_desc_t attrs[IOS_WO49_TOPOLOGY_ATTR_CAP];
++} ios_wo49_topology_producer_desc_t;
++
+ unsigned long long ios_index_trace_ingress(const char *function, GLenum mode,
+     GLsizei count, GLenum type, const void *caller_indices, const GLuint *resolved,
+     GLuint start, GLuint end, GLint basevertex, int deferred, int intercept);
+@@ -15,4 +68,24 @@ void ios_index_trace_native(unsigned long long id, const char *function,
+     GLuint segment_count);
+ void ios_index_trace_summary_if_ready(void);
+ 
++unsigned long long APIENTRY_GL4ES gl4es_wo49_topology_producer(
++    const ios_wo49_topology_producer_desc_t *desc);
++void APIENTRY_GL4ES gl4es_wo49_topology_arm(unsigned long long token);
++void APIENTRY_GL4ES gl4es_wo49_topology_finish(unsigned long long token);
++void APIENTRY_GL4ES gl4es_wo49_topology_absence(unsigned long long token, const char *reason);
++
++unsigned long long ios_wo49_topology_ingress(const char *function, GLenum mode,
++    GLsizei count, GLenum type, const void *caller_indices, const GLuint *resolved,
++    GLuint start, GLuint end, GLint basevertex, int deferred, int intercept);
++void ios_wo49_topology_route(unsigned long long token, const char *route,
++    const GLuint *indices, GLsizei count, GLuint vertex_first, GLuint vertex_count,
++    int appended, const GLfloat *positions, GLsizei position_stride);
++void ios_wo49_topology_set_active(unsigned long long token);
++void ios_wo49_topology_set_replay(const unsigned long long *tokens,
++    const GLuint *offsets, const GLuint *counts, unsigned int token_count,
++    const GLuint *owned_indices, unsigned long long vertex_bytes,
++    unsigned long long index_bytes);
++void ios_wo49_topology_realized(const char *function, GLenum mode, GLsizei count,
++    GLenum type, const void *indices);
++
+ #endif
+diff --git a/src/gl/indextrace.c b/src/gl/indextrace.c
+index 9aba847f..2286b847 100644
+--- a/src/gl/indextrace.c
++++ b/src/gl/indextrace.c
+@@ -3,6 +3,7 @@
+ #include "buffers.h"
+ #include "gl4es.h"
+ #include "glstate.h"
++#include "program.h"
+ #include "../glx/hardext.h"
+ #include "../../include/gl4esinit.h"
+ 
+@@ -76,6 +77,86 @@ static unsigned int ios_index_record_count;
+ static unsigned long long ios_index_active_id;
+ static const void *ios_index_active_caller;
+ 
++typedef struct {
++    unsigned int index;
++    int enabled;
++    GLint size;
++    GLenum type;
++    int normalized;
++    int integer;
++    GLsizei stride;
++    uintptr_t pointer;
++    GLint divisor;
++    GLuint buffer;
++    GLuint native_buffer;
++    unsigned long long buffer_bytes;
++    unsigned long long highest_byte;
++    int in_bounds;
++} ios_wo49_attr_state_t;
++
++typedef struct {
++    unsigned long long id;
++    ios_wo49_topology_producer_desc_t producer;
++    char producer_name[64];
++    char model[96];
++    char function[32];
++    char route[16];
++    char absence[48];
++    unsigned int logical_vao;
++    unsigned int logical_vbo;
++    unsigned int logical_ebo;
++    unsigned int logical_native_ebo;
++    unsigned long long logical_ebo_bytes;
++    uint32_t logical_vertex_checksum;
++    uint32_t logical_position_checksum;
++    uintptr_t ingress_pointer;
++    GLenum ingress_mode;
++    GLenum ingress_type;
++    GLsizei ingress_count;
++    GLuint ingress_min;
++    GLuint ingress_max;
++    uint32_t ingress_checksum;
++    GLuint ingress_start;
++    GLuint ingress_end;
++    GLint ingress_base;
++    ios_wo49_attr_state_t logical_attrs[IOS_WO49_TOPOLOGY_ATTR_CAP];
++    unsigned int logical_attr_count;
++    GLuint route_min;
++    GLuint route_max;
++    uint32_t route_checksum;
++    uint32_t route_position_checksum;
++    GLuint route_vertex_first;
++    GLuint route_vertex_count;
++    GLsizei route_count;
++    int route_appended;
++    int stage;
++    int finished;
++    int mismatch_emitted;
++    int absence_emitted;
++} ios_wo49_record_t;
++
++typedef struct {
++    unsigned long long tokens[IOS_WO49_TOPOLOGY_TOKEN_CAP];
++    GLuint offsets[IOS_WO49_TOPOLOGY_TOKEN_CAP];
++    GLuint counts[IOS_WO49_TOPOLOGY_TOKEN_CAP];
++    unsigned int count;
++    const GLuint *owned_indices;
++    unsigned long long vertex_bytes;
++    unsigned long long index_bytes;
++} ios_wo49_replay_t;
++
++static ios_wo49_record_t ios_wo49_records[IOS_WO49_TOPOLOGY_TOKEN_CAP];
++static unsigned int ios_wo49_record_count;
++static unsigned long long ios_wo49_next_id;
++static unsigned long long ios_wo49_first_frame;
++static unsigned long long ios_wo49_pending_token;
++static unsigned long long ios_wo49_active_token;
++static ios_wo49_replay_t ios_wo49_replay;
++static int ios_wo49_policy_emitted;
++static int ios_wo49_summary_emitted;
++
++static void ios_wo49_summary_if_due(unsigned long long frame, int force);
++
+ static const char *ios_index_family_name(unsigned int family)
+ {
+     switch(family) {
+@@ -157,6 +238,116 @@ static void ios_index_emit(int summary, const char *format, ...)
+     ++ios_index_lines;
+ }
+ 
++static void ios_wo49_emit(const char *format, ...)
++{
++    char buffer[4096];
++    va_list args;
++    if(!ios_index_logger || ios_index_logger_busy)
++        return;
++    va_start(args, format);
++    vsnprintf(buffer, sizeof(buffer), format, args);
++    va_end(args);
++    buffer[sizeof(buffer) - 1] = '\0';
++    ios_index_logger_busy = 1;
++    ios_index_logger(buffer);
++    ios_index_logger_busy = 0;
++}
++
++static ios_wo49_record_t *ios_wo49_find(unsigned long long id)
++{
++    for(unsigned int i = 0; i < ios_wo49_record_count; ++i)
++        if(ios_wo49_records[i].id == id)
++            return &ios_wo49_records[i];
++    return NULL;
++}
++
++static void ios_wo49_append(char *buffer, size_t capacity, size_t *used,
++    const char *format, ...)
++{
++    va_list args;
++    int written;
++    if(*used >= capacity)
++        return;
++    va_start(args, format);
++    written = vsnprintf(buffer + *used, capacity - *used, format, args);
++    va_end(args);
++    if(written < 0)
++        return;
++    if((size_t)written >= capacity - *used)
++        *used = capacity - 1;
++    else
++        *used += (size_t)written;
++}
++
++static uint32_t ios_wo49_position_checksum(const GLfloat *positions,
++    GLsizei stride, GLuint count)
++{
++    uint32_t hash = 2166136261u;
++    const unsigned char *base = (const unsigned char *)positions;
++    size_t actual_stride = stride > 0 ? (size_t)stride : sizeof(GLfloat) * 4;
++    if(!positions)
++        return 0;
++    for(GLuint vertex = 0; vertex < count; ++vertex) {
++        const unsigned char *bytes = base + (size_t)vertex * actual_stride;
++        for(size_t i = 0; i < sizeof(GLfloat) * 3; ++i) {
++            hash ^= bytes[i];
++            hash *= 16777619u;
++        }
++    }
++    return hash;
++}
++
++static uint32_t ios_wo49_bytes_checksum(const void *data, size_t size)
++{
++    uint32_t hash = 2166136261u;
++    const unsigned char *bytes = (const unsigned char *)data;
++    if(!data)
++        return 0;
++    for(size_t i = 0; i < size; ++i) {
++        hash ^= bytes[i];
++        hash *= 16777619u;
++    }
++    return hash;
++}
++
++static void ios_wo49_capture_logical_attr(ios_wo49_attr_state_t *out,
++    unsigned int index, GLuint maximum)
++{
++    vertexattrib_t *attr = &glstate->vao->vertexattrib[index];
++    unsigned int width = ios_index_type_bytes(attr->type);
++    unsigned long long stride = attr->stride ? (unsigned long long)attr->stride :
++        (unsigned long long)width * (unsigned long long)attr->size;
++    memset(out, 0, sizeof(*out));
++    out->index = index;
++    out->enabled = attr->enabled;
++    out->size = attr->size;
++    out->type = attr->type;
++    out->normalized = attr->normalized;
++    out->integer = attr->integer;
++    out->stride = attr->stride;
++    out->pointer = (uintptr_t)attr->pointer;
++    out->divisor = attr->divisor;
++    if(attr->buffer) {
++        out->buffer = attr->buffer->buffer;
++        out->native_buffer = attr->buffer->real_buffer;
++        out->buffer_bytes = (unsigned long long)attr->buffer->size;
++    }
++    out->highest_byte = (unsigned long long)out->pointer +
++        (unsigned long long)maximum * stride +
++        (unsigned long long)width * (unsigned long long)attr->size - 1u;
++    out->in_bounds = out->buffer_bytes ? out->highest_byte < out->buffer_bytes : -1;
++}
++
++static const char *ios_wo49_stage_name(const ios_wo49_record_t *record)
++{
++    switch(record->stage) {
++        case 4: return "realized";
++        case 3: return "route";
++        case 2: return "ingress";
++        default: return "producer";
++    }
++}
++
+ void set_index_trace_logger(void (APIENTRY_GL4ES *callback)(const char *))
+ {
+     ios_index_logger = callback;
+@@ -165,10 +356,15 @@ void set_index_trace_logger(void (APIENTRY_GL4ES *callback)(const char *))
+         ios_index_emit(0, "iOS index trace policy: window=%u records<=16 families=world-client,studio-ebo,studio-decal-client mutation=none error_queue=untouched",
+             IOS_INDEX_TRACE_WINDOW);
+     }
++    if(callback && !ios_wo49_policy_emitted) {
++        ios_wo49_policy_emitted = 1;
++        ios_wo49_emit("WO49 topology policy: tokens<=4 selection=first-submitted-vertexlit-cache-aggregate-gt-65535 producer=pre-ChooseStudioProgram direct=post-realize_glenv+realize_bufferIndex deferred=post-replay-realization attrs=all-active bounds=checked sink=engine-console allocation=none mutation=none error_queue=untouched");
++    }
+ }
+ 
+ void set_index_trace_context(unsigned long long frame, const char *map, const char *phase)
+ {
++    ios_wo49_summary_if_due(frame, 0);
+     ios_index_frame = frame;
+     if(map) {
+         strncpy(ios_index_map, map, sizeof(ios_index_map) - 1);
+@@ -410,3 +606,574 @@ void ios_index_trace_summary_if_ready(void)
+         (ios_index_seen_families & 0x0eu) == 0x0eu ? "none" : "one-or-more-families",
+         ios_index_lines + 1);
+ }
++
++unsigned long long APIENTRY_GL4ES gl4es_wo49_topology_producer(
++    const ios_wo49_topology_producer_desc_t *desc)
++{
++    ios_wo49_record_t *record;
++    char attrs[1536] = "";
++    size_t used = 0;
++    if(!desc || desc->version != IOS_WO49_TOPOLOGY_VERSION ||
++       desc->size != sizeof(*desc) || desc->aggregateVerts <= 65535u ||
++       !desc->meshIdentity || !desc->numVerts || !desc->numElems)
++        return 0;
++    for(unsigned int i = 0; i < ios_wo49_record_count; ++i)
++        if(ios_wo49_records[i].producer.meshIdentity == desc->meshIdentity)
++            return 0;
++    if(ios_wo49_record_count >= IOS_WO49_TOPOLOGY_TOKEN_CAP)
++        return 0;
++
++    record = &ios_wo49_records[ios_wo49_record_count++];
++    memset(record, 0, sizeof(*record));
++    record->id = ++ios_wo49_next_id;
++    record->producer = *desc;
++    record->producer.attrCount = desc->attrCount > IOS_WO49_TOPOLOGY_ATTR_CAP ?
++        IOS_WO49_TOPOLOGY_ATTR_CAP : desc->attrCount;
++    memcpy(record->producer.attrs, desc->attrs,
++        record->producer.attrCount * sizeof(desc->attrs[0]));
++    snprintf(record->producer_name, sizeof(record->producer_name), "%s",
++        desc->producer ? desc->producer : "<none>");
++    snprintf(record->model, sizeof(record->model), "%s",
++        desc->model ? desc->model : "<none>");
++    record->producer.producer = record->producer_name;
++    record->producer.model = record->model;
++    record->stage = 1;
++    if(!ios_wo49_first_frame)
++        ios_wo49_first_frame = desc->frame;
++
++    for(unsigned int i = 0; i < record->producer.attrCount; ++i) {
++        const ios_wo49_topology_attr_desc_t *a = &record->producer.attrs[i];
++        ios_wo49_append(attrs, sizeof(attrs), &used,
++            "%sa%u=e%u/c%u/t0x%04x/n%u/i%u/s%u/o%llu",
++            i ? "," : "", a->index, a->enabled, a->size, a->type,
++            a->normalized, a->integer, a->stride, a->offset);
++    }
++    ios_wo49_emit(
++        "WO49 topology producer: token=%llu frame=%llu map=%s producer=%s model=%s cache=0x%llx instance=0x%llx mesh=0x%llx aggregate_verts=%u local_verts=%u elems=%u mode=0x%04x index_type=0x%04x index_source=ebo-upload min=%u max=%u checksum=%08x base=%d range=%u..%u layout=%u stride=%u vao=%u vbo=%u ebo=%u vbo_bytes=%llu ebo_bytes=%llu vertex_upload=%llu index_upload=%llu vertex_checksum=%08x position_checksum=%08x highest_local=%llu highest_packed_byte=%llu submission=not-yet-known attrs=[%s]",
++        record->id, desc->frame, ios_index_map, record->producer_name,
++        record->model, desc->cacheIdentity, desc->instanceIdentity,
++        desc->meshIdentity, desc->aggregateVerts, desc->numVerts,
++        desc->numElems, desc->mode, desc->indexType, desc->indexMin,
++        desc->indexMax, desc->indexChecksum, desc->baseVertex,
++        desc->rangeStart, desc->rangeEnd, desc->layout, desc->stride,
++        desc->vao, desc->vbo, desc->ebo, desc->vboBytes, desc->eboBytes,
++        desc->vertexUploadOffset, desc->indexUploadOffset,
++        desc->vertexChecksum, desc->positionChecksum,
++        desc->highestLocalVertex, desc->highestPackedVertexByte, attrs);
++    return record->id;
++}
++
++void APIENTRY_GL4ES gl4es_wo49_topology_arm(unsigned long long token)
++{
++    ios_wo49_record_t *record = ios_wo49_find(token);
++    if(!record || record->stage != 1 || record->absence_emitted)
++        return;
++    ios_wo49_pending_token = token;
++}
++
++void APIENTRY_GL4ES gl4es_wo49_topology_absence(unsigned long long token,
++    const char *reason)
++{
++    ios_wo49_record_t *record = ios_wo49_find(token);
++    if(!record || record->absence_emitted || record->stage >= 4)
++        return;
++    record->absence_emitted = 1;
++    snprintf(record->absence, sizeof(record->absence), "%s", reason ? reason : "unknown");
++    ios_wo49_emit("WO49 topology absence: token=%llu furthest=%s reason=%s",
++        token, ios_wo49_stage_name(record), record->absence);
++    if(ios_wo49_pending_token == token)
++        ios_wo49_pending_token = 0;
++}
++
++unsigned long long ios_wo49_topology_ingress(const char *function, GLenum mode,
++    GLsizei count, GLenum type, const void *caller_indices, const GLuint *resolved,
++    GLuint start, GLuint end, GLint basevertex, int deferred, int intercept)
++{
++    unsigned long long token = ios_wo49_pending_token;
++    ios_wo49_record_t *record;
++    char attrs[2048] = "";
++    size_t used = 0;
++    if(!token)
++        return 0;
++    ios_wo49_pending_token = 0;
++    record = ios_wo49_find(token);
++    if(!record || record->absence_emitted)
++        return 0;
++    if(!resolved || count <= 0) {
++        gl4es_wo49_topology_absence(token, "unresolved-index-source");
++        return 0;
++    }
++
++    snprintf(record->function, sizeof(record->function), "%s", function ? function : "<none>");
++    record->ingress_pointer = (uintptr_t)caller_indices;
++    record->ingress_mode = mode;
++    record->ingress_type = type;
++    record->ingress_count = count;
++    record->ingress_start = start;
++    record->ingress_end = end;
++    record->ingress_base = basevertex;
++    if(type == GL_UNSIGNED_INT) {
++        ios_index_minmax(resolved, count, &record->ingress_min, &record->ingress_max);
++        record->ingress_checksum = ios_index_checksum(resolved, count);
++    }
++    record->logical_vao = glstate->vao->array;
++    if(glstate->vao->elements) {
++        record->logical_ebo = glstate->vao->elements->buffer;
++        record->logical_native_ebo = glstate->vao->elements->real_buffer;
++        record->logical_ebo_bytes = (unsigned long long)glstate->vao->elements->size;
++    }
++    record->logical_attr_count = record->producer.attrCount;
++    for(unsigned int i = 0; i < record->logical_attr_count; ++i) {
++        unsigned int index = record->producer.attrs[i].index;
++        ios_wo49_attr_state_t *a = &record->logical_attrs[i];
++        if(index >= (unsigned int)hardext.maxvattrib)
++            continue;
++        ios_wo49_capture_logical_attr(a, index, record->ingress_max);
++        if(index == record->producer.attrs[0].index) {
++            vertexattrib_t *position = &glstate->vao->vertexattrib[index];
++            record->logical_vbo = a->buffer;
++            if(position->buffer && position->buffer->data) {
++                record->logical_vertex_checksum = ios_wo49_bytes_checksum(
++                    position->buffer->data, (size_t)position->buffer->size);
++                if(a->in_bounds == 1)
++                    record->logical_position_checksum = ios_wo49_position_checksum(
++                        (const GLfloat *)((const unsigned char *)position->buffer->data +
++                            a->pointer), a->stride, record->producer.numVerts);
++            }
++        }
++        ios_wo49_append(attrs, sizeof(attrs), &used,
++            "%sa%u=e%d/b%u/nb%u/bytes%llu/c%d/t0x%04x/n%d/i%d/s%d/o%llu/d%d/high%llu/ok%d",
++            i ? "," : "", a->index, a->enabled, a->buffer,
++            a->native_buffer, a->buffer_bytes, a->size, a->type,
++            a->normalized, a->integer, a->stride,
++            (unsigned long long)a->pointer, a->divisor, a->highest_byte,
++            a->in_bounds);
++    }
++    record->stage = 2;
++    ios_wo49_emit(
++        "WO49 topology ingress: token=%llu function=%s mode=0x%04x count=%d type=0x%04x range=%u..%u base=%d source=%s pointer_or_offset=0x%llx min=%u max=%u checksum=%08x route=%s logical_vao=%u array_buffer=%u ebo=%u native_ebo=%u ebo_bytes=%llu vertex_checksum=%08x position_checksum=%08x attrs=[%s]",
++        token, record->function, mode, count, type, start, end, basevertex,
++        record->logical_ebo ? "ebo-offset" : "client-pointer",
++        (unsigned long long)record->ingress_pointer, record->ingress_min,
++        record->ingress_max, record->ingress_checksum,
++        deferred ? (intercept ? "intercept" : "deferred") : "direct",
++        record->logical_vao, record->logical_vbo, record->logical_ebo,
++        record->logical_native_ebo, record->logical_ebo_bytes,
++        record->logical_vertex_checksum, record->logical_position_checksum, attrs);
++    return token;
++}
++
++static void ios_wo49_emit_route(ios_wo49_record_t *record, int replay)
++{
++    if(record->stage >= 3)
++        return;
++    record->stage = 3;
++    ios_wo49_emit(
++        "WO49 topology route: token=%llu owner=%s copied=%d normalized=%d rebased=%d appended=%d replay=%d count=%d min=%u max=%u checksum=%08x vertex_first=%u vertex_count=%u position_checksum=%08x position_match=%d storage=fixed-owned",
++        record->id, record->route, strcmp(record->route, "direct") != 0,
++        strcmp(record->route, "direct") != 0, record->ingress_base != 0,
++        record->route_appended, replay, record->route_count,
++        record->route_min, record->route_max, record->route_checksum,
++        record->route_vertex_first, record->route_vertex_count,
++        record->route_position_checksum,
++        record->route_position_checksum == record->producer.positionChecksum);
++}
++
++void ios_wo49_topology_route(unsigned long long token, const char *route,
++    const GLuint *indices, GLsizei count, GLuint vertex_first, GLuint vertex_count,
++    int appended, const GLfloat *positions, GLsizei position_stride)
++{
++    ios_wo49_record_t *record = ios_wo49_find(token);
++    if(!record || record->absence_emitted || record->stage < 2)
++        return;
++    if(indices && count > 0) {
++        ios_index_minmax(indices, count, &record->route_min, &record->route_max);
++        record->route_checksum = ios_index_checksum(indices, count);
++    }
++    record->route_position_checksum = positions ?
++        ios_wo49_position_checksum(positions, position_stride, vertex_count) :
++        record->producer.positionChecksum;
++    record->route_vertex_first = vertex_first;
++    record->route_vertex_count = vertex_count;
++    record->route_count = count;
++    record->route_appended |= appended;
++    snprintf(record->route, sizeof(record->route), "%s", route ? route : "unknown");
++    if(strcmp(record->route, "direct") == 0)
++        ios_wo49_emit_route(record, 0);
++}
++
++void ios_wo49_topology_set_active(unsigned long long token)
++{
++    ios_wo49_active_token = token;
++}
++
++void ios_wo49_topology_set_replay(const unsigned long long *tokens,
++    const GLuint *offsets, const GLuint *counts, unsigned int token_count,
++    const GLuint *owned_indices, unsigned long long vertex_bytes,
++    unsigned long long index_bytes)
++{
++    memset(&ios_wo49_replay, 0, sizeof(ios_wo49_replay));
++    ios_wo49_replay.count = token_count > IOS_WO49_TOPOLOGY_TOKEN_CAP ?
++        IOS_WO49_TOPOLOGY_TOKEN_CAP : token_count;
++    for(unsigned int i = 0; i < ios_wo49_replay.count; ++i) {
++        ios_wo49_record_t *record;
++        ios_wo49_replay.tokens[i] = tokens[i];
++        ios_wo49_replay.offsets[i] = offsets[i];
++        ios_wo49_replay.counts[i] = counts[i];
++        record = ios_wo49_find(tokens[i]);
++        if(record) {
++            record->route_count = (GLsizei)counts[i];
++            ios_wo49_emit_route(record, 1);
++        }
++    }
++    ios_wo49_replay.owned_indices = owned_indices;
++    ios_wo49_replay.vertex_bytes = vertex_bytes;
++    ios_wo49_replay.index_bytes = index_bytes;
++}
++
++static ios_wo49_attr_state_t *ios_wo49_logical_attr(
++    ios_wo49_record_t *record, unsigned int index)
++{
++    for(unsigned int i = 0; i < record->logical_attr_count; ++i)
++        if(record->logical_attrs[i].index == index)
++            return &record->logical_attrs[i];
++    return NULL;
++}
++
++static const ios_wo49_topology_attr_desc_t *ios_wo49_producer_attr(
++    const ios_wo49_record_t *record, unsigned int index)
++{
++    for(unsigned int i = 0; i < record->producer.attrCount; ++i)
++        if(record->producer.attrs[i].index == index)
++            return &record->producer.attrs[i];
++    return NULL;
++}
++
++static void ios_wo49_mismatch(ios_wo49_record_t *record, const char *field,
++    unsigned long long producer, unsigned long long ingress,
++    unsigned long long realized)
++{
++    if(record->mismatch_emitted)
++        return;
++    record->mismatch_emitted = 1;
++    ios_wo49_emit(
++        "WO49 topology mismatch: token=%llu field=%s producer=%llu ingress=%llu realized=%llu route=%s",
++        record->id, field, producer, ingress, realized,
++        record->route[0] ? record->route : "unknown");
++}
++
++static void ios_wo49_realize_one(ios_wo49_record_t *record, const char *function,
++    GLenum mode, GLsizei native_count, GLenum type, const void *indices,
++    const GLuint *owned_indices, GLuint segment_offset, GLuint segment_count,
++    unsigned long long replay_vertex_bytes, unsigned long long replay_index_bytes)
++{
++    if(!record || record->absence_emitted || record->stage >= 4)
++        return;
++    const GLuint *segment = owned_indices ? owned_indices + segment_offset : NULL;
++    GLuint minimum = 0, maximum = 0;
++    uint32_t checksum = 0;
++    GLuint native_ebo = glstate->bind_buffer.index;
++    unsigned long long native_ebo_bytes = replay_index_bytes;
++    char attrs[2304] = "";
++    size_t used = 0;
++    int position_seen = 0;
++    int bounds_ok = 1;
++    int deferred = strcmp(record->route, "direct") != 0;
++    unsigned int active_attr_count = 0;
++
++    if(!segment && type == GL_UNSIGNED_INT) {
++        if(native_ebo && glstate->vao->elements && glstate->vao->elements->data &&
++           (uintptr_t)indices + (uintptr_t)record->ingress_count * sizeof(GLuint) <=
++               (uintptr_t)glstate->vao->elements->size) {
++            segment = (const GLuint *)((const unsigned char *)glstate->vao->elements->data +
++                (uintptr_t)indices);
++            segment_count = record->ingress_count;
++            native_ebo_bytes = (unsigned long long)glstate->vao->elements->size;
++        } else if(!native_ebo) {
++            segment = (const GLuint *)indices;
++            segment_count = record->ingress_count;
++        }
++    }
++    if(segment && segment_count) {
++        ios_index_minmax(segment, (GLsizei)segment_count, &minimum, &maximum);
++        checksum = ios_index_checksum(segment, (GLsizei)segment_count);
++    }
++
++    /* Compare immutable producer facts to wrapper ingress before considering
++     * translated native state. The first call wins and is emitted only once. */
++    if(record->ingress_mode != record->producer.mode)
++        ios_wo49_mismatch(record, "primitive-mode", record->producer.mode,
++            record->ingress_mode, mode);
++    if(!record->mismatch_emitted && record->logical_vao != record->producer.vao)
++        ios_wo49_mismatch(record, "logical-vao", record->producer.vao,
++            record->logical_vao, 0);
++    if(!record->mismatch_emitted && record->logical_vbo != record->producer.vbo)
++        ios_wo49_mismatch(record, "logical-vbo", record->producer.vbo,
++            record->logical_vbo, 0);
++    if(!record->mismatch_emitted && record->logical_ebo != record->producer.ebo)
++        ios_wo49_mismatch(record, "logical-ebo", record->producer.ebo,
++            record->logical_ebo, native_ebo);
++    if(!record->mismatch_emitted && record->logical_ebo_bytes != record->producer.eboBytes)
++        ios_wo49_mismatch(record, "logical-ebo-size", record->producer.eboBytes,
++            record->logical_ebo_bytes, native_ebo_bytes);
++    if(!record->mismatch_emitted && record->logical_vertex_checksum != record->producer.vertexChecksum)
++        ios_wo49_mismatch(record, "vertex-upload-checksum", record->producer.vertexChecksum,
++            record->logical_vertex_checksum, 0);
++    if(!record->mismatch_emitted && record->logical_position_checksum != record->producer.positionChecksum)
++        ios_wo49_mismatch(record, "position-upload-checksum", record->producer.positionChecksum,
++            record->logical_position_checksum, 0);
++    if(!record->mismatch_emitted && record->ingress_type != record->producer.indexType)
++        ios_wo49_mismatch(record, "ingress-index-type", record->producer.indexType,
++            record->ingress_type, type);
++    if(!record->mismatch_emitted && record->ingress_count != (GLsizei)record->producer.numElems)
++        ios_wo49_mismatch(record, "ingress-index-count", record->producer.numElems,
++            record->ingress_count, native_count);
++    if(!record->mismatch_emitted && record->ingress_checksum != record->producer.indexChecksum)
++        ios_wo49_mismatch(record, "ingress-index-checksum", record->producer.indexChecksum,
++            record->ingress_checksum, checksum);
++    if(!record->mismatch_emitted && record->ingress_min != record->producer.indexMin)
++        ios_wo49_mismatch(record, "ingress-index-min", record->producer.indexMin,
++            record->ingress_min, minimum);
++    if(!record->mismatch_emitted && record->ingress_max != record->producer.indexMax)
++        ios_wo49_mismatch(record, "ingress-index-max", record->producer.indexMax,
++            record->ingress_max, maximum);
++    if(!record->mismatch_emitted && record->ingress_base != record->producer.baseVertex)
++        ios_wo49_mismatch(record, "base-vertex", record->producer.baseVertex,
++            record->ingress_base, 0);
++    if(!record->mismatch_emitted && record->ingress_start != record->producer.rangeStart)
++        ios_wo49_mismatch(record, "range-start", record->producer.rangeStart,
++            record->ingress_start, 0);
++    if(!record->mismatch_emitted && record->ingress_end != record->producer.rangeEnd)
++        ios_wo49_mismatch(record, "range-end", record->producer.rangeEnd,
++            record->ingress_end, 0);
++    for(unsigned int i = 0; i < record->producer.attrCount && !record->mismatch_emitted; ++i) {
++        const ios_wo49_topology_attr_desc_t *p = &record->producer.attrs[i];
++        ios_wo49_attr_state_t *logical = ios_wo49_logical_attr(record, p->index);
++        if(!logical)
++            ios_wo49_mismatch(record, "logical-attribute-missing", p->index, 0, 0);
++        else if(logical->enabled != (int)p->enabled)
++            ios_wo49_mismatch(record, "logical-attribute-enabled", p->enabled,
++                logical->enabled, 0);
++        else if(logical->buffer != record->producer.vbo)
++            ios_wo49_mismatch(record, "logical-attribute-buffer", record->producer.vbo,
++                logical->buffer, 0);
++        else if(logical->size != (GLint)p->size)
++            ios_wo49_mismatch(record, "logical-attribute-size", p->size, logical->size, 0);
++        else if(logical->type != p->type)
++            ios_wo49_mismatch(record, "logical-attribute-type", p->type, logical->type, 0);
++        else if(logical->normalized != (int)p->normalized)
++            ios_wo49_mismatch(record, "logical-attribute-normalized", p->normalized,
++                logical->normalized, 0);
++        else if(logical->integer != (int)p->integer)
++            ios_wo49_mismatch(record, "logical-attribute-integer", p->integer,
++                logical->integer, 0);
++        else if(logical->stride != (GLsizei)p->stride)
++            ios_wo49_mismatch(record, "logical-attribute-stride", p->stride,
++                logical->stride, 0);
++        else if((unsigned long long)logical->pointer != p->offset)
++            ios_wo49_mismatch(record, "logical-attribute-offset", p->offset,
++                logical->pointer, 0);
++        else if(logical->buffer_bytes != record->producer.vboBytes)
++            ios_wo49_mismatch(record, "logical-attribute-buffer-size",
++                record->producer.vboBytes, logical->buffer_bytes, 0);
++        else if(logical->in_bounds == 0)
++            ios_wo49_mismatch(record, "logical-attribute-bounds",
++                record->producer.highestPackedVertexByte, logical->highest_byte, 0);
++    }
++
++    program_t *program = glstate->gleshard->glprogram;
++    for(unsigned int index = 0; index < (unsigned int)hardext.maxvattrib &&
++        index < IOS_WO49_TOPOLOGY_ATTR_CAP; ++index) {
++        vertexattrib_t *native_attr;
++        ios_wo49_attr_state_t *logical;
++        unsigned int width;
++        unsigned long long stride;
++        unsigned long long pointer;
++        unsigned long long buffer_bytes;
++        unsigned long long highest;
++        int in_bounds;
++        if(!program || !program->va_size[index])
++            continue;
++        ++active_attr_count;
++        native_attr = &glstate->gleshard->vertexattrib[index];
++        logical = ios_wo49_logical_attr(record, index);
++        width = ios_index_type_bytes(native_attr->type);
++        stride = native_attr->stride ? (unsigned long long)native_attr->stride :
++            (unsigned long long)width * (unsigned long long)native_attr->size;
++        pointer = (unsigned long long)(uintptr_t)(native_attr->real_buffer ?
++            native_attr->real_pointer : native_attr->pointer);
++        buffer_bytes = native_attr->buffer ?
++            (unsigned long long)native_attr->buffer->size : replay_vertex_bytes;
++        highest = pointer + (unsigned long long)maximum * stride +
++            (unsigned long long)width * (unsigned long long)native_attr->size - 1u;
++        in_bounds = buffer_bytes ? highest < buffer_bytes : -1;
++        if(index == record->producer.attrs[0].index)
++            position_seen = native_attr->enabled;
++        if(in_bounds == 0)
++            bounds_ok = 0;
++        ios_wo49_append(attrs, sizeof(attrs), &used,
++            "%sa%u=e%d/b%u/bytes%llu/c%d/t0x%04x/n%d/i%d/s%d/o%llu/d%d/high%llu/ok%d",
++            used ? "," : "", index, native_attr->enabled,
++            native_attr->real_buffer, buffer_bytes, native_attr->size,
++            native_attr->type, native_attr->normalized, native_attr->integer,
++            native_attr->stride, pointer, native_attr->divisor, highest, in_bounds);
++        if(!record->mismatch_emitted && !native_attr->enabled)
++            ios_wo49_mismatch(record, "attribute-enabled", 1,
++                logical ? logical->enabled : 0, native_attr->enabled);
++        if(!record->mismatch_emitted && !deferred && logical) {
++            if(native_attr->real_buffer != logical->native_buffer)
++                ios_wo49_mismatch(record, "attribute-buffer", logical->buffer,
++                    logical->native_buffer, native_attr->real_buffer);
++            else if(native_attr->stride != logical->stride)
++                ios_wo49_mismatch(record, "attribute-stride", logical->stride,
++                    logical->stride, native_attr->stride);
++            else if(pointer != (unsigned long long)logical->pointer)
++                ios_wo49_mismatch(record, "attribute-offset", logical->pointer,
++                    logical->pointer, pointer);
++            else if(native_attr->size != logical->size)
++                ios_wo49_mismatch(record, "attribute-size", logical->size,
++                    logical->size, native_attr->size);
++            else if(native_attr->type != logical->type)
++                ios_wo49_mismatch(record, "attribute-type", logical->type,
++                    logical->type, native_attr->type);
++            else if(native_attr->normalized != logical->normalized)
++                ios_wo49_mismatch(record, "attribute-normalized", logical->normalized,
++                    logical->normalized, native_attr->normalized);
++            else if(native_attr->integer != logical->integer)
++                ios_wo49_mismatch(record, "attribute-integer", logical->integer,
++                    logical->integer, native_attr->integer);
++            else if(native_attr->divisor != logical->divisor)
++                ios_wo49_mismatch(record, "attribute-divisor", logical->divisor,
++                    logical->divisor, native_attr->divisor);
++        }
++        if(!record->mismatch_emitted && !deferred &&
++           !ios_wo49_producer_attr(record, index))
++            ios_wo49_mismatch(record, "native-active-attribute-unexpected", 0,
++                logical ? 1 : 0, index);
++        if(!record->mismatch_emitted && deferred && native_attr->real_buffer &&
++           native_attr->real_buffer != glstate->bind_buffer.array)
++            ios_wo49_mismatch(record, "deferred-attribute-buffer", glstate->bind_buffer.array,
++                0, native_attr->real_buffer);
++        if(!record->mismatch_emitted && in_bounds == 0)
++            ios_wo49_mismatch(record, "attribute-bounds", record->producer.vboBytes,
++                logical ? logical->buffer_bytes : 0, highest);
++    }
++
++    if(!record->mismatch_emitted && type != record->producer.indexType)
++        ios_wo49_mismatch(record, "index-type", record->producer.indexType,
++            record->ingress_type, type);
++    if(!record->mismatch_emitted && segment_count != record->producer.numElems)
++        ios_wo49_mismatch(record, "index-count", record->producer.numElems,
++            record->ingress_count, segment_count);
++    if(!record->mismatch_emitted && checksum != record->route_checksum)
++        ios_wo49_mismatch(record, "index-checksum", record->producer.indexChecksum,
++            record->route_checksum, checksum);
++    if(!record->mismatch_emitted && minimum != record->route_min)
++        ios_wo49_mismatch(record, "index-min", record->producer.indexMin,
++            record->route_min, minimum);
++    if(!record->mismatch_emitted && maximum != record->route_max)
++        ios_wo49_mismatch(record, "index-max", record->producer.indexMax,
++            record->route_max, maximum);
++    if(!record->mismatch_emitted && record->route_position_checksum != record->producer.positionChecksum)
++        ios_wo49_mismatch(record, "route-position-checksum",
++            record->producer.positionChecksum, record->route_position_checksum, 0);
++    if(!record->mismatch_emitted && mode != record->producer.mode)
++        ios_wo49_mismatch(record, "native-primitive-mode", record->producer.mode,
++            record->ingress_mode, mode);
++    if(!record->mismatch_emitted && !deferred &&
++       native_ebo != record->logical_native_ebo)
++        ios_wo49_mismatch(record, "native-ebo", record->producer.ebo,
++            record->logical_native_ebo, native_ebo);
++    if(!record->mismatch_emitted && !deferred && !native_ebo)
++        ios_wo49_mismatch(record, "index-source", record->producer.ebo,
++            record->logical_ebo, native_ebo);
++    if(!record->mismatch_emitted && !position_seen)
++        ios_wo49_mismatch(record, "position-attribute", 1, 1, 0);
++    if(!record->mismatch_emitted && !active_attr_count)
++        ios_wo49_mismatch(record, "active-attribute-set", record->producer.attrCount,
++            record->logical_attr_count, 0);
++
++    record->stage = 4;
++    ios_wo49_emit(
++        "WO49 topology realized: token=%llu function=%s route=%s mode=0x%04x native_vao=0 vao_policy=gl4es-emulated array_binding=%u ebo=%u ebo_bytes=%llu source=%s pointer_or_offset=0x%llx native_draw_count=%d segment_count=%u type=0x%04x min=%u max=%u checksum=%08x attrs=[%s] position_present=%d bounds_ok=%d match=%d comparison=producer+ingress+route-aware-realized",
++        record->id, function, record->route, mode, glstate->bind_buffer.array,
++        native_ebo, native_ebo_bytes, native_ebo ? "ebo-offset" : "client-pointer",
++        (unsigned long long)(uintptr_t)indices, native_count, segment_count,
++        type, minimum, maximum, checksum, attrs, position_seen, bounds_ok,
++        !record->mismatch_emitted);
++}
++
++void ios_wo49_topology_realized(const char *function, GLenum mode, GLsizei count,
++    GLenum type, const void *indices)
++{
++    if(ios_wo49_active_token) {
++        ios_wo49_record_t *record = ios_wo49_find(ios_wo49_active_token);
++        if(record)
++            ios_wo49_realize_one(record, function, mode, count, type, indices,
++                NULL, 0, 0, 0, 0);
++        ios_wo49_active_token = 0;
++    }
++    for(unsigned int i = 0; i < ios_wo49_replay.count; ++i) {
++        ios_wo49_record_t *record = ios_wo49_find(ios_wo49_replay.tokens[i]);
++        if(record)
++            ios_wo49_realize_one(record, function, mode, count, type, indices,
++                ios_wo49_replay.owned_indices, ios_wo49_replay.offsets[i],
++                ios_wo49_replay.counts[i], ios_wo49_replay.vertex_bytes,
++                ios_wo49_replay.index_bytes);
++    }
++    memset(&ios_wo49_replay, 0, sizeof(ios_wo49_replay));
++}
++
++void APIENTRY_GL4ES gl4es_wo49_topology_finish(unsigned long long token)
++{
++    ios_wo49_record_t *record = ios_wo49_find(token);
++    if(!record)
++        return;
++    record->finished = 1;
++    if(record->stage == 1 && !record->absence_emitted)
++        gl4es_wo49_topology_absence(token, "wrapper-ingress-missing");
++    else if(record->stage == 2 && !record->absence_emitted)
++        gl4es_wo49_topology_absence(token, "route-ownership-missing");
++    else if(record->stage == 3 && !record->absence_emitted &&
++        strcmp(record->route, "direct") == 0)
++        gl4es_wo49_topology_absence(token, "post-realization-missing");
++    if(ios_wo49_record_count == IOS_WO49_TOPOLOGY_TOKEN_CAP) {
++        int complete = 1;
++        for(unsigned int i = 0; i < ios_wo49_record_count; ++i)
++            if(ios_wo49_records[i].stage < 4 && !ios_wo49_records[i].absence_emitted)
++                complete = 0;
++        if(complete)
++            ios_wo49_summary_if_due(ios_index_frame, 1);
++    }
++}
++
++static void ios_wo49_summary_if_due(unsigned long long frame, int force)
++{
++    char tokens[768] = "";
++    size_t used = 0;
++    unsigned int realized = 0, mismatched = 0, absent = 0;
++    if(ios_wo49_summary_emitted || !ios_wo49_record_count)
++        return;
++    if(!force && frame <= ios_wo49_first_frame)
++        return;
++    for(unsigned int i = 0; i < ios_wo49_record_count; ++i) {
++        ios_wo49_record_t *record = &ios_wo49_records[i];
++        if(record->stage < 4 && !record->absence_emitted) {
++            const char *reason = record->stage == 1 ? "producer-only" :
++                (record->stage == 2 && record->route[0] ? "deferred-replay-absent" :
++                (record->stage == 2 ? "ingress-without-route" : "post-realization-absent"));
++            gl4es_wo49_topology_absence(record->id, reason);
++        }
++        if(record->stage >= 4) ++realized;
++        if(record->mismatch_emitted) ++mismatched;
++        if(record->absence_emitted) ++absent;
++        ios_wo49_append(tokens, sizeof(tokens), &used,
++            "%st%llu:%s:%s", i ? "," : "", record->id,
++            ios_wo49_stage_name(record), record->absence_emitted ? record->absence :
++            (record->mismatch_emitted ? "mismatch" : "match"));
++    }
++    ios_wo49_summary_emitted = 1;
++    ios_wo49_emit(
++        "WO49 topology summary: tokens=%u cap=4 realized=%u mismatched=%u absent=%u terminal=1 stages=[%s] first_mismatch_per_token=bounded records_per_stage<=1 mutation=none",
++        ios_wo49_record_count, realized, mismatched, absent, tokens);
++}
+diff --git a/src/gl/gl_lookup.c b/src/gl/gl_lookup.c
+index e79c31a0..84e76eb5 100644
+--- a/src/gl/gl_lookup.c
++++ b/src/gl/gl_lookup.c
+@@ -9,6 +9,7 @@
+ #include "render.h"
+ #include "texgen.h"
+ #include "vertexattrib.h"
++#include "indextrace.h"
+ #include "oldprogram.h"
+ #include "samplers.h"
+ #include "matrix.h"
+@@ -36,6 +37,10 @@ void APIENTRY_GL4ES gl4es_Stub(void *x) {}
+ 
+ void* APIENTRY_GL4ES gl4es_GetProcAddress(const char *name) {
+     DBG(printf("glGetProcAddress(\"%s\")", name);)
++    MAP("gl4es_iOSWO49TopologyProducer", gl4es_wo49_topology_producer);
++    MAP("gl4es_iOSWO49TopologyArm", gl4es_wo49_topology_arm);
++    MAP("gl4es_iOSWO49TopologyFinish", gl4es_wo49_topology_finish);
++    MAP("gl4es_iOSWO49TopologyAbsence", gl4es_wo49_topology_absence);
+     // generated gles wrappers
+     #include "glesfuncs.inc"
+ 
+diff --git a/src/gl/list.h b/src/gl/list.h
+index 9f8fc86f..b7a0ef31 100644
+--- a/src/gl/list.h
++++ b/src/gl/list.h
+@@ -231,6 +231,16 @@ typedef struct _renderlist_t {
+     GLuint       ios_index_trace_offset;
+     GLuint       ios_index_trace_count;
+ 
++    // Work Order 49 diagnostics only. Fixed slots preserve every selected
++    // producer token through append/merge and replay without affecting data.
++    unsigned long long ios_wo49_tokens[4];
++    GLuint       ios_wo49_offsets[4];
++    GLuint       ios_wo49_counts[4];
++    GLuint       ios_wo49_vertex_offsets[4];
++    GLuint       ios_wo49_vertex_counts[4];
++    unsigned int ios_wo49_token_count;
++    unsigned long long ios_wo49_vbo_bytes;
++
+     int         instanceCount;
+     
+     khash_t(material) *material;
+diff --git a/src/gl/drawing.c b/src/gl/drawing.c
+index 61ffd77d..8cfc076d 100644
+--- a/src/gl/drawing.c
++++ b/src/gl/drawing.c
+@@ -18,6 +18,20 @@
+ #define DBG(a)
+ #endif
+ 
++static void ios_wo49_attach_list(renderlist_t *list, unsigned long long token,
++    GLuint index_offset, GLuint index_count, GLuint vertex_offset,
++    GLuint vertex_count)
++{
++    if(!list || !token || list->ios_wo49_token_count >= IOS_WO49_TOPOLOGY_TOKEN_CAP)
++        return;
++    unsigned int slot = list->ios_wo49_token_count++;
++    list->ios_wo49_tokens[slot] = token;
++    list->ios_wo49_offsets[slot] = index_offset;
++    list->ios_wo49_counts[slot] = index_count;
++    list->ios_wo49_vertex_offsets[slot] = vertex_offset;
++    list->ios_wo49_vertex_counts[slot] = vertex_count;
++}
++
+ static GLboolean is_cache_compatible(GLsizei count) {
+     #define T2(AA, A, B) \
+     if(glstate->vao->AA!=glstate->vao->B.enabled) return GL_FALSE; \
+@@ -593,6 +607,9 @@ void APIENTRY_GL4ES gl4es_glDrawRangeElements(GLenum mode, GLuint start, GLuint
+     unsigned long long ios_trace_id = ios_index_trace_ingress("glDrawRangeElements",
+         mode, count, type, indices, (const GLuint *)resolved_element_indices(indices),
+         start, end, 0, compiling||intercept, intercept);
++    unsigned long long ios_wo49_token = ios_wo49_topology_ingress("glDrawRangeElements",
++        mode, count, type, indices, (const GLuint *)resolved_element_indices(indices),
++        start, end, 0, compiling||intercept, intercept);
+     if(type==GL_UNSIGNED_INT) {
+         trace_uint_element_route("range", IOS_UINT_ROUTE_RANGE, (const GLuint*)resolved_element_indices(indices), count, compiling||intercept);
+         if(compiling)
+@@ -610,6 +627,7 @@ void APIENTRY_GL4ES gl4es_glDrawRangeElements(GLenum mode, GLuint start, GLuint
+             list = NewDrawStage(list, mode);
+             if(list->vert) {
+                 GLuint ios_trace_offset = list->ilen;
++                GLuint ios_wo49_vertex_offset = list->len;
+                 glstate->list.active = arrays_add_renderlist(list, mode, start, end + 1, iindices, count);
+                 if(ios_trace_id && !glstate->list.active->ios_index_trace_id) {
+                     glstate->list.active->ios_index_trace_id = ios_trace_id;
+@@ -619,6 +637,18 @@ void APIENTRY_GL4ES gl4es_glDrawRangeElements(GLenum mode, GLuint start, GLuint
+                         glstate->list.active->indices + ios_trace_offset,
+                         count, start, end - start + 1, 1);
+                 }
++                ios_wo49_attach_list(glstate->list.active, ios_wo49_token,
++                    ios_trace_offset, count, ios_wo49_vertex_offset, end - start + 1);
++                if(ios_wo49_token) {
++                    GLsizei wo49_stride = glstate->list.active->vert_stride ?
++                        glstate->list.active->vert_stride : sizeof(GLfloat) * 4;
++                    const GLfloat *wo49_positions = glstate->list.active->vert ?
++                        (const GLfloat *)((const char *)glstate->list.active->vert +
++                            (size_t)ios_wo49_vertex_offset * wo49_stride) : NULL;
++                    ios_wo49_topology_route(ios_wo49_token, "deferred",
++                        glstate->list.active->indices + ios_trace_offset, count,
++                        start, end - start + 1, 1, wo49_positions, wo49_stride);
++                }
+                 release_element_indices(sindices, iindices, owned_indices, old_index);
+                 NewStage(glstate->list.active, STAGE_POSTDRAW);
+                 return;
+@@ -634,6 +664,9 @@ void APIENTRY_GL4ES gl4es_glDrawRangeElements(GLenum mode, GLuint start, GLuint
+         list->ios_index_trace_id = ios_trace_id;
+         list->ios_index_trace_offset = 0;
+         list->ios_index_trace_count = ios_trace_id ? count : 0;
++        ios_wo49_attach_list(list, ios_wo49_token, 0, count, 0, end - start + 1);
++        ios_wo49_topology_route(ios_wo49_token, "deferred", list->indices,
++            count, start, end - start + 1, 0, list->vert, list->vert_stride);
+         //end_renderlist(list);
+         
+         wantBufferIndex(old_index);
+@@ -652,6 +685,9 @@ void APIENTRY_GL4ES gl4es_glDrawRangeElements(GLenum mode, GLuint start, GLuint
+         list->ios_index_trace_id = ios_trace_id;
+         list->ios_index_trace_offset = 0;
+         list->ios_index_trace_count = ios_trace_id ? count : 0;
++        ios_wo49_attach_list(list, ios_wo49_token, 0, count, 0, end - start + 1);
++        ios_wo49_topology_route(ios_wo49_token, "intercept", list->indices,
++            count, start, end - start + 1, 0, list->vert, list->vert_stride);
+         list = end_renderlist(list);
+         draw_renderlist(list);
+         free_renderlist(list);
+@@ -660,6 +696,9 @@ void APIENTRY_GL4ES gl4es_glDrawRangeElements(GLenum mode, GLuint start, GLuint
+         return;
+     } else {
+         ios_index_trace_set_active(ios_trace_id, indices);
++        ios_wo49_topology_route(ios_wo49_token, "direct", iindices, count,
++            start, end - start + 1, 0, NULL, 0);
++        ios_wo49_topology_set_active(ios_wo49_token);
+         glDrawElementsCommon(mode, 0, count, end+1, sindices, iindices, 1);
+         release_element_indices(sindices, iindices, owned_indices, old_index);
+     }
+@@ -709,6 +748,9 @@ void APIENTRY_GL4ES gl4es_glDrawElements(GLenum mode, GLsizei count, GLenum type
+     unsigned long long ios_trace_id = ios_index_trace_ingress("glDrawElements",
+         mode, count, type, indices, (const GLuint *)resolved_element_indices(indices),
+         0, 0, 0, compiling||intercept, intercept);
++    unsigned long long ios_wo49_token = ios_wo49_topology_ingress("glDrawElements",
++        mode, count, type, indices, (const GLuint *)resolved_element_indices(indices),
++        0, 0, 0, compiling||intercept, intercept);
+     if(type==GL_UNSIGNED_INT) {
+         trace_uint_element_route("ordinary", IOS_UINT_ROUTE_ORDINARY, (const GLuint*)resolved_element_indices(indices), count, compiling||intercept);
+         if(compiling)
+@@ -726,6 +768,7 @@ void APIENTRY_GL4ES gl4es_glDrawElements(GLenum mode, GLsizei count, GLenum type
+         if(globals4es.mergelist && list->stage>=STAGE_DRAW && is_list_compatible(list) && !list->use_glstate && iindices) {
+             list = NewDrawStage(list, mode);
+             GLuint ios_trace_offset = list->ilen;
++            GLuint ios_wo49_vertex_offset = list->len;
+             glstate->list.active = arrays_add_renderlist(list, mode, min, max + 1, iindices, count);
+             if(ios_trace_id && !glstate->list.active->ios_index_trace_id) {
+                 glstate->list.active->ios_index_trace_id = ios_trace_id;
+@@ -735,6 +778,18 @@ void APIENTRY_GL4ES gl4es_glDrawElements(GLenum mode, GLsizei count, GLenum type
+                     glstate->list.active->indices + ios_trace_offset,
+                     count, min, max - min + 1, 1);
+             }
++            ios_wo49_attach_list(glstate->list.active, ios_wo49_token,
++                ios_trace_offset, count, ios_wo49_vertex_offset, max - min + 1);
++            if(ios_wo49_token) {
++                GLsizei wo49_stride = glstate->list.active->vert_stride ?
++                    glstate->list.active->vert_stride : sizeof(GLfloat) * 4;
++                const GLfloat *wo49_positions = glstate->list.active->vert ?
++                    (const GLfloat *)((const char *)glstate->list.active->vert +
++                        (size_t)ios_wo49_vertex_offset * wo49_stride) : NULL;
++                ios_wo49_topology_route(ios_wo49_token, "deferred",
++                    glstate->list.active->indices + ios_trace_offset, count,
++                    min, max - min + 1, 1, wo49_positions, wo49_stride);
++            }
+             release_element_indices(sindices, iindices, owned_indices, old_index);
+             NewStage(glstate->list.active, STAGE_POSTDRAW);
+             return;
+@@ -749,6 +804,9 @@ void APIENTRY_GL4ES gl4es_glDrawElements(GLenum mode, GLsizei count, GLenum type
+         list->ios_index_trace_id = ios_trace_id;
+         list->ios_index_trace_offset = 0;
+         list->ios_index_trace_count = ios_trace_id ? count : 0;
++        ios_wo49_attach_list(list, ios_wo49_token, 0, count, 0, max - min + 1);
++        ios_wo49_topology_route(ios_wo49_token, "deferred", list->indices,
++            count, min, max - min + 1, 0, list->vert, list->vert_stride);
+         //end_renderlist(list);
+         
+         wantBufferIndex(old_index);
+@@ -768,6 +826,9 @@ void APIENTRY_GL4ES gl4es_glDrawElements(GLenum mode, GLsizei count, GLenum type
+         list->ios_index_trace_id = ios_trace_id;
+         list->ios_index_trace_offset = 0;
+         list->ios_index_trace_count = ios_trace_id ? count : 0;
++        ios_wo49_attach_list(list, ios_wo49_token, 0, count, 0, max - min + 1);
++        ios_wo49_topology_route(ios_wo49_token, "intercept", list->indices,
++            count, min, max - min + 1, 0, list->vert, list->vert_stride);
+         list = end_renderlist(list);
+         draw_renderlist(list);
+         free_renderlist(list);
+@@ -775,6 +836,9 @@ void APIENTRY_GL4ES gl4es_glDrawElements(GLenum mode, GLsizei count, GLenum type
+         return;
+     } else {
+         ios_index_trace_set_active(ios_trace_id, indices);
++        ios_wo49_topology_route(ios_wo49_token, "direct", iindices, count,
++            0, 0, 0, NULL, 0);
++        ios_wo49_topology_set_active(ios_wo49_token);
+         glDrawElementsCommon(mode, 0, count, 0, sindices, iindices, 1);
+         release_element_indices(sindices, iindices, owned_indices, old_index);
+     }
+diff --git a/src/gl/list.c b/src/gl/list.c
+index f7492688..4c2bdf5d 100644
+--- a/src/gl/list.c
++++ b/src/gl/list.c
+@@ -515,6 +515,7 @@ void append_renderlist(renderlist_t *a, renderlist_t *b) {
+     // check the final indice size of a and b
+     int ilen_a = a->ilen;
+     int ilen_b = b->ilen;
++    unsigned long len_a = a->len;
+     // lets append all the arrays
+     unsigned long cap = a->cap;
+     if (a->len + b->len >= cap) cap += b->cap + DEFAULT_RENDER_LIST_CAPACITY;
+@@ -550,6 +551,24 @@ void append_renderlist(renderlist_t *a, renderlist_t *b) {
+                 a->indices + a->ios_index_trace_offset,
+                 a->ios_index_trace_count, 0, b->len, 1);
+     }
++    for(unsigned int i = 0; i < b->ios_wo49_token_count &&
++        a->ios_wo49_token_count < IOS_WO49_TOPOLOGY_TOKEN_CAP; ++i) {
++        unsigned int slot = a->ios_wo49_token_count++;
++        a->ios_wo49_tokens[slot] = b->ios_wo49_tokens[i];
++        a->ios_wo49_offsets[slot] = ilen_a + b->ios_wo49_offsets[i];
++        a->ios_wo49_counts[slot] = b->ios_wo49_counts[i];
++        a->ios_wo49_vertex_offsets[slot] = (GLuint)len_a + b->ios_wo49_vertex_offsets[i];
++        a->ios_wo49_vertex_counts[slot] = b->ios_wo49_vertex_counts[i];
++        if(a->indices && a->vert) {
++            GLsizei stride = a->vert_stride ? a->vert_stride : sizeof(GLfloat) * 4;
++            const GLfloat *positions = (const GLfloat *)((const char *)a->vert +
++                (size_t)a->ios_wo49_vertex_offsets[slot] * stride);
++            ios_wo49_topology_route(a->ios_wo49_tokens[slot], "deferred",
++                a->indices + a->ios_wo49_offsets[slot],
++                a->ios_wo49_counts[slot], a->ios_wo49_vertex_offsets[slot],
++                a->ios_wo49_vertex_counts[slot], 1, positions, stride);
++        }
++    }
+     // lenghts
+     a->len += b->len;
+     if(a->mode_inits) list_add_modeinit(a, b->mode);
+diff --git a/src/gl/listdraw.c b/src/gl/listdraw.c
+index 4074e27b..eb12b60e 100644
+--- a/src/gl/listdraw.c
++++ b/src/gl/listdraw.c
+@@ -111,6 +111,7 @@ int list2VBO(renderlist_t* list)
+     gles_glGenBuffers(1, &list->vbo_array);
+     bindBuffer(GL_ARRAY_BUFFER, list->vbo_array);
+     gles_glBufferData(GL_ARRAY_BUFFER, vbo_base, NULL, GL_STATIC_DRAW);
++    list->ios_wo49_vbo_bytes = vbo_base;
+     for(int i=0; i<imax; ++i) {
+         array2vbo_t *r = work+sorted[i];
+         if(r->vbo_base==r->vbo_basebase)
+@@ -769,6 +770,8 @@ void draw_renderlist(renderlist_t *list) {
+ 
+         if (indices) {
+             if (glstate->render_mode == GL_SELECT) {
++                for(unsigned int wo49_i = 0; wo49_i < list->ios_wo49_token_count; ++wo49_i)
++                    gl4es_wo49_topology_absence(list->ios_wo49_tokens[wo49_i], "selection-render-mode");
+                 vertexattrib_t vtx = {0};
+                 vtx.pointer = list->vert;
+                 vtx.type = GL_FLOAT;
+@@ -792,7 +795,11 @@ void draw_renderlist(renderlist_t *list) {
+                     const GLvoid *index_data;
+                     GLushort *index_fallback;
+                     if(prepare_renderlist_indices(list->ind_lines, list->ind_line, &index_type, &index_data, &index_fallback))
++                    {
++                        for(unsigned int wo49_i = 0; wo49_i < list->ios_wo49_token_count; ++wo49_i)
++                            gl4es_wo49_topology_absence(list->ios_wo49_tokens[wo49_i], "polygon-line-transform");
+                         gles_glDrawElements(mode, list->ind_line, index_type, index_data);
++                    }
+                     free(index_fallback);
+                     use_vbo_indices = 1;
+                 } else {
+@@ -823,6 +830,13 @@ void draw_renderlist(renderlist_t *list) {
+                             (const GLuint *)indices,
+                             list->ios_index_trace_offset,
+                             list->ios_index_trace_count);
++                    if(prepared && list->ios_wo49_token_count)
++                        ios_wo49_topology_set_replay(list->ios_wo49_tokens,
++                            list->ios_wo49_offsets, list->ios_wo49_counts,
++                            list->ios_wo49_token_count, (const GLuint *)indices,
++                            list->ios_wo49_vbo_bytes,
++                            (unsigned long long)list->ilen *
++                                ((index_type == GL_UNSIGNED_INT) ? sizeof(GLuint) : sizeof(GLushort)));
+                     if(prepared && list->instanceCount==1)
+                         gles_glDrawElements(mode, list->ilen, index_type, vbo_indices?NULL:index_data);
+                     else if(prepared) {
+diff --git a/src/gl/fpe.c b/src/gl/fpe.c
+index 07f73eb3..939250ef 100644
+--- a/src/gl/fpe.c
++++ b/src/gl/fpe.c
+@@ -13,6 +13,7 @@
+ #include "shaderconv.h"
+ 
+ #include "fpe.h"
++#include "indextrace.h"
+ 
+ #define fpe_state_t fpe_state_t
+ #define fpe_fpe_t fpe_fpe_t
+@@ -829,6 +830,7 @@ void APIENTRY_GL4ES fpe_glDrawElements(GLenum mode, GLsizei count, GLenum type,
+         DBG(printf("Using VBO %d for indices\n", glstate->vao->elements->real_buffer);)
+     }
+     realize_bufferIndex();
++    ios_wo49_topology_realized("fpe_glDrawElements", mode, count, type, indices);
+     gles_glDrawElements(mode, count, type, indices);
+     if(use_vbo)
+         wantBufferIndex(0);
+
