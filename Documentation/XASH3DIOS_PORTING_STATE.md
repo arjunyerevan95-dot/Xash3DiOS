@@ -1000,3 +1000,66 @@ Remaining risks: the device's exact world/studio maximum indices and direct/defe
 Durable ledger path and commit: `Documentation/XASH3DIOS_PORTING_STATE.md`. This report is published in one documentation-only `[skip ci]` commit. Its exact hash is recorded in the authoritative Google Docs mirror and final handoff because a Git commit cannot contain its own hash.
 
 Stop state: Work Order 48 Phase A ends at **Outcome B** for orchestrator review. Treat Bundle 71 as a failed topology candidate. Do not modify code, build, start a workflow, create/retrieve/upload an IPA, use tempfile.org, contact Arjun, request evidence or a device test, implement the bounded diagnostic candidate, repair topology/material/startup/transition behavior, or begin another phase or work order.
+
+## Work Order 48 Phase B - Bundle 75 bounded ingress-to-native index-stream pairing
+
+Candidate/run and acceptance status: **Bundle 75 is build-qualified diagnostics-only and awaiting orchestrator review; it is not device-accepted.** Bundle 71 remains rejected at the topology gate. Bundle 69's direct-drawable zero-MSAA presentation architecture and Bundle 71's native-ES3 uint-element repair are preserved byte-for-behavior. This candidate makes no gameplay, renderer-output, index, vertex, VAO/VBO/EBO, shader, material, uniform, texture, startup, transition, framebuffer, MSAA, presentation, menu, touch, audio, launch-argument, map, model or asset repair.
+
+### Commits, workflows, retained artifact and tempfile publication
+
+- Diagnostics implementation commit: `0c75669d892944ff2b49ee8da360f8e8905cf01c` (`diag(ios): pair index streams through native draw`). Final candidate commit: `ac0b030fb672630ce76e765176dcee63ddd4417e` (`fix(ios): preserve drawable validation ordering`). The second commit only places logger install/clear outside the exact ordering strings enforced by the accepted direct-drawable validator; it does not alter runtime order relative to context initialization or destruction.
+- Retained qualifying workflow: GitHub Actions `push` run `31883710344`, bundle/run number `75`, successful, head `ac0b030fb672630ce76e765176dcee63ddd4417e`: `https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/31883710344`. Job `95009746716` completed build, IPA verification and artifact upload successfully.
+- The first push run `31882507292` / bundle 73 failed before compilation because the accepted drawable validator requires literal adjacency around `initialize_gl4es` and `close_gl4es`; its automatic PR twin `31882509829` also completed without an accepted candidate. The final automatic PR twin `31883711515` / bundle 76 completed before cancellation could be issued. Its artifact `9246745059` was immediately deleted and readback confirms zero retained artifacts. It is not offered as a candidate. Only Bundle 75 is retained.
+- Retained GitHub artifact: `Xash3DiOS-arm64-unsigned`, artifact ID `9246753251`, archive size `8,571,751` bytes, digest `sha256:786d4f92c23263bf7d122f79263bfa4eef70372eb1b59730b3c988f6ecaa69ee`, expires `2026-08-29T12:12:02Z`: `https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/31883710344/artifacts/9246753251`.
+- Verified IPA: `xash3d-fwgs-ios-arm64.ipa`, `8,668,802` bytes, SHA-256 `97F931D4EA889BDEF66D6052B2FE4F259C28873CF5858FD357AF24F7E6203311`.
+- Exactly one tempfile.org upload: information page `https://tempfile.org/ZNvLN9dyzMC/`; direct download `https://tempfile.org/ZNvLN9dyzMC/download`; expiry `2026-08-17 12:22:51 UTC`. Tempfile metadata reports the same filename and size, no security warning, and the downloaded server readback has the exact local SHA-256 above.
+
+### Exact files changed
+
+- `ref/gl/gl_context.c`: records the three Diffusion-resolved draw entry pointers and their `dladdr` image/symbol ownership in one engine-console line. Diffusion's source-supported core-to-EXT alias is queried only for ownership when the client aliases EXT locally.
+- `ref/gl/gl_opengl.c`: installs and clears a bounded, guarded `libref_gl4es` diagnostic callback that writes complete fixed-buffer records through `gEngfuncs.Con_Printf` into `engine.log`.
+- `ref/gl/gl_rmain.c`: supplies copied frame/map/phase context immediately before the custom Diffusion renderer callback.
+- `scripts/ios/gl4es-index-trace-ios.patch`: adds the fixed-cap trace implementation to the exact GL4ES pin; samples affected wrapper ingress, direct/intercept/deferred capture, render-list append/merge identity, and native egress without modifying submitted rendering data or GL state.
+- `scripts/ios/validate-ios-index-trace.py`: enforces positive coverage and rejects stdout-only logging, flooding, missing families, lost IDs, missing deferred/replay/append coverage, allocations, error-queue changes, index mutation, uniform/material expansion and drawable/FBO/MSAA/presentation changes.
+- `scripts/gha/build_ios.sh`: applies the trace patch after the unchanged Bundle-71 uint patch and runs its self-test validator.
+- `scripts/ios/verify_ipa.sh`: requires all eight index-trace marker families in the packaged renderer.
+- `Documentation/XASH3DIOS_PORTING_STATE.md`: this durable worker report only in the following documentation-only `[skip ci]` commit.
+
+### Verified failure boundary and unresolved structural cause
+
+Run/Bundle 71 proved that severe exploded, stretched, disconnected and ribbon-like topology survives the structural uint-element repair. Phase A proved that Diffusion's world-client range draws, studio EBO draws and studio-decal client draws resolve through packaged `libref_gl4es`, but Bundle-71 diagnostics wrote only to process stdout and therefore did not reach `engine.log`. The exact live affected maximum index, direct/deferred/intercept selection, native element binding/pointer pairing, normalized copy, render-list replay and position-buffer/VAO pairing remained unobserved. The complete topology cause therefore remains **unresolved**; this candidate does not promote the suspected direct studio-EBO pointer/offset pairing or any other branch into a repair without device evidence.
+
+The new invariant is a monotonic trace ID created at every affected uint wrapper ingress. A maximum of five sampled IDs covers the first use of each of the three source-supported families, the first high index and the first deferred/intercept route. For each sample, the logger records mode/count/type/range/base, client versus EBO source, logical and native EBO identities, offset or pointer, CPU-mirror-valid min/max and FNV-1a checksum, logical VAO, position attribute enable/type/component count/stride/offset/logical/native buffer/size/highest legal vertex, copied vertex span and normalized data. Deferred/render-list fields preserve the originating ID and segment through append/merge and native replay. Native records compare width, count, min/max, checksum, offset/base/range, EBO/client semantics and vertex pairing. The first mismatch emits exactly one `first divergence`; matching high data proves Bundle 71 active; a completed 64-ingress window emits one covered/uncovered summary.
+
+### Why this satisfies Work Order 48 Phase B without changing rendering
+
+The logging bridge is iOS+GL4ES-only, formats into a fixed 1,024-byte stack buffer, uses no diagnostic allocation, has a reentrancy guard, copies map/phase text, retains no game pointer, does not call `glGetError`, and never changes error-queue semantics or GL state. Trace computation reads wrapper-owned CPU mirrors or live client data only inside the synchronous ingress/native call. `renderlist_t` receives three diagnostics-only scalar fields; they do not participate in compatibility, batching, transforms, storage, draw order or submission. All added native hooks execute immediately before the pre-existing draw with the same arguments.
+
+The GL4ES logger reserves 15 lines and the engine ownership record is exactly one line, proving a hard global maximum of 16 records. Silent counters continue only through the 64-ingress window. The exact SHA-256 values of `gl4es-uint-elements-ios.patch`, `gl4es-drawable-bridge-ios.patch` and `sdl2-drawable-bridge-ios.patch` remain respectively `57CBB4B8899EB182A71BEE9E9FBA1FE29334E541B3AEB4CB4BA6EE327DF5F5FE`, `F9E521FABF164801341C222ED802F2BE24439B4E526094F122997CA147485CB1` and `49B867A0F01B488E7BF6A85575B0363E6D1325CAC1EF0249E2B421A0E13F7826`.
+
+### Validation performed
+
+- The latest authoritative Google Docs entry and complete repository ledger were read before modification. Codebase Memory graph search, call tracing and source snippets preceded direct inspection of `R_GetProcAddress`, `GL4ES_GetProcAddress`, `R_RenderFrame`, `Con_Printf`, exact applied GL4ES sources and every affected Diffusion draw family.
+- Exact pin replay passed from clean GL4ES `81547d986798e876de8b434193920b606a72363f`: base iOS patch, Bundle-69 drawable patch, unchanged Bundle-71 uint patch and new trace patch each passed `git apply --check` and applied in order.
+- `validate-ios-index-trace.py` passed Python bytecode compilation, positive validation and all mutation/rejection self-tests. Existing uint and direct-drawable validators passed their complete positive and rejection suites. `git diff --check` passed.
+- CI compiled and linked the full arm64 engine, Half-Life, Diffusion client/server/menu, SDL and GL4ES targets; all workflow policy validators, shader validation, IPA contract checks and artifact upload steps passed.
+- Independent artifact readback verified `CFBundleVersion=75`, `CFBundleExecutable=xash`, minimum iOS `12.0`, 163 packaged files, 11 dylibs, and thin 64-bit arm64 Mach-O headers for `xash`, `libref_gl4es.dylib` and Diffusion client/server/menu. All eight trace markers are embedded in `libref_gl4es.dylib`. Local artifact and tempfile readback size/hash match exactly.
+
+Expected bounded `engine.log` markers:
+
+```text
+iOS index trace logger:
+iOS index trace policy:
+iOS index trace ownership:
+iOS index trace ingress:
+iOS index trace deferred:
+iOS index trace native:
+iOS index trace first divergence:
+iOS index trace summary:
+```
+
+Remaining risks: Bundle 75 has not been run on device, so it cannot yet identify the first live divergence or prove a matching high-index submission. A bounded window may not encounter studio decals or a high index; the summary reports either gap explicitly. If every sampled maximum is at or below 65,535, Bundle 71 was non-operative for those samples. If high data reaches native `GL_UNSIGNED_INT` with matching count/checksum/span and no mismatch, the next authorized audit boundary is vertex/VAO state, not an undo of the uint repair. The independent `glUniform4fv` active-extent material issue, synchronous startup latency and later changelevel termination remain unchanged and out of scope.
+
+Durable ledger path and commit: `Documentation/XASH3DIOS_PORTING_STATE.md`. This report is published in one documentation-only `[skip ci]` commit. Its exact hash is recorded in the authoritative Google Docs ledger and final worker handoff because a Git commit cannot contain its own hash.
+
+Stop state: Work Order 48 Phase B implementation, positive/rejection validation, retained Bundle-75 qualifying workflow/artifact, independent IPA verification, exactly one tempfile.org publication and both durable-ledger reports are complete. Stop for orchestrator review. Do not contact Arjun, request logs/evidence/device testing, interpret future device evidence, implement a topology/material/startup/transition repair, or begin another phase or work order.
