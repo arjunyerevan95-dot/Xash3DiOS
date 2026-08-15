@@ -8,6 +8,17 @@
 #if XASH_IOS && XASH_GL4ES
 void R_IOSDirectDrawableContextCreated( void );
 void R_IOSDirectDrawableContextDestroying( void );
+
+static int ios_index_trace_log_busy;
+
+static void APIENTRY R_IOSIndexTraceLog( const char *line )
+{
+	if( !line || ios_index_trace_log_busy )
+		return;
+	ios_index_trace_log_busy = 1;
+	gEngfuncs.Con_Printf( "%s\n", line );
+	ios_index_trace_log_busy = 0;
+}
 #endif
 
 CVAR_DEFINE( gl_extensions, "gl_allow_extensions", "1", FCVAR_GLCONFIG|FCVAR_READ_ONLY, "allow gl_extensions" );
@@ -1311,6 +1322,7 @@ void R_Shutdown( void )
 #if XASH_GL4ES
 #if XASH_IOS
 	R_IOSDirectDrawableContextDestroying();
+	set_index_trace_logger( NULL );
 #endif
 	close_gl4es();
 #endif // XASH_GL4ES
@@ -1566,6 +1578,7 @@ void GL_OnContextCreated( void )
 	set_getmainfbsize( GL4ES_GetMainFBSize );
 	initialize_gl4es();
 #if XASH_IOS
+	set_index_trace_logger( R_IOSIndexTraceLog );
 	R_IOSDirectDrawableContextCreated();
 #endif
 

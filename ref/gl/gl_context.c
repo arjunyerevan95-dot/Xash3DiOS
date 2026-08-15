@@ -22,6 +22,64 @@ GNU General Public License for more details.
 #include "gl4es/include/gl4esinit.h"
 #endif
 
+#if XASH_IOS && XASH_GL4ES
+#include <dlfcn.h>
+
+typedef struct ios_index_trace_owner_s
+{
+	const char *name;
+	void *address;
+	Dl_info info;
+	qboolean resolved;
+} ios_index_trace_owner_t;
+
+static ios_index_trace_owner_t ios_index_trace_owners[] =
+{
+	{ "glDrawRangeElements", NULL, { 0 }, false },
+	{ "glDrawRangeElementsEXT", NULL, { 0 }, false },
+	{ "glDrawElements", NULL, { 0 }, false }
+};
+static qboolean ios_index_trace_ownership_logged;
+
+static void R_IOSIndexTraceOwnership( const char *name, void *address )
+{
+	if( ios_index_trace_ownership_logged || !name || !address )
+		return;
+	for( size_t i = 0; i < ARRAYSIZE( ios_index_trace_owners ); ++i )
+	{
+		ios_index_trace_owner_t *owner = &ios_index_trace_owners[i];
+		if( !Q_strcmp( name, owner->name ))
+		{
+			owner->address = address;
+			owner->resolved = dladdr( address, &owner->info ) != 0;
+		}
+	}
+	/* Diffusion aliases EXT to the resolved core pointer when core range draws
+	 * are present. Query the wrapper alias here so the one ownership record
+	 * still proves all three live entry points without changing that policy. */
+	if( ios_index_trace_owners[0].address && !ios_index_trace_owners[1].address )
+	{
+		ios_index_trace_owner_t *owner = &ios_index_trace_owners[1];
+		owner->address = gl4es_GetProcAddress( owner->name );
+		owner->resolved = owner->address && dladdr( owner->address, &owner->info ) != 0;
+	}
+	if( ios_index_trace_owners[0].address && ios_index_trace_owners[1].address && ios_index_trace_owners[2].address )
+	{
+		gEngfuncs.Con_Printf( "iOS index trace ownership: range=%p image=%s symbol=%s range_ext=%p image=%s symbol=%s elements=%p image=%s symbol=%s\n",
+			ios_index_trace_owners[0].address,
+			ios_index_trace_owners[0].resolved && ios_index_trace_owners[0].info.dli_fname ? ios_index_trace_owners[0].info.dli_fname : "<unknown>",
+			ios_index_trace_owners[0].resolved && ios_index_trace_owners[0].info.dli_sname ? ios_index_trace_owners[0].info.dli_sname : "<unknown>",
+			ios_index_trace_owners[1].address,
+			ios_index_trace_owners[1].resolved && ios_index_trace_owners[1].info.dli_fname ? ios_index_trace_owners[1].info.dli_fname : "<unknown>",
+			ios_index_trace_owners[1].resolved && ios_index_trace_owners[1].info.dli_sname ? ios_index_trace_owners[1].info.dli_sname : "<unknown>",
+			ios_index_trace_owners[2].address,
+			ios_index_trace_owners[2].resolved && ios_index_trace_owners[2].info.dli_fname ? ios_index_trace_owners[2].info.dli_fname : "<unknown>",
+			ios_index_trace_owners[2].resolved && ios_index_trace_owners[2].info.dli_sname ? ios_index_trace_owners[2].info.dli_sname : "<unknown>" );
+		ios_index_trace_ownership_logged = true;
+	}
+}
+#endif
+
 
 
 static void R_ClearScreen( void )
@@ -390,7 +448,11 @@ static void GAME_EXPORT R_OverrideTextureSourceSize( unsigned int texnum, uint s
 static void* GAME_EXPORT R_GetProcAddress( const char *name )
 {
 #if XASH_GL4ES
-	return gl4es_GetProcAddress( name );
+	void *address = gl4es_GetProcAddress( name );
+#if XASH_IOS
+	R_IOSIndexTraceOwnership( name, address );
+#endif
+	return address;
 #else // TODO: other wrappers
 	return gEngfuncs.GL_GetProcAddress( name );
 #endif

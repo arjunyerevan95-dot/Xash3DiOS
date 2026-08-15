@@ -22,10 +22,14 @@ git -C 3rdparty/gl4es/gl4es apply --check --unidiff-zero "$GITHUB_WORKSPACE/scri
 git -C 3rdparty/gl4es/gl4es apply --unidiff-zero "$GITHUB_WORKSPACE/scripts/ios/gl4es-drawable-bridge-ios.patch" || die
 git -C 3rdparty/gl4es/gl4es apply --check --unidiff-zero --ignore-space-change --ignore-whitespace "$GITHUB_WORKSPACE/scripts/ios/gl4es-uint-elements-ios.patch" || die
 git -C 3rdparty/gl4es/gl4es apply --unidiff-zero --ignore-space-change --ignore-whitespace "$GITHUB_WORKSPACE/scripts/ios/gl4es-uint-elements-ios.patch" || die
+git -C 3rdparty/gl4es/gl4es apply --check "$GITHUB_WORKSPACE/scripts/ios/gl4es-index-trace-ios.patch" || die
+git -C 3rdparty/gl4es/gl4es apply "$GITHUB_WORKSPACE/scripts/ios/gl4es-index-trace-ios.patch" || die
 python3 "$GITHUB_WORKSPACE/scripts/ios/validate-ios-drawable-bridge.py" \
 	"$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/SDL" \
 	"$GITHUB_WORKSPACE/3rdparty/gl4es/gl4es" --self-test || die
 python3 "$GITHUB_WORKSPACE/scripts/ios/validate-ios-uint-elements.py" \
+	"$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/3rdparty/gl4es/gl4es" --self-test || die
+python3 "$GITHUB_WORKSPACE/scripts/ios/validate-ios-index-trace.py" \
 	"$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/3rdparty/gl4es/gl4es" --self-test || die
 mkdir -p build || die
 cc -std=gnu11 -DNANOGL_MANGLE_PREPEND=1 -DREF_DLL=1 \

@@ -107,6 +107,21 @@ for uint_marker in \
 	fi
 done
 
+for trace_marker in \
+	'iOS index trace logger:' \
+	'iOS index trace policy:' \
+	'iOS index trace ownership:' \
+	'iOS index trace ingress:' \
+	'iOS index trace deferred:' \
+	'iOS index trace native:' \
+	'iOS index trace first divergence:' \
+	'iOS index trace summary:'; do
+	if ! grep -q "$trace_marker" "$GL4ES_RENDERER_STRINGS"; then
+		echo "Renderer is missing index-trace marker: $trace_marker" >&2
+		exit 1
+	fi
+done
+
 for bridge_marker in \
 	'iOS direct drawable policy:' \
 	'iOS direct drawable register:' \

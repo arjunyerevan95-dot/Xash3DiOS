@@ -19,6 +19,10 @@ GNU General Public License for more details.
 #include "beamdef.h"
 #include "entity_types.h"
 
+#if XASH_IOS && XASH_GL4ES
+#include "gl4es/include/gl4esinit.h"
+#endif
+
 
 #define IsLiquidContents( cnt )	( cnt == CONTENTS_WATER || cnt == CONTENTS_SLIME || cnt == CONTENTS_LAVA )
 
@@ -1154,6 +1158,9 @@ void R_RenderFrame( const ref_viewpass_t *rvp )
 	if( gEngfuncs.drawFuncs->GL_RenderFrame != NULL )
 	{
 		tr.fCustomRendering = true;
+#if XASH_IOS && XASH_GL4ES
+		set_index_trace_context( tr.realframecount, world_name, "custom-render" );
+#endif
 
 		if( gEngfuncs.drawFuncs->GL_RenderFrame( rvp ))
 		{
