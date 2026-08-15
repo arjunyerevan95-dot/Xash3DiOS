@@ -1321,8 +1321,8 @@ void R_Shutdown( void )
 
 #if XASH_GL4ES
 #if XASH_IOS
-	R_IOSDirectDrawableContextDestroying();
 	set_index_trace_logger( NULL );
+	R_IOSDirectDrawableContextDestroying();
 #endif
 	close_gl4es();
 #endif // XASH_GL4ES
@@ -1578,8 +1578,8 @@ void GL_OnContextCreated( void )
 	set_getmainfbsize( GL4ES_GetMainFBSize );
 	initialize_gl4es();
 #if XASH_IOS
-	set_index_trace_logger( R_IOSIndexTraceLog );
 	R_IOSDirectDrawableContextCreated();
+	set_index_trace_logger( R_IOSIndexTraceLog );
 #endif
 
 	// merge glBegin/glEnd in beams and console
