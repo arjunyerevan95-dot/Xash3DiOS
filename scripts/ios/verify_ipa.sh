@@ -96,6 +96,17 @@ if ! grep -q 'compressed texture buffer overrun' "$GL4ES_RENDERER_STRINGS"; then
 	exit 1
 fi
 
+for uint_marker in \
+	'iOS uint element policy:' \
+	'iOS uint element first use:' \
+	'iOS uint element high index:' \
+	'iOS uint element route summary:'; do
+	if ! grep -q "$uint_marker" "$GL4ES_RENDERER_STRINGS"; then
+		echo "Renderer is missing uint-element invariant marker: $uint_marker" >&2
+		exit 1
+	fi
+done
+
 for bridge_marker in \
 	'iOS direct drawable policy:' \
 	'iOS direct drawable register:' \
