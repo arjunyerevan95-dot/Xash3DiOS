@@ -842,3 +842,67 @@ Remaining risks: the exact first Bundle-69 index above 65,535 is not logged, so 
 Durable ledger path and commit: `Documentation/XASH3DIOS_PORTING_STATE.md`. This report is published in one documentation-only `[skip ci]` commit. Its exact hash is recorded in the authoritative Google Docs ledger and final handoff because a Git commit cannot contain its own hash.
 
 Stop state: Work Order 47 Phase A ends at **Track-A Outcome B** and **Track-B unresolved evidence gap** for orchestrator review. Do not implement either repair, modify code, build, start a workflow, create/retrieve/upload an IPA, use tempfile.org, contact Arjun, request evidence or testing, begin Phase B, or create another work order.
+
+## Work Order 47 Phase B - Bundle 71 native-ES3 32-bit element-index repair
+
+Candidate/run and acceptance status: **Bundle 71 is build-qualified and awaiting orchestrator review; it is not device-accepted.** The candidate preserves Bundle 69's direct-drawable logical-zero mapping and zero-MSAA presentation architecture. Work Order 47 Phase B addresses only the proven element-index topology boundary. It does not change `glUniform4fv`/`u_BrushParams`, startup behavior, or the later `ch1map0` to `ch1map1` termination.
+
+### Commits, workflow, and artifacts
+
+- Behavioral and final build commit: `cc87b9ab09501ef3e7ace571786535707d54948e` (`fix(ios): preserve uint element indices on native ES3`). Exact GL4ES pin: `81547d986798e876de8b434193920b606a72363f`.
+- Sole qualifying workflow: GitHub Actions run `31872797997`, bundle/run number `71`, `push`, successful, head `cc87b9ab09501ef3e7ace571786535707d54948e`: `https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/31872797997`. Job `94983900217` completed every step successfully.
+- The automatic pull-request duplicate, run `31872799390` / number `72`, was cancelled immediately and produced no retained candidate. It is not Bundle 71 and is not offered for testing.
+- Retained GitHub artifact: `Xash3DiOS-arm64-unsigned`, artifact ID `9243950326`, archive size `8,564,939` bytes, digest `sha256:58442bf8af7977a9b635bf0882dc1037ef5d3d32bbb55f53a9db1b475a4722af`, expires `2026-08-29T07:51:31Z`: `https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/31872797997/artifacts/9243950326`.
+- Verified IPA: `xash3d-fwgs-ios-arm64.ipa`, `8,662,214` bytes, SHA-256 `1A0DBE078050B853EB9C5E5A4A31972B6A07C3C376063C616EA43BA4DCEAC8B5`.
+- One and only one tempfile.org upload of that verified byte-identical IPA: information page `https://tempfile.org/qDJUk1VciLj/`; direct download `https://tempfile.org/qDJUk1VciLj/download`; expiry `2026-08-17 08:16:18 UTC`. Tempfile metadata reports `8,662,214` bytes and a safe scan; its server-side SHA-256 equals the independently calculated IPA hash.
+
+### Exact files changed by the behavioral candidate
+
+- `.gitattributes`
+- `scripts/gha/build_ios.sh`
+- `scripts/ios/gl4es-uint-elements-ios.patch`
+- `scripts/ios/validate-ios-uint-elements.py`
+- `scripts/ios/verify_ipa.sh`
+
+The subsequent durable-ledger publication changes only `Documentation/XASH3DIOS_PORTING_STATE.md`, uses `[skip ci]`, and does not create another qualifying candidate. Its exact commit is recorded in the authoritative Google Docs ledger and final handoff because a Git commit cannot contain its own hash.
+
+### Verified failure boundary and structural cause
+
+The earliest violated invariant was the pinned iOS GL4ES wrapper, not Diffusion's index generation or Bundle 69's presentation path. SDL supplies a live OpenGL ES 3 context, but the GL4ES iOS profile is compiled with `DEFAULT_ES=2`. Capability discovery previously enabled `hardext.elementuint` only when the legacy `GL_OES_element_index_uint` extension token appeared. Native ES3 exposes 32-bit element indices as core and need not advertise that ES2-era token, so `hardext.elementuint` remained false. Ordinary, range, base-vertex, instanced, multidraw, and intercept/render-list routes could then copy caller-supplied `GLuint` indices through `GLushort` storage. Values at and above 65,536 wrapped, matching Bundle 69's disconnected, stretched, exploded, and ribbon-like topology while low-index geometry and the direct drawable continued to work.
+
+### Structural repair and complete route coverage
+
+- `hardext.c` now parses the already-read live native `GL_VERSION`. Native ES 3.x enables uint elements as a core capability even without `GL_OES_element_index_uint`; ES2 still requires the extension. No unconditional enablement and no inference from compile-time `DEFAULT_ES` or stale wrapper profile state is used.
+- Direct supported paths preserve `GL_UNSIGNED_INT` and the original client pointer or EBO byte offset. Unsupported ES2 paths never submit an unsupported native uint draw: they either take a proven non-lossy route or set `GL_INVALID_OPERATION` and reject before narrowing.
+- `drawing.c` applies the same policy to ordinary, range, base-vertex, instanced, multidraw, intercept, client-index, and EBO-offset entry points. The audited multidraw intercept path also uses per-draw index sources/base vertices rather than a shadowed local source.
+- Render-list/index accumulation is 32-bit end to end: list storage, append/merge, line and texgen helpers, GL state declarations, draw submission, and selection paths use `GLuint`. Native ES3 or supported ES2 submits `GL_UNSIGNED_INT`. An unsupported ES2 render list converts only after proving every value is at most 65,535; otherwise it rejects explicitly. No supported route copies through `GLushort`.
+- Diffusion's existing uint world, studio, foliage, and decal semantics are unchanged. The regular Half-Life renderer's existing `GL_UNSIGNED_SHORT` split is unchanged. No map/model clamp, model exclusion, asset substitution, renderer disable, material shortcut, direct-drawable/FBO rollback, MSAA change, uniform change, or transition change was introduced.
+
+### Validation and rejection results
+
+- Exact pinned-source replay passed from clean trees: the existing base iOS GL4ES patch, Bundle 69 drawable bridge patch, and new uint-element patch all applied in order with `git apply --check` and then applied cleanly.
+- The validator passed Python bytecode compilation and its full self-test. Positive fixtures prove exact values `65535`, `65536`, `65537`, and `100000` in ES3 without the legacy extension, ES2 with the extension, and all audited client/EBO, ordinary/range/base-vertex/instanced/multidraw/render-list/intercept routes. Diffusion world and studio semantic fixtures preserve high-index triangles; low-index semantics remain identical.
+- Rejection fixtures fail closed for extension-only ES3 detection, unconditional capability enablement, any lossy `GLuint` to `GLushort` path, public-`glDrawElements`-only or otherwise incomplete route coverage, unsupported ES2 uint submission, marker removal, map/model-specific hacks, Bundle 69 direct-drawable/MSAA/FBO rollback, and bundled uniform or transition changes.
+- `git diff --check` passed. The exact patched GL4ES source compiled all 70 translation units and linked successfully on the available MSVC toolchain. GitHub Actions repeated the policy/rejection validation, shader checks, exact patch application, and the complete arm64 engine plus Half-Life and Diffusion client/server/menu build.
+- Independent IPA verification found bundle version `71`, minimum iOS `12.0`, executable `xash`, 13 Mach-O files and 11 dylibs. `xash`, `libref_gl4es.dylib`, and all Diffusion client/server/menu modules are thin 64-bit arm64. All four new uint-policy markers and all accepted Bundle 69 direct-drawable markers are present; legacy transfer/audit/sentinel markers are absent.
+
+Expected bounded log markers:
+
+```text
+iOS uint element policy:
+iOS uint element first use:
+iOS uint element high index:
+iOS uint element route summary:
+```
+
+The policy marker identifies the live native ES version and core-versus-extension decision. First-use/high-index/route-summary records are bounded and identify draw family, client-versus-EBO source, submitted type, and representative maximum index without per-frame flooding.
+
+### Orchestrator-controlled acceptance gate, risks, and stop state
+
+Single device test proposed **only for orchestrator approval; the worker has not contacted Arjun or requested a test**: install Bundle 71, use New Game -> Chapter 1 -> Medium, wait for live `ch1map0`, and judge only whether exploded, stretched, disconnected, or ribbon-like topology is gone. Preserve the complete `engine.log` for orchestrator review of the four bounded markers. Material/fog/water/color defects from the deliberately unchanged `u_BrushParams` mismatch and the later `ch1map1` termination are not failures of this topology gate.
+
+Remaining risks: build and fixture evidence cannot establish device topology. Some material/water output may remain wrong because the known `glUniform4fv` active-extent mismatch is unchanged. Synchronous startup may remain slow. The later map transition may still terminate for its independently unresolved reason. The safe-rejection path for an actual ES2 device without the extension is intentionally fail-closed, not a claim that every uint workload can be rendered there.
+
+Durable ledger path: `Documentation/XASH3DIOS_PORTING_STATE.md`. Behavioral candidate commit: `cc87b9ab09501ef3e7ace571786535707d54948e`. The exact documentation-only ledger commit is recorded in the authoritative Google Docs ledger and final handoff.
+
+Stop state: Work Order 47 Phase B implementation, positive and rejection validation, exactly one qualifying successful Bundle 71 workflow, one retained GitHub artifact, independent IPA verification, exactly one tempfile.org upload, and both durable-ledger reports are complete. Stop for orchestrator review. Do not contact Arjun, request evidence or testing directly, claim device acceptance, implement the excluded uniform/transition/startup work, or begin another phase or work order.
