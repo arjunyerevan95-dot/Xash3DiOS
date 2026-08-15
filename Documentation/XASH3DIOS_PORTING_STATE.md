@@ -906,3 +906,97 @@ Remaining risks: build and fixture evidence cannot establish device topology. So
 Durable ledger path: `Documentation/XASH3DIOS_PORTING_STATE.md`. Behavioral candidate commit: `cc87b9ab09501ef3e7ace571786535707d54948e`. The exact documentation-only ledger commit is recorded in the authoritative Google Docs ledger and final handoff.
 
 Stop state: Work Order 47 Phase B implementation, positive and rejection validation, exactly one qualifying successful Bundle 71 workflow, one retained GitHub artifact, independent IPA verification, exactly one tempfile.org upload, and both durable-ledger reports are complete. Stop for orchestrator review. Do not contact Arjun, request evidence or testing directly, claim device acceptance, implement the excluded uniform/transition/startup work, or begin another phase or work order.
+
+## Work Order 48 Phase A - Bundle 71 failed-topology structural audit
+
+Candidate/run and acceptance status: **audit-only; Outcome B selected; no candidate**. Bundle 71 is rejected at the device topology gate: all nine authoritative screenshots still show severe exploded, stretched, disconnected and ribbon-like scene geometry. It is build-qualified only and is not device-accepted. Bundle 69 remains the accepted direct-drawable presentation architecture, and Run 39 remains the accepted gameplay/menu baseline. This phase changes no engine, renderer, GL4ES, SDL, Diffusion, menu, gameplay, patch, validator, build or CI behavior. It creates no build, workflow, artifact, IPA, upload, marker, evidence request or device-test request.
+
+### Authoritative evidence and audit inputs
+
+- Repository and remote audit head before this report: `ce231df9662db97dc2355321d82fb58b0e679794`; Bundle-71 behavioral commit: `cc87b9ab09501ef3e7ace571786535707d54948e`; Bundle-69 direct-drawable candidate head: `4caad99dbb7e0fdaed050dd21fad2095655ce6b0`. Exact pins remain Diffusion `14d156bf3a6993c172697fac83a937836c3b5561`, SDL `5d249570393f7a37e037abf22cd6012a4cc56a71`, GL4ES `81547d986798e876de8b434193920b606a72363f`, and Diffusion-MainUI `8c68de2f2325a0130953719efc3ae413eb24e01a`.
+- The authoritative Google Docs ledger was read through its latest complete entry at revision `AIroW35rd_MdrfzT7yZ1Z6ItSAokSCds6hWEmObvjTBVnCS2WD19La4BWOrXmcDGIxKHnWz70PDqhIExwOdmU0vFUBNfMccaRN9NAP7roeo`, tab `t.0`, end index `284408`. Its nine screenshots and complete `engine(20260815-084517).log` findings are the device authority. The large video is not needed and no evidence was requested from Arjun.
+- Authoritative log findings: no OOM, allocation failure, memory-pressure, Jetsam, texture eviction or failed texture-allocation record; the visible 20-30 second delay coincides with synchronous UberShader programs `#10` through `#59`, foliage generation and the render-gate opening; all four Bundle-71 uint markers are absent; material/capability warnings include `u_BrushParams` active extents of one or two with a three-`vec4` upload, absent texture arrays, absent `GL_EXT_gpu_shader4`, unavailable depth/shadow features, unsupported `depthCube`, and unsupported BC6H/BC7; transition processing reaches `Spawn Server: ch1map1 [to_map1]`, cubemap boxes, unload/load configuration, and StudioSolid/`CompileUberShader #60` before log EOF without a crash or memory discriminator.
+- The retained Bundle-71 IPA was inspected without rebuilding it: `xash3d-fwgs-ios-arm64.ipa`, 8,662,214 bytes, SHA-256 `1a0dbe078050b853eb9c5e5a4a31972b6a07c3c376063c616ea43ba4dceac8b5`. Its extracted `xash` is 2,763,568 bytes, SHA-256 `9873f875893df11d30533f301215fcad1a45daf02d76aba2972e295a7d408ca0`; `bin/client_arm64.dylib` is 2,268,040 bytes, SHA-256 `2e99f788d3689c3dc16f2322e89b5ee31b763c3d585984ffe7a0c45a8679d527`; `libref_gl4es.dylib` is 1,721,096 bytes, SHA-256 `ead885e53373a12e40ea67c6c5a9a76aaecc9accc9f2bf91e38bdc23f91a8a6a`.
+- Codebase Memory graph search, architecture, call tracing and function snippets preceded direct inspection of the repository and exact pinned/applied sources. The audit then covered Diffusion GL loading and all draw call sites, world/studio/decal vertex-index construction, VBO/VAO/EBO ownership, GL4ES lookup, capability discovery, draw translation, render lists, buffers, FPE/native submission, marker logging, uniform validation and feature fallbacks, plus the Bundle-71 binary's Mach-O ownership and marker strings.
+
+### Track A - provenance, symbol ownership and the absent markers
+
+The packaged call chain is structurally unambiguous:
+
+```text
+Diffusion client renderer
+  R_InitExtensions / GL_CheckExtension
+  -> gRenderfuncs.GL_GetProcAddress
+  -> libref_gl4es R_GetProcAddress
+  -> gl4es_GetProcAddress
+  -> gl4es_glDrawRangeElements / gl4es_glDrawElements aliases
+  -> GL4ES direct or render-list/intercept route
+  -> native GLES glDrawElements obtained through GL4ES_GetProcAddress
+  -> engine SDL_GL_GetProcAddress
+```
+
+`client/render/r_opengl.cpp` fills every `pgl*` slot only through `GL_GetProcAddress`, which is `gRenderfuncs.GL_GetProcAddress`. Under `XASH_GL4ES`, `ref/gl/gl_context.c:R_GetProcAddress` returns `gl4es_GetProcAddress(name)` rather than the engine's native resolver. The lookup table maps both core and `EXT` range names to `gl4es_glDrawRangeElements`, and ordinary draws to `gl4es_glDrawElements`. GL4ES's own native callback is separately installed by `ref/gl/gl_opengl.c` and reaches SDL only after wrapper translation.
+
+The Bundle-71 Mach-O audit rejects a direct-native-GL bypass. `client_arm64.dylib` owns `gRenderfuncs` and the `pglDraw*` pointer variables but has no OpenGLES dependency or undefined direct GL draw import. `libref_gl4es.dylib` contains `R_GetProcAddress`, `GL4ES_GetProcAddress`, `gl4es_GetProcAddress`, `gl4es_glDrawRangeElements`, `gl4es_glDrawElements`, the other patched draw families, and `LogPrintf`; it has no direct OpenGLES framework dependency. The executable supplies the engine/SDL resolver. All four Bundle-71 marker strings are present in `libref_gl4es.dylib`. The behavioral commit and exact library hash therefore match the packaged wrapper; **Outcome C is rejected**.
+
+The missing records do not prove that these symbols were bypassed. `scripts/ios/gl4es-uint-elements-ios.patch` emits the policy with `SHUT_LOGD` and the first-use/high-index/summary records with `LOGD`. On iOS, GL4ES `LogPrintf` writes `LIBGL: ` records with `printf`/`vprintf` to process stdout; it does not call the engine console logger used by `engine.log`. `SHUT_LOGD` is additionally suppressed when `LIBGL_NOBANNER` is active. As a reproducible cross-check, both archived device engine logs available to this worker contain `GL4ES_VERSION: OpenGL ES 3.0 Metal - 104.1` and extensive `CompileUberShader` activity but exactly zero lines beginning `LIBGL:` (139 and 41 engine-renderer evidence matches respectively). Thus all four missing Bundle-71 records share a sink mismatch; their absence cannot establish route inactivity, capability failure, or packaging failure.
+
+### Track B - actual draw families, vertex/index pairing and Bundle 69 versus 71
+
+Diffusion's affected renderer uses only two 32-bit entry families:
+
+1. **World/brush client range route.** `r_world.cpp` builds a static `GLuint tempElems[MAX_MAP_ELEMS]` from absolute `mextrasurf_t::firstvertex` values. `R_DrawBrushList`, world dynamic-light lists and shadow lists bind `world->vertex_array_object`, whose attributes reference one monolithic `bvert_t` VBO, compute inclusive `startv`/`endv - 1`, and call `pglDrawRangeElementsEXT(GL_TRIANGLES, ..., GL_UNSIGNED_INT, tempElems)`. No element buffer is bound. The indices and range refer to the same absolute monolithic vertex space. The static client array remains valid for the synchronous direct call; any GL4ES deferred route copies it before return.
+2. **Studio/decal routes.** Studio mesh creation uploads local `GLuint m_arrayelems` into a per-mesh EBO and pairs it with that mesh's VBO/VAO; draw uses range or ordinary `GL_UNSIGNED_INT` with byte offset zero. GL4ES retains a CPU mirror of the EBO as well as an optional native buffer, so its wrapper resolves the offset against the mirror before any client/deferred processing. Studio decals use client `GLuint` arrays paired with their generated client vertex arrays. Diffusion's other grass, weather and particle element calls are `GL_UNSIGNED_SHORT`. It does not call base-vertex, instanced or multidraw element APIs in this renderer.
+
+Counts and modes are not silently reinterpreted on the affected path: all audited topology calls use triangles and counts generated as triangle multiples. Range normalization subtracts `start` only after the corresponding `[start, end]` vertex span is copied into a deferred list. Ordinary deferred draws normalize by the observed minimum and copy the matching vertex span. Render-list storage and native submission are 32-bit in Bundle 71. Default GL4ES initialization sets `maxbatch=0`, and this repository does not set `LIBGL_BATCH`; valid shader-backed triangle draws therefore select the direct route unless runtime state independently activates a list/intercept. The precise device subroute remains unlogged, which is one part of the Outcome-B discriminator.
+
+Bundle 69's wrapper had a genuine lossy path: capability discovery could leave `hardext.elementuint` false on native ES3 without the legacy extension token, and deferred routes used 16-bit list storage. Bundle 71 corrects native-ES3 capability discovery and preserves uint storage/submission through every audited family. It does **not** change Diffusion index generation, vertex attributes, VAO/VBO pairing, draw counts, material selection or presentation. Because Bundle 71 produces the same severe topology, the old narrowing defect is not established as the complete active cause. The evidence permits three possibilities that cannot be distinguished from this `engine.log`: the affected draws never exceed 65,535; they traverse an unexpected runtime subroute/state pairing; or correct 32-bit submission exposes an independent vertex/index-state defect. Claiming any one now would be serial whack-a-mole.
+
+The prior Work Order 47 cause is therefore reclassified as **a proven wrapper invariant defect but an unproven sole device cause**. It was reasonable to repair structurally, but Bundle 71's failed gate disproves device acceptance and requires a runtime pairing discriminator before another topology repair.
+
+### Track C - material, capability and memory findings remain separate
+
+- Diffusion always uploads three `vec4` values to `u_BrushParams`; translated programs report an active array extent of one or two. GL4ES `GoUniformfv` checks `count > m->size`, raises `GL_INVALID_OPERATION`, and returns before cache mutation or native upload. This can leave fog, view/wave or underwater material parameters stale, but it cannot overwrite adjacent uniform state or reconnect triangle indices. It is a real, separate material defect and not authorized for repair here.
+- Missing `GL_EXT_texture_array` explicitly disables landscapes; missing `GL_EXT_gpu_shader4` disables omni-light shadows; absent depth/shadow support disables dynamic shadows; an unsupported depth cubemap disables that resource path. These are source-declared feature fallbacks. They can produce flat, missing or incorrectly lit materials but not exploded vertex connectivity.
+- BC6H/BC7 upload returns false when BPTC support is absent. That can reject individual compressed textures, but the renderer contains no evidence that it changes element indices or vertex ownership.
+- The authoritative log contains no OOM, allocation failure, memory-pressure, Jetsam, texture eviction or failed texture-allocation marker. Memory pressure is rejected as the present topology explanation. Texture/material warnings are not promoted to allocation failures.
+
+### Track D - latency and transition boundary
+
+The 20-30 second startup is forward progress, not a freeze: the log serially advances through at least 50 synchronous UberShader programs (`#10` through `#59`), foliage work and the render-gate opening. No topology conclusion follows from that compilation latency, and startup optimization remains a separate future track.
+
+The later transition is also separate. The log reaches `Spawn Server: ch1map1 [to_map1]`, creates cubemap boxes, executes old-map unload/new-map load configuration, and advances to StudioSolid/`CompileUberShader #60` before ending. It provides no crash, assertion, watchdog, Jetsam or allocation discriminator. A timestamp-matched iOS incident report would distinguish exception/backtrace, watchdog and memory termination mechanisms, but this phase neither requests that evidence nor changes the transition path.
+
+### Proof-gate decision - Outcome B
+
+**Outcome B is selected: the active route is narrowed and packaging is proven, but one runtime discriminator is missing.** Outcome A is not established because no exact high index, direct/deferred choice, native element binding or submitted pointer/type pairing from an affected device draw reached `engine.log`. Outcome C is rejected by the binary ownership, exact hashes and embedded marker strings.
+
+If and only if a later phase explicitly authorizes it, the single bounded diagnostics-only candidate must do all of the following without changing draw results:
+
+1. Route records into the engine console sink, not GL4ES stdout. Install a small iOS-only GL4ES diagnostic callback from `libref_gl4es` to `gEngfuncs.Con_Printf`; do not change capability, indices, vertex data, draw order, error state or presentation.
+2. Emit one ownership record after Diffusion resolves `glDrawRangeElements`, `glDrawRangeElementsEXT` and `glDrawElements`, including returned pointer and `dladdr` image/symbol, proving the live function owners.
+3. Emit at most one first-use record for each affected world-client, studio-EBO and studio-decal-client family, plus the first high-index record and one final summary; hard cap all records at 16. Each record must contain route, direct/deferred/intercept state, mode/count, incoming type, start/end where applicable, client-versus-EBO source, EBO byte offset/CPU-mirror/native-buffer identity, input min/max, normalized min/max when copied, actual native submitted type and pointer-versus-offset, logical VAO, position-attribute buffer/stride/offset, and the copied vertex span. Do not call or consume `glGetError` for diagnostics.
+4. Preserve Bundle 71's uint policy and Bundle 69's direct-drawable architecture byte-for-behavior. Rejection validation must fail marker-only stdout logging, per-draw flooding, missing client or EBO coverage, any index/vertex mutation, any material/uniform/startup/transition change, and any FBO/MSAA/presentation change.
+5. The diagnostic interpretation is predetermined: `(a)` an affected maximum at or below 65,535 proves Bundle 71 was non-operative for that draw; `(b)` a high input that reaches native `GL_UNSIGNED_INT` with the matching vertex span proves the repaired invariant is active and shifts the next audit to vertex/VAO state without undoing it; `(c)` a mismatch between input, normalized or native submission identifies the exact missing route/state boundary. No screenshot-only success claim is allowed.
+
+The explicit later-phase stop gate is: build and publish at most one diagnostics-only candidate only when separately authorized, append both ledgers, and stop for orchestrator review before contacting Arjun, requesting a device run, interpreting new evidence or implementing a renderer repair. This Work Order 48 Phase A does not authorize that candidate.
+
+### Validation, report fields and stop state
+
+Structural cause: **unresolved at the complete topology level**. Bundle 69's uint narrowing was real, but Bundle 71 proves it was incomplete, inactive for the affected index magnitudes, bypassed by runtime state, or accompanied by another vertex/index-state defect. The current evidence does not distinguish those branches. The absent markers are explained by their stdout sink, not by a proven route bypass.
+
+Why this work satisfies Work Order 48 Phase A: it proves candidate provenance and wrapper ownership, traces every Diffusion 32-bit draw family through GL4ES to native GLES, pairs each index source with its vertex storage and lifetime, compares Bundle 69 and 71 at the changed invariant, rejects unsupported material/memory/latency/transition conflation, selects exactly one authorized proof-gate outcome, and specifies one bounded non-mutating discriminator for a later separately authorized phase.
+
+Validation performed: Google Docs title/tab/revision/end-index verification and full latest-entry read; Codebase Memory-first architecture/search/call tracing; exact source and pin inspection; all Diffusion element-call enumeration; world/studio/decal construction and lifetime audit; GL4ES direct/deferred/intercept/render-list/capability/buffer/FPE/native-submission audit; uniform and feature-fallback inspection; Bundle-69/71 patch comparison; retained IPA size/hash readback; extracted Mach-O dependency/symbol/marker inspection; and two archived engine-log sink cross-checks. Publication validation additionally requires `git diff --check`, documentation-only changed-file inspection, `[skip ci]` commit/push, remote-head verification, clean worktree verification, and readback of both durable ledgers.
+
+Workflow URL/ID and result: none; forbidden. Artifact/IPA/upload: none created, retrieved, published or uploaded; forbidden. The retained Bundle-71 IPA was read only for provenance. Tempfile.org was not used.
+
+Expected new log markers: none. This phase is documentation-only. The future diagnostic names above are a boundary specification, not implemented markers.
+
+Exact files changed by Work Order 48 Phase A: `Documentation/XASH3DIOS_PORTING_STATE.md` only.
+
+Remaining risks: the device's exact world/studio maximum indices and direct/deferred state remain unknown; correct uint submission may coexist with a VAO/attribute/buffer-state defect; the uniform active-extent mismatch can independently corrupt material appearance; capability fallbacks can hide content; synchronous shader compilation remains slow; and the later map-transition termination mechanism remains unresolved. None authorizes another patch or test in this phase.
+
+Durable ledger path and commit: `Documentation/XASH3DIOS_PORTING_STATE.md`. This report is published in one documentation-only `[skip ci]` commit. Its exact hash is recorded in the authoritative Google Docs mirror and final handoff because a Git commit cannot contain its own hash.
+
+Stop state: Work Order 48 Phase A ends at **Outcome B** for orchestrator review. Treat Bundle 71 as a failed topology candidate. Do not modify code, build, start a workflow, create/retrieve/upload an IPA, use tempfile.org, contact Arjun, request evidence or a device test, implement the bounded diagnostic candidate, repair topology/material/startup/transition behavior, or begin another phase or work order.
