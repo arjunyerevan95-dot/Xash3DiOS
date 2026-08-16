@@ -171,6 +171,11 @@ for transform_api in \
 	fi
 done
 
+if ! grep -q 'WO49 texture policy: target-source=per-unit route=all-realize_textures' "$GL4ES_RENDERER_STRINGS"; then
+	echo "Renderer is missing the WO49 per-unit texture-realization policy" >&2
+	exit 1
+fi
+
 if ! grep -q 'gl4es_iOSWO49TopologyProducer' "$DIFFUSION_CLIENT_STRINGS"; then
 	echo "Diffusion client is missing the WO49 pre-shader producer bridge" >&2
 	exit 1

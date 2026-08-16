@@ -28,6 +28,8 @@ git -C 3rdparty/gl4es/gl4es apply --check "$GITHUB_WORKSPACE/scripts/ios/gl4es-w
 git -C 3rdparty/gl4es/gl4es apply "$GITHUB_WORKSPACE/scripts/ios/gl4es-wo49-topology-ios.patch" || die
 git -C 3rdparty/gl4es/gl4es apply --check "$GITHUB_WORKSPACE/scripts/ios/gl4es-wo49-transform-ios.patch" || die
 git -C 3rdparty/gl4es/gl4es apply "$GITHUB_WORKSPACE/scripts/ios/gl4es-wo49-transform-ios.patch" || die
+git -C 3rdparty/gl4es/gl4es apply --check "$GITHUB_WORKSPACE/scripts/ios/gl4es-wo49-texture-unit-ios.patch" || die
+git -C 3rdparty/gl4es/gl4es apply "$GITHUB_WORKSPACE/scripts/ios/gl4es-wo49-texture-unit-ios.patch" || die
 python3 "$GITHUB_WORKSPACE/scripts/ios/validate-ios-drawable-bridge.py" \
 	"$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/SDL" \
 	"$GITHUB_WORKSPACE/3rdparty/gl4es/gl4es" --self-test || die
@@ -41,6 +43,9 @@ python3 "$GITHUB_WORKSPACE/scripts/ios/validate-ios-wo49-topology.py" \
 python3 "$GITHUB_WORKSPACE/scripts/ios/validate-ios-wo49-transform.py" \
 	"$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/3rdparty/gl4es/gl4es" \
 	--gl4es-only --self-test || die
+python3 "$GITHUB_WORKSPACE/scripts/ios/validate-ios-wo49-texture-unit.py" \
+	"$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/3rdparty/gl4es/gl4es" \
+	--self-test || die
 mkdir -p build || die
 cc -std=gnu11 -DNANOGL_MANGLE_PREPEND=1 -DREF_DLL=1 \
 	-I3rdparty/nanogl -I3rdparty/nanogl/GL \
