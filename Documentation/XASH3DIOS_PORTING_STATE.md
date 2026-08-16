@@ -1406,3 +1406,115 @@ Remaining risks: Bundle 81 has not been device-tested or accepted; the per-unit 
 Durable ledger path and commit: `Documentation/XASH3DIOS_PORTING_STATE.md`. This report is published in one documentation-only `[skip ci]` commit after the qualifying build; its exact hash is mirrored into the authoritative Google Docs ledger and final handoff because a Git commit cannot contain its own hash.
 
 Stop state: Work Order 49 Phase F Outcome A implementation, validation, sole retained Bundle-81 workflow/artifact, independent IPA/tempfile readback and both durable-ledger updates are complete. **Stop for orchestrator review.** Do not contact Arjun, request evidence or testing, request a Bundle 79 retest, interpret Bundle 81 device behavior, modify code, run another workflow, create another artifact/upload, or begin Phase G or any later phase.
+
+## Work Order 50 Phase A - consolidated landscape and material-state audit
+
+Candidate/run and acceptance status: **Outcome C; audit only. No candidate, build, workflow, IPA, upload, or device-test request was authorized or produced.** Bundle 81 remains not fully device-accepted, but its per-unit texture-target repair is device-supported and retained. Bundle 69 direct-drawable presentation, Bundle 71 native-ES3 uint indices, the real Diffusion menu/touch/callback/map route, and all other previously accepted fixes remain unchanged.
+
+### Verified boundaries and decision
+
+The two Bundle-81 visual classes have independent source-proven boundaries:
+
+1. **Missing road/ground/landscape: capability/architecture boundary.** Diffusion checks the literal `GL_EXT_texture_array` capability before loading landscapes. The pinned GL4ES does not advertise that extension and, more importantly, has no distinct texture-array target state, array allocation/upload implementation, `sampler2DArray` reflection, or `texture2DArray` shader-conversion route. Its exported 3D aliases call 2D operations while discarding the caller's depth/z semantics. This is Work Order 50 classification **A5: the required implementation is genuinely absent**, not an extension-string-only A1/A4 defect.
+2. **Flat tan/yellow or flickering studio materials: application-producer cache lifetime.** Diffusion's studio renderer retains member-level texture/material cache values across draws, while every studio draw ends with engine `GL_CleanUpTextureUnits(0)`. Cleanup invalidates the engine's actual logical texture bindings but does not invalidate Diffusion's private `cached_texture`, `cached_normalmap`, `cached_cubemap`, or related material cache. A later draw with the same shader and base texture number can therefore skip the required `GL_Bind` calls after cleanup or intervening world/postprocess work. Bundle 81 correctly realizes every bind it receives; this remaining defect is above GL4ES and can prevent a bind from being issued at all. The cache key also uses the base `iTexnum`, not every selected animated/monitor/drone frame texture identity, so dynamic sources can be skipped independently.
+
+Outcome C is selected because the pinned GL4ES architecture genuinely cannot transport the landscape array resource. The independent yellow-material audit nevertheless proves a separate, bounded general studio cache-lifetime defect plus two narrower uniform defects. Phase A documents their ownership boundaries only; it does not authorize any repair.
+
+### Landscape capability and dispatch table
+
+| Stage | Exact source behavior | Classification |
+| --- | --- | --- |
+| Diffusion application check | `client/render/r_opengl.cpp` requires literal `GL_EXT_texture_array`; failure emits `Warning: GL_EXT_texture_array not supported. Landscapes will be unavailable.` | Correctly detects that the wrapper exposes no usable route; changing only this check would be unsafe. |
+| Engine capability gate | `ref/gl/gl_opengl.c` requires the extension plus 3D texture functions; `GL_LoadTextureArray` in `ref/gl/gl_image.c` returns texture 0 when `GL_TEXTURE_ARRAY_EXT` support is absent. | Allocation is rejected before layer upload. |
+| GL4ES advertisement | `BuildExtensionsList` in pinned `src/gl/getter.c` contains no `GL_EXT_texture_array` entry or live-context conditional addition. | Not advertised. |
+| GL4ES entry points | Core/EXT `glTexImage3D`, `glTexSubImage3D`, and copy aliases are exported and found by `gl_lookup.c`, but pinned `texture_3d.c` forwards them to 2D calls and drops depth/z behavior. | Alias exists; array semantics do not. This rules out A2 as the complete explanation. |
+| GL4ES target/object state | `texture.h`, `what_target`, `to_target`, bind/enable logic, and Bundle-81 `realize_textures` know 1D, 2D, 3D, rectangle, and cube targets only. `GL_TEXTURE_2D_ARRAY` falls into non-array behavior; no per-object layer lifecycle exists. | Native array object cannot be represented or realized. |
+| GL4ES shader/reflection | Pinned shader conversion has no `sampler2DArray`/`texture2DArray` handling, emits the ESSL-100 path, and program reflection classifies 2D and cube samplers only. | Array shader cannot be converted, reflected, or bound correctly. |
+| Native context | The accepted Bundle-71 proof establishes the live native GLES3 path and 32-bit element-index support. GL4ES performs live-context hardware discovery during initialization, but never turns that capability into the complete array route above. | Native capability alone is insufficient; wrapper transport is missing. |
+| Actual Diffusion use | No diffuse array object is returned, landscape faces are not mapped as `SURF_LANDSCAPE`, and terrain array shader/draw submission is never reached. | First blocking boundary is application capability/allocation through absent GL4ES architecture, before native array upload/draw. |
+
+Initialization timing is not the defect by itself. GL4ES initializes the native library/context capability record before its lazy extension string is consumed, and parses texture-related configuration, but there is no conditional implementation to enable. Advertising the name or aliasing the enum without target storage, allocation/upload, sampler reflection, and an ESSL-300-compatible shader route would move the failure downstream and violate the structural gate.
+
+### Landscape resource and draw-family table
+
+| Resource/path | Target, format, layers and upload | Sampler/shader use | Draw/material family and observed boundary |
+| --- | --- | --- | --- |
+| Landscape index/height map | Ordinary 2D image loaded by `LoadHeightMap`; pixels are retained for face classification. | 2D height/index sampler in the terrain-capable brush shader. | Loads independently, but cannot activate multilayer faces without a diffuse array. |
+| Landscape diffuse layers | Individual layer materials are resolved, then `LOAD_TEXTURE_ARRAY` requests one layered diffuse object. `GL_LoadTextureArray` returns 0 at the capability gate. | Terrain GLSL declares `sampler2DArray` and calls `texture2DArray`; the solid path binds the diffuse array on its terrain material unit. | Affects lightmapped/solid world and brush landscape faces, including road/ground faces assigned to the same BSP landscape group. |
+| Landscape normal layers | Optional normal maps are assembled as a second array. | Terrain normal-array sampling is used by the terrain-capable solid/dynamic-light variants on their assigned normal-array unit. | Same landscape surface families; also unreachable without the diffuse array. |
+| Face classification | `R_LoadLandscapes` parses `maps/<map>_land.txt`, loads index/diffuse/layer metadata, calls `LoadTerrainLayers`, then currently marks the terrain record valid without checking its false return. `Mod_MappingLandscapes` later refuses to set `SURF_LANDSCAPE` when `gl_diffuse_id == 0`. | Successful mapping would add the terrain options to the brush shader key. | The unchecked return is a general bookkeeping defect, but the downstream guard prevents array shader/draw use; it is not a compatibility implementation. |
+| Solid/lightmapped terrain | Would bind the diffuse array, index/height map, optional normal array, lightmap/deluxe and other canonical material inputs. | `BmodelSolid` terrain/multilayer variants consume the array samplers and landscape coordinates. | Unreachable on this architecture. |
+| Projected/omni dynamic-light terrain | Reuses the same terrain arrays with dynamic-light inputs. | `BmodelDlight` terrain/multilayer variants consume the same layered resources. | Unreachable on this architecture. |
+| Grass/foliage | Grass separately consults texture-array capability for an optimized family, but is not the road/ground landscape face mapper. | Separate vegetation shaders and draw path. | Capability may affect vegetation behavior, but it does not explain the landscape face gate or all yellow objects. |
+
+No separate road renderer was found. Roads and terrain are ordinary BSP world/brush surfaces associated with landscape face information and therefore share the same array allocation, face mapping, shader-key, sampler, and draw path. Once the diffuse array is zero, those surfaces retain the non-landscape/base BSP path; depending on the authored assets and surrounding visibility, the device can show missing road/ground or sky/void beneath vehicles.
+
+### Smallest future landscape compatibility boundary (not implemented)
+
+The smallest structurally complete path is a GL4ES GLES3 array passthrough, not an extension-string workaround or asset substitution:
+
+- after live native GLES3 capability discovery, add a distinct `GL_TEXTURE_2D_ARRAY` target through texture-object creation, per-unit enable/bind state, allocation, layer upload/subupload, deletion, queries, and Bundle-81's per-unit realization invariant;
+- load and call the native GLES3 3D allocation/subimage entry points with preserved target, depth, z offset, internal format, mip, and layer limits;
+- add `GL_SAMPLER_2D_ARRAY` program reflection and sampler-unit handling;
+- translate the desktop `sampler2DArray`/`texture2DArray` shader route through a coherent ESSL-300-compatible vertex/fragment pipeline, including attributes/varyings and fragment output syntax, rather than inserting one unsupported token into the ESSL-100 converter;
+- advertise `GL_EXT_texture_array` only when that entire live-context route is available; and
+- make Diffusion mark a terrain record valid only when `LoadTerrainLayers` succeeds, so metadata matches resource lifetime.
+
+Atlas emulation is larger and riskier because it must rewrite shader coordinates and handle mip filtering, layer boundaries, wrap modes and bleed. No source evidence justifies asset downscaling, substitution, disabling landscape, or bypassing Diffusion's material classification.
+
+### Yellow-material hypothesis matrix
+
+| Hypothesis | Source/evidence result | Scope/judgment |
+| --- | --- | --- |
+| Intentional yellow/debug output | The terrain shader contains a yellow-ish layer-debug palette helper, but no production caller was found, and the landscape array route never reaches that shader. Frustum yellow is explicit debug geometry. | Rejected as the general Bundle-81 material result. |
+| Stable fallback or missing texture | Default/white/gray/fallback textures exist for missing assets, fullbright/lightmap policy, or explicit material fallback. They are deterministic absent state variation. | Can explain an individual stable material, not cross-frame loss/recovery by itself. |
+| Residual Bundle-81 per-unit target alias | The fixed `realize_textures()` now selects target and object from the same unit on all audited realization callers. No contrary source evidence was found for an issued 2D bind. | Bundle 81's restored cliff/building textures are positive device evidence that this repair is valid and must be preserved. |
+| Studio producer skips texture binds | Member texture/material caches survive `GL_CleanUpTextureUnits(0)`, even though cleanup invalidates engine bindings. Same shader/base texture can suppress base, normal, interior/blend or cubemap binds; dynamic texture identity is incompletely keyed. | **Source-proven general studio material-state defect; best structural explanation for intermittent flat/wrong/flickering studio materials.** Boundary is before engine `GL_Bind` and GL4ES. |
+| `u_StudioParams` over-count | Producer always uploads three vec4s, while optimized additive variants can expose only one or two active elements. Pinned GL4ES rejects `count > active size` with `GL_INVALID_OPERATION` before cache/native mutation. | Proven subset defect affecting additive studio view/chrome/fog parameters; not a complete explanation for broad diffuse texture loss. |
+| `u_FoliageSwayHeight` type mismatch | Packaged iOS shader declares float. Solid studio foliage still uses the integer uniform call; dlight/depth use float calls. | Proven vegetation-specific vertex-sway defect, not a general material-color path. |
+| Shader-cache key omission | Material option keys cover the broad static variant features, but studio bind caching keys base texture number rather than every actual animated/monitor/drone selected object. | Contributes to dynamic studio texture staleness; no evidence that compiled shader programs themselves alias unrelated option sets. |
+| Failed native upload/format | Audited loaders carry texture metadata and bounds; accepted evidence contains no allocation/upload error discriminator for the yellow objects. | Unproven for this class; array upload absence is Track A, not the existing 2D studio route. |
+| Memory pressure | Bundle-81 log has no OOM, allocation failure, memory warning, or Jetsam discriminator. | Unsupported. Do not introduce memory limits, purges, or downscaling. |
+
+The representative studio path is: material load and optional maps/animation -> shader option/cache selection -> `DrawStudioMeshes` producer values -> base/animated/monitor/drone texture selection plus normal/cubemap/interior/blend/colormask units -> engine `GL_Bind` target/object bookkeeping -> GL4ES logical deferred state -> Bundle-81 per-unit native realization -> draw. The proven first divergence is the application producer's decision to skip some `GL_Bind` calls using a stale private cache after engine cleanup; it is not GL4ES re-aliasing a bind that was actually submitted.
+
+### Per-variant `u_StudioParams` audit
+
+The source declarations reserve `u_StudioParams[3]`; index 0 carries view origin and real time, index 1 carries view-right data for chrome, and index 2 carries fog data for non-additive variants. `DrawStudioMeshes` unconditionally calls `pglUniform4fvARB(location, 3, ...)`. Native link optimization changes the active extent by variant, and pinned GL4ES rejects an over-count rather than partially applying it.
+
+| Studio solid variant | Declared extent | Native active extent | Producer call/count | Error semantics and downstream scope |
+| --- | --- | --- | --- | --- |
+| Non-additive, with or without chrome | 3 vec4 | 3 (fog keeps trailing element active) | `glUniform4fv`, count 3 | Valid; indices 0-2 reach native state. |
+| Additive without chrome | 3 vec4 | 1 (observed scalar/base location in accepted shader evidence) | `glUniform4fv`, count 3 | GL4ES `GoUniformfv` rejects count greater than reflected size with `GL_INVALID_OPERATION`; view/realtime update can remain stale. |
+| Additive with chrome | 3 vec4 | 2 | `glUniform4fv`, count 3 | Same rejection; view/realtime and chrome/view-right update can remain stale. |
+
+This is a bounded subset defect. It can affect additive studio view/chrome/fog-derived rendering and explains a recurring GL error, but it does not issue, select, or bind the diffuse texture and cannot alone explain broad non-additive or world material flicker.
+
+### Competing-hypothesis rejection matrix
+
+| Competing explanation | Bundle-81/source discriminator | Result |
+| --- | --- | --- |
+| Bundle-81 repair is wrong or should be reverted | Cliffs and buildings retain correct textures after the repair; exact source now preserves per-unit target/object selection. | Rejected; partial success is affirmative evidence. Preserve it. |
+| Landscape is another manifestation of the old unit-target alias | The device log emits the explicit extension failure; allocation returns zero before landscape mapping and shaders. | Rejected. Distinct capability/architecture class. |
+| Advertising one extension string is sufficient | Target state, layered upload semantics, array sampler reflection, and shader conversion are all absent. | Rejected as a downstream whack-a-mole change. |
+| Missing landscape assets alone | The first deterministic boundary occurs before layer use because capability is absent. Asset warnings may be secondary but do not remove the architecture gate. | Not the primary cause. |
+| Yellow is the terrain debug palette | Landscape faces never reach the terrain shader, and the helper is not on a production call path. | Rejected. |
+| Yellow is remaining GL4ES cross-unit aliasing | No new source defect exists for issued 2D binds after Bundle 81; the device improved. Diffusion can skip issuing binds after its private cache outlives cleanup. | Rejected for the fixed route; application cache lifetime is the stronger remaining boundary. |
+| `u_StudioParams` explains every yellow object | Only additive optimized variants reject the count; it does not control diffuse sampler binding. | Proven subset, rejected as complete cause. |
+| Foliage uniform explains every visual class | Mismatch is confined to solid foliage sway position. | Proven subset, rejected as general material/landscape cause. |
+| Resource pressure causes material loss | No OOM/allocation/Jetsam/memory-warning evidence exists; landscape failure is deterministic during capability setup. | Unsupported. |
+| Startup shader compilation is the visual failure | `GL_FindUberShader` compiles/link variants synchronously on first use, so it can delay first presentation, but accepted frames continue and the visual classes persist. | Separate performance track, not the landscape/material-state cause. |
+
+### Performance/memory classification, validation and future evidence
+
+Startup delay remains consistent with synchronous, on-demand `GL_FindUberShader` compilation/linking and the accepted sequence of `CompileUberShader` markers. The existing evidence does not establish memory pressure: it contains no OOM, failed allocation, memory warning, Jetsam, or termination discriminator. A future evidence review could distinguish the classes by correlating timestamp gaps around compile markers and continued frame markers against explicit allocation failures, iOS memory-warning callbacks, or Jetsam/termination records, but Phase A requests no evidence and authorizes no test.
+
+Validation performed: newest authoritative Google Docs ledger and complete Bundle-81 evidence/constraints read; Codebase Memory-first architecture, symbol and caller/callee trace; exact-source inspection of pinned Diffusion `14d156bf3a6993c172697fac83a937836c3b5561`, GL4ES `81547d986798e876de8b434193920b606a72363f`, engine executable `9505a1c01f597e23c3acb7cbb8852b9dcfb0a038`, and unchanged MainUI `8c68de2f2325a0130953719efc3ae413eb24e01a`; applied iOS patch inspection including Bundle-81 and shader policy; end-to-end capability, allocation/upload, mapping, shader/sampler, material, bind/cache, realization and draw trace; accepted-log/source comparison; and competing-hypothesis rejection. No runtime/source/build-policy file was edited and no build was run.
+
+Expected new log markers: **none**; this phase adds no instrumentation or runtime change. Exact file changed: `Documentation/XASH3DIOS_PORTING_STATE.md` only. Workflow/artifact/IPA/tempfile: **none**. Single device test requested: **none**.
+
+Remaining risks: the landscape compatibility path requires a coherent GLES3 shader and texture-array architecture, not a bounded one-line alias; a future studio-cache repair must invalidate/re-key all material texture families without regressing animation or Bundle-81 realization; the additive `u_StudioParams` and foliage-call defects remain independently real; missing assets could remain after capability is added; shader compilation latency and the later ch1map0-to-ch1map1 termination remain separate; and no repair or candidate is authorized by this audit.
+
+Durable ledger path and commit: `Documentation/XASH3DIOS_PORTING_STATE.md`. This report is published in one documentation-only `[skip ci]` commit; its exact hash is mirrored into the authoritative Google Docs ledger and final handoff because a commit cannot contain its own hash.
+
+Stop state: Work Order 50 Phase A Outcome C source audit and durable report are complete. **Stop for orchestrator review.** Do not modify renderer/runtime code, build, start GitHub Actions, create an IPA/artifact/upload, contact Arjun, request evidence/testing, or begin Phase B or any later phase.
