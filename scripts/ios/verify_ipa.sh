@@ -66,6 +66,18 @@ if ! grep -q 'iOS mobile renderer profile: canonical materials, shared animated-
 	exit 1
 fi
 
+for material_marker in \
+	'iOS material-state policy:' \
+	'iOS studio texture cache epoch:' \
+	'iOS studio params exact count:' \
+	'iOS foliage uniform type:' \
+	'iOS material-state terminal:'; do
+	if ! grep -q "$material_marker" "$DIFFUSION_CLIENT_STRINGS"; then
+		echo "Diffusion client is missing material-state marker: $material_marker" >&2
+		exit 1
+	fi
+done
+
 DIFFUSION_MENU_STRINGS="$VERIFY_ROOT/diffusion-menu.strings"
 strings "$DIFFUSION_MENU_PATH" > "$DIFFUSION_MENU_STRINGS"
 if ! grep -q 'iOS mobile menu policy: decorative background map disabled; UI callbacks remain active' "$DIFFUSION_MENU_STRINGS"; then
