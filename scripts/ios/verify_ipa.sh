@@ -183,6 +183,35 @@ for transform_api in \
 	fi
 done
 
+for material_trace_marker in \
+	'WO52 material trace policy:' \
+	'WO52 material trace producer:' \
+	'WO52 material trace shader:' \
+	'WO52 material trace bind:' \
+	'WO52 material trace gl4es:' \
+	'WO52 material trace native:' \
+	'WO52 material trace transition:' \
+	'WO52 material trace terminal:' \
+	'WO52 material trace summary:'; do
+	if ! grep -q "$material_trace_marker" "$GL4ES_RENDERER_STRINGS"; then
+		echo "Renderer is missing WO52 material-trace marker: $material_trace_marker" >&2
+		exit 1
+	fi
+done
+
+for material_trace_api in \
+	'gl4es_iOSWO52MaterialBegin' \
+	'gl4es_iOSWO52MaterialCache' \
+	'gl4es_iOSWO52EngineBind' \
+	'gl4es_iOSWO52MaterialArm' \
+	'gl4es_iOSWO52MaterialFinish' \
+	'gl4es_iOSWO52MaterialTransition'; do
+	if ! grep -q "$material_trace_api" "$GL4ES_RENDERER_STRINGS"; then
+		echo "Renderer is missing WO52 material-trace API: $material_trace_api" >&2
+		exit 1
+	fi
+done
+
 if ! grep -q 'WO49 texture policy: target-source=per-unit route=all-realize_textures' "$GL4ES_RENDERER_STRINGS"; then
 	echo "Renderer is missing the WO49 per-unit texture-realization policy" >&2
 	exit 1
@@ -195,6 +224,16 @@ fi
 
 if ! grep -q 'gl4es_iOSWO49TransformBegin' "$DIFFUSION_CLIENT_STRINGS"; then
 	echo "Diffusion client is missing the WO49 transform producer bridge" >&2
+	exit 1
+fi
+
+if ! grep -q 'gl4es_iOSWO52MaterialBegin' "$DIFFUSION_CLIENT_STRINGS"; then
+	echo "Diffusion client is missing the WO52 material producer bridge" >&2
+	exit 1
+fi
+
+if ! grep -q 'gl4es_iOSWO52EngineBind' "$ENGINE_STRINGS"; then
+	echo "Engine is missing the WO52 engine bind bridge" >&2
 	exit 1
 fi
 

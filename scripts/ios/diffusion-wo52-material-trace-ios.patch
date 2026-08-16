@@ -1,0 +1,888 @@
+diff --git a/client/render/r_local.h b/client/render/r_local.h
+index fd191df..8033548 100644
+--- a/client/render/r_local.h
++++ b/client/render/r_local.h
+@@ -800,6 +800,9 @@ bool IsBuildingCubemaps( void );
+ void R_NewMap( void );
+ void Mod_ThrowModelInstances( void );
+ void Mod_PrepareModelInstances( void );
++#if defined( XASH_IOS )
++void R_IOSWO52MaterialTransition( const char *event );
++#endif
+ int Mod_SampleSizeForFace( const msurface_t *surf );
+ void R_LoadLandscapes( const char *filename );
+ terrain_t *R_FindTerrain( const char *texname );
+diff --git a/client/render/r_misc.cpp b/client/render/r_misc.cpp
+index fa86eed..5ebfd09 100644
+--- a/client/render/r_misc.cpp
++++ b/client/render/r_misc.cpp
+@@ -2052,6 +2052,10 @@ void R_NewMap( void )
+ 	int	i, j;
+ 	model_t *m;
+ 
++#if defined( XASH_IOS )
++	R_IOSWO52MaterialTransition( "R_NewMap" );
++#endif
++
+ 	if( g_pParticleSystems )
+ 		g_pParticleSystems->ClearSystems();
+ 
+diff --git a/client/render/r_shader.cpp b/client/render/r_shader.cpp
+index e66cbed..2a856e4 100644
+--- a/client/render/r_shader.cpp
++++ b/client/render/r_shader.cpp
+@@ -1031,6 +1031,9 @@ static glsl_program_t *GL_FindUberShader( const char *glname, const char *option
+ 		if( !Q_strcmp( prog->name, glname ) && !Q_strcmp( prog->options, options ) )
+ 		{
+ 			prog->status |= SHADER_STATUS_HASHED;
++#if defined( XASH_IOS )
++			R_IOSWO52MaterialTransition( va( "shader-reuse:%s", glname ) );
++#endif
+ 			return prog;
+ 		}
+ 	}
+@@ -1042,6 +1045,10 @@ static glsl_program_t *GL_FindUberShader( const char *glname, const char *option
+ 
+ 	prog = GL_CreateUberShader( i, glname, options, pfnInitUniforms );
+ 
++#if defined( XASH_IOS )
++	R_IOSWO52MaterialTransition( va( "shader-create:%s", glname ) );
++#endif
++
+ 	if( prog != NULL )
+ 	{
+ 		// add to hash table
+@@ -3263,4 +3270,4 @@ void GL_FreeGPUShaders( void )
+ 	memset( glsl_programsHashTable, 0, sizeof( glsl_programsHashTable ) );
+ 
+ 	GL_BindShader( GL_NONE );
+-}
+\ No newline at end of file
++}
+diff --git a/client/render/r_studio.cpp b/client/render/r_studio.cpp
+index 34e97c8..faa92d4 100644
+--- a/client/render/r_studio.cpp
++++ b/client/render/r_studio.cpp
+@@ -70,6 +70,98 @@ static unsigned int ios_studio_params_counts_reported = 0;
+ #define WO49_TRANSFORM_SWAY 0x02u
+ #define WO49_TRANSFORM_VERTEX_LIGHTING 0x04u
+ #define WO49_TRANSFORM_BONE_WEIGHTING 0x08u
++#define WO52_MATERIAL_VERSION 1u
++#define WO52_MATERIAL_UNIT_CAP 6u
++
++typedef struct wo52_material_unit_desc_s
++{
++	unsigned int unit;
++	unsigned int target;
++	unsigned int engineObject;
++	unsigned int logicalObject;
++	unsigned int width;
++	unsigned int height;
++	unsigned int format;
++	unsigned int resourceFlags;
++	int mode;
++	int ready;
++	int samplerLocation;
++	int samplerValue;
++} wo52_material_unit_desc_t;
++
++typedef struct wo52_material_producer_desc_s
++{
++	unsigned int version;
++	unsigned int size;
++	unsigned long long frame;
++	unsigned int generation;
++	unsigned int entity;
++	unsigned int modelHandle;
++	unsigned int skin;
++	int bodypart;
++	int mesh;
++	int material;
++	int diffuseObject;
++	int fallbackObject;
++	int animationId;
++	int monitorObject;
++	int droneObject;
++	int normalObject;
++	int cubemapObject;
++	int interiorObject;
++	int blendObject;
++	int maskObject;
++	unsigned long long meshIdentity;
++	unsigned int cacheEpoch;
++	unsigned int lightpass;
++	const char *map;
++	const char *model;
++	const char *materialName;
++	const char *sourceName;
++	unsigned int materialFlags;
++	unsigned int shaderIndex;
++	unsigned int logicalProgram;
++	unsigned int optionsHash;
++	unsigned int shaderStatus;
++	int colorMapLocation;
++	int renderColorLocation;
++	int meshParamsLocation;
++	int studioLightingLocation;
++	float renderColor[4];
++	float meshParams[4];
++	unsigned int fullbright;
++	unsigned int additive;
++	unsigned int vertexLighting;
++	unsigned int unitCount;
++	wo52_material_unit_desc_t units[WO52_MATERIAL_UNIT_CAP];
++} wo52_material_producer_desc_t;
++
++typedef struct wo52_material_cache_unit_s
++{
++	unsigned int unit;
++	int requestedObject;
++	int beforeObject;
++	int afterObject;
++	int beforeMode;
++	int afterMode;
++	int issued;
++} wo52_material_cache_unit_t;
++
++typedef struct wo52_material_cache_desc_s
++{
++	unsigned int version;
++	unsigned int size;
++	unsigned long long token;
++	unsigned int cacheEpoch;
++	unsigned int unitCount;
++	wo52_material_cache_unit_t units[WO52_MATERIAL_UNIT_CAP];
++} wo52_material_cache_desc_t;
++
++typedef unsigned long long (*wo52_material_begin_fn)( const wo52_material_producer_desc_t *desc );
++typedef void (*wo52_material_cache_fn)( const wo52_material_cache_desc_t *desc );
++typedef void (*wo52_material_token_fn)( unsigned long long token );
++typedef void (*wo52_material_transition_fn)( const char *event,
++	unsigned int generation, unsigned long long frame, const char *map );
+ 
+ typedef struct wo49_topology_attr_desc_s
+ {
+@@ -166,8 +258,18 @@ static wo49_topology_token_fn pWO49TopologyFinish;
+ static wo49_topology_absence_fn pWO49TopologyAbsence;
+ static wo49_transform_begin_fn pWO49TransformBegin;
+ static wo49_transform_finish_fn pWO49TransformFinish;
++static wo52_material_begin_fn pWO52MaterialBegin;
++static wo52_material_cache_fn pWO52MaterialCache;
++static wo52_material_token_fn pWO52MaterialArm;
++static wo52_material_token_fn pWO52MaterialFinish;
++static wo52_material_transition_fn pWO52MaterialTransition;
+ static bool wo49_topology_resolved;
+ static bool wo49_transform_claimed;
++static unsigned int wo52_material_generation;
++static unsigned int wo52_transition_count;
++static unsigned int wo52_transition_hashes[128];
++static unsigned int wo52_transition_generations[128];
++static bool wo52_transition_overflow;
+ 
+ static unsigned int WO49Checksum( const void *data, size_t bytes )
+ {
+@@ -207,6 +309,11 @@ static void WO49ResolveTopologyAPI( void )
+ 	pWO49TopologyAbsence = (wo49_topology_absence_fn)GL_GetProcAddress( "gl4es_iOSWO49TopologyAbsence" );
+ 	pWO49TransformBegin = (wo49_transform_begin_fn)GL_GetProcAddress( "gl4es_iOSWO49TransformBegin" );
+ 	pWO49TransformFinish = (wo49_transform_finish_fn)GL_GetProcAddress( "gl4es_iOSWO49TransformFinish" );
++	pWO52MaterialBegin = (wo52_material_begin_fn)GL_GetProcAddress( "gl4es_iOSWO52MaterialBegin" );
++	pWO52MaterialCache = (wo52_material_cache_fn)GL_GetProcAddress( "gl4es_iOSWO52MaterialCache" );
++	pWO52MaterialArm = (wo52_material_token_fn)GL_GetProcAddress( "gl4es_iOSWO52MaterialArm" );
++	pWO52MaterialFinish = (wo52_material_token_fn)GL_GetProcAddress( "gl4es_iOSWO52MaterialFinish" );
++	pWO52MaterialTransition = (wo52_material_transition_fn)GL_GetProcAddress( "gl4es_iOSWO52MaterialTransition" );
+ }
+ 
+ static void WO49AddAttribute( wo49_topology_producer_desc_t *desc, unsigned int index,
+@@ -247,6 +354,62 @@ static void WO49DescribeLayout( wo49_topology_producer_desc_t *desc )
+ 		WO49AddAttribute( desc, ATTR_INDEX_LIGHT_VECS, 4, GL_FLOAT, desc->stride, sizeof( Vector ) * 4 + sizeof( float ) * 6 + 8 );
+ 	}
+ }
++
++static void WO52AddMaterialUnit( wo52_material_producer_desc_t *desc,
++	unsigned int unit, int object, int mode, int samplerLocation )
++{
++	if( object <= 0 || desc->unitCount >= WO52_MATERIAL_UNIT_CAP )
++		return;
++	wo52_material_unit_desc_t *entry = &desc->units[desc->unitCount++];
++	memset( entry, 0, sizeof( *entry ) );
++	entry->unit = unit;
++	entry->engineObject = object;
++	entry->logicalObject = RENDER_GET_PARM( PARM_TEX_TEXNUM, object );
++	entry->target = RENDER_GET_PARM( PARM_TEX_TARGET, object );
++	entry->width = RENDER_GET_PARM( PARM_TEX_WIDTH, object );
++	entry->height = RENDER_GET_PARM( PARM_TEX_HEIGHT, object );
++	entry->format = RENDER_GET_PARM( PARM_TEX_GLFORMAT, object );
++	entry->resourceFlags = RENDER_GET_PARM( PARM_TEX_FLAGS, object );
++	entry->mode = mode;
++	entry->ready = entry->logicalObject != 0 && entry->width != 0 && entry->height != 0;
++	entry->samplerLocation = samplerLocation;
++	entry->samplerValue = unit;
++}
++
++static void WO52Transition( const char *event )
++{
++	const unsigned int event_hash = WO49Checksum( event ? event : "unknown",
++		Q_strlen( event ? event : "unknown" ) );
++	for( unsigned int i = 0; i < wo52_transition_count; ++i )
++	{
++		if( wo52_transition_hashes[i] == event_hash &&
++			wo52_transition_generations[i] == wo52_material_generation )
++			return;
++	}
++	WO49ResolveTopologyAPI();
++	if( pWO52MaterialTransition && wo52_transition_count < 128 )
++	{
++		wo52_transition_hashes[wo52_transition_count] = event_hash;
++		wo52_transition_generations[wo52_transition_count] = wo52_material_generation;
++		++wo52_transition_count;
++		pWO52MaterialTransition( event, wo52_material_generation,
++			tr.realframecount, worldmodel ? worldmodel->name : "<none>" );
++	}
++	else if( pWO52MaterialTransition && !wo52_transition_overflow )
++	{
++		wo52_transition_overflow = true;
++		pWO52MaterialTransition( "transition-overflow-cap-128",
++			wo52_material_generation, tr.realframecount,
++			worldmodel ? worldmodel->name : "<none>" );
++	}
++}
++
++void R_IOSWO52MaterialTransition( const char *event )
++{
++	if( event && !Q_strcmp( event, "R_NewMap" ) )
++		++wo52_material_generation;
++	WO52Transition( event );
++}
+ #endif
+ 
+ //================================================================================================
+@@ -342,6 +505,10 @@ VidInit
+ */
+ void CStudioModelRenderer::VidInit( void )
+ {
++#if defined( XASH_IOS )
++	++wo52_material_generation;
++	WO52Transition( "VidInit" );
++#endif
+ 	ResetRenderCache();
+ #if defined( XASH_IOS )
+ 	if( !ios_material_policy_reported )
+@@ -371,12 +538,16 @@ void CStudioModelRenderer::ResetRenderCache( void )
+ 	cached_aux_mode = STUDIO_TEXTURE_MODE_INVALID;
+ 	cached_aux_material = -1;
+ 	cached_colormask = -1;
++#if defined( XASH_IOS )
++	WO52Transition( "ResetRenderCache" );
++#endif
+ }
+ 
+ void CStudioModelRenderer::InvalidateStudioMaterialCache( void )
+ {
+ 	ResetRenderCache();
+ #if defined( XASH_IOS )
++	WO52Transition( "InvalidateStudioMaterialCache" );
+ 	if( !ios_material_cache_epoch_reported )
+ 	{
+ 		ALERT( at_console, "iOS studio texture cache epoch: cleanup=%u invalidated all studio material identities; next draw rebinds\n", material_cache_epoch );
+@@ -823,6 +994,9 @@ void CStudioModelRenderer::ClearInstanceData( bool create )
+ 
+ void CStudioModelRenderer::ProcessUserData( model_t *mod, qboolean create, const byte *buffer )
+ {
++#if defined( XASH_IOS )
++	WO52Transition( create ? "ProcessUserData:create" : "ProcessUserData:destroy" );
++#endif
+ 	m_pRenderModel = mod;
+ 
+ 	if( !(m_pStudioHeader = (studiohdr_t *)IEngineStudio.Mod_Extradata( m_pRenderModel )) )
+@@ -2207,6 +2381,9 @@ void CStudioModelRenderer::DestroyMeshCache( void )
+ 
+ void CStudioModelRenderer::LoadStudioMaterials( void )
+ {
++#if defined( XASH_IOS )
++	WO52Transition( "LoadStudioMaterials" );
++#endif
+ 	// first we need alloc copy of all the materials to prevent modify mstudiotexture_t
+ 	m_pRenderModel->materials = (mstudiomaterial_t *)Mem_Alloc( sizeof( mstudiomaterial_t ) * m_pStudioHeader->numtextures );
+ 
+@@ -2305,6 +2482,9 @@ void CStudioModelRenderer::LoadStudioMaterials( void )
+ //============================================================================================================
+ void CStudioModelRenderer::TryReloadingAnimation( mstudiomaterial_t *mat )
+ {
++#if defined( XASH_IOS )
++	WO52Transition( "TryReloadingAnimation" );
++#endif
+ 	// find a free slot
+ 	int f = 0;
+ 	while( f < MAX_ANIMATIONS )
+@@ -2354,6 +2534,9 @@ void CStudioModelRenderer::FreeStudioMaterials( void )
+ 
+ void CStudioModelRenderer::DestroyAllModelInstances( void )
+ {
++#if defined( XASH_IOS )
++	WO52Transition( "DestroyAllModelInstances" );
++#endif
+ 	// NOTE: should destroy in reverse-order because it's linked list not array!
+ 	for( int i = m_ModelInstances.Count(); --i >= 0; )
+ 	{
+@@ -5347,6 +5530,183 @@ bool CStudioModelRenderer::WO49BeginTransform( const gl_studiomesh_t *entry,
+ 	wo49_transform_claimed = true;
+ 	return true;
+ }
++
++unsigned long long CStudioModelRenderer::WO52BeginMaterialTrace(
++	const gl_studiomesh_t *entry, const mstudiomaterial_t *mat,
++	int materialSlot, int diffuseObject, int textureMode, int textureObject, int normalUnit,
++	int auxMode, int auxTexture, int cubemapTexture, bool lightpass,
++	const Vector meshparams[3] )
++{
++	WO49ResolveTopologyAPI();
++	if( !pWO52MaterialBegin || !entry || !entry->mesh || !mat ||
++		!RI->currentshader || textureObject <= 0 )
++		return 0;
++
++	wo52_material_producer_desc_t desc;
++	memset( &desc, 0, sizeof( desc ) );
++	desc.version = WO52_MATERIAL_VERSION;
++	desc.size = sizeof( desc );
++	desc.frame = tr.realframecount;
++	desc.generation = wo52_material_generation;
++	desc.entity = m_pCurrentEntity ? m_pCurrentEntity->index : 0;
++	desc.modelHandle = m_pCurrentEntity ? m_pCurrentEntity->modelhandle : 0;
++	desc.skin = m_pCurrentEntity ? m_pCurrentEntity->curstate.skin : 0;
++	desc.bodypart = entry->wo52_bodypart;
++	desc.mesh = entry->wo52_mesh;
++	desc.material = materialSlot;
++	desc.diffuseObject = diffuseObject;
++	desc.fallbackObject = tr.materials[diffuseObject].gl_fallbacktex_id;
++	desc.animationId = tr.materials[diffuseObject].animation_id;
++	desc.monitorObject = m_pCurrentEntity &&
++		m_pCurrentEntity->index < 8192 ?
++		tr.studio_screen_tex[m_pCurrentEntity->index] : 0;
++	desc.droneObject = tr.DroneViewTex;
++	desc.normalObject = tr.materials[diffuseObject].gl_normalmap_id;
++	desc.cubemapObject = cubemapTexture;
++	desc.interiorObject = tr.materials[diffuseObject].gl_interiormap_id;
++	desc.blendObject = tr.materials[diffuseObject].gl_blendtex_id;
++	desc.maskObject = tr.materials[diffuseObject].gl_colormask_id;
++	desc.meshIdentity = (unsigned long long)(size_t)entry->mesh;
++	desc.cacheEpoch = material_cache_epoch;
++	desc.lightpass = lightpass ? 1 : 0;
++	desc.map = worldmodel ? worldmodel->name : "<none>";
++	desc.model = entry->model ? entry->model->name : "<none>";
++	desc.materialName = tr.materials[diffuseObject].name;
++	desc.sourceName = mat->pSource ? mat->pSource->name : "<none>";
++	desc.materialFlags = mat->flags;
++	desc.shaderIndex = entry->hProgram;
++	desc.logicalProgram = RI->currentshader->handle;
++	desc.optionsHash = WO49Checksum( RI->currentshader->options,
++		Q_strlen( RI->currentshader->options ) );
++	desc.shaderStatus = RI->currentshader->status;
++	desc.colorMapLocation = RI->currentshader->u_ColorMap;
++	desc.renderColorLocation = RI->currentshader->u_RenderColor;
++	desc.meshParamsLocation = RI->currentshader->u_MeshParams;
++	desc.studioLightingLocation = RI->currentshader->u_StudioLighting;
++	const float entity_r = m_pCurrentEntity->curstate.rendercolor.r / 255.0f;
++	const float entity_g = m_pCurrentEntity->curstate.rendercolor.g / 255.0f;
++	const float entity_b = m_pCurrentEntity->curstate.rendercolor.b / 255.0f;
++	if( !r_lightmap->value && ( tr.materials[diffuseObject].ApplyColor ||
++		tr.materials[diffuseObject].gl_colormask_id > 0 ) )
++	{
++		desc.renderColor[0] = entity_r;
++		desc.renderColor[1] = entity_g;
++		desc.renderColor[2] = entity_b;
++		desc.renderColor[3] = tr.blend;
++		if( m_pCurrentEntity->curstate.rendermode == kRenderTransAdd &&
++			!m_pCurrentEntity->curstate.rendercolor.r &&
++			!m_pCurrentEntity->curstate.rendercolor.g &&
++			!m_pCurrentEntity->curstate.rendercolor.b )
++			desc.renderColor[0] = desc.renderColor[1] = desc.renderColor[2] = 1.0f;
++	}
++	else
++	{
++		switch( m_pCurrentEntity->curstate.rendermode )
++		{
++		case kRenderTransColor:
++			desc.renderColor[0] = entity_r;
++			desc.renderColor[1] = entity_g;
++			desc.renderColor[2] = entity_b;
++			desc.renderColor[3] = tr.blend;
++			break;
++		case kRenderTransAdd:
++			desc.renderColor[0] = desc.renderColor[1] =
++				desc.renderColor[2] = tr.blend;
++			desc.renderColor[3] = 1.0f;
++			break;
++		case kRenderNormal:
++		case kRenderTransAlpha:
++			desc.renderColor[0] = desc.renderColor[1] =
++				desc.renderColor[2] = desc.renderColor[3] = 1.0f;
++			break;
++		default:
++			desc.renderColor[0] = desc.renderColor[1] =
++				desc.renderColor[2] = 1.0f;
++			desc.renderColor[3] = tr.blend;
++			break;
++		}
++	}
++	desc.meshParams[0] = meshparams[2].x;
++	desc.meshParams[1] = meshparams[2].y;
++	desc.meshParams[2] = meshparams[2].z;
++	desc.meshParams[3] = tr.time;
++	desc.fullbright = FBitSet( mat->flags, STUDIO_NF_FULLBRIGHT ) ||
++		m_pCurrentEntity->curstate.renderfx == kRenderFxFullbright ||
++		m_pCurrentEntity->curstate.renderfx == kRenderFxFullbrightNoShadows;
++	desc.additive = FBitSet( mat->flags, STUDIO_NF_ADDITIVE ) ||
++		m_pCurrentEntity->curstate.rendermode == kRenderTransAdd;
++	desc.vertexLighting = FBitSet( m_pModelInstance->info_flags, MF_VERTEX_LIGHTING );
++
++	WO52AddMaterialUnit( &desc, 0, textureObject, textureMode,
++		RI->currentshader->u_ColorMap );
++	if( RI->currentshader->status & SHADER_USE_BUMP )
++		WO52AddMaterialUnit( &desc, normalUnit,
++		tr.materials[diffuseObject].gl_normalmap_id,
++			STUDIO_TEXTURE_MODE_BASE, RI->currentshader->u_NormalMap );
++	if( auxMode != STUDIO_TEXTURE_MODE_INVALID )
++		WO52AddMaterialUnit( &desc, 4, auxTexture, auxMode,
++			auxMode == STUDIO_TEXTURE_MODE_INTERIOR ?
++			RI->currentshader->u_InteriorMap : RI->currentshader->u_BlendTexture );
++	if( !lightpass && ( RI->currentshader->status & SHADER_USE_CUBEMAPS ) )
++		WO52AddMaterialUnit( &desc, 2, cubemapTexture,
++			STUDIO_TEXTURE_MODE_BASE, RI->currentshader->u_CubemapBox );
++	if( tr.materials[diffuseObject].gl_colormask_id > 0 )
++		WO52AddMaterialUnit( &desc, 5,
++			tr.materials[diffuseObject].gl_colormask_id,
++			STUDIO_TEXTURE_MODE_BASE, RI->currentshader->u_ColorMask );
++	return pWO52MaterialBegin( &desc );
++}
++
++void CStudioModelRenderer::WO52RecordMaterialCache( unsigned long long token,
++	bool lightpass, const int requestedObject[6], const int beforeObject[6],
++	const int beforeMode[6], const int issued[6] )
++{
++	(void)lightpass;
++	if( !token || !pWO52MaterialCache )
++		return;
++	wo52_material_cache_desc_t desc;
++	memset( &desc, 0, sizeof( desc ) );
++	desc.version = WO52_MATERIAL_VERSION;
++	desc.size = sizeof( desc );
++	desc.token = token;
++	desc.cacheEpoch = material_cache_epoch;
++	for( int unit = 0; unit < 6; ++unit )
++	{
++		if( requestedObject[unit] <= 0 )
++			continue;
++		wo52_material_cache_unit_t *entry = &desc.units[desc.unitCount++];
++		entry->unit = unit;
++		entry->requestedObject = requestedObject[unit];
++		entry->beforeObject = beforeObject[unit];
++		entry->beforeMode = beforeMode[unit];
++		entry->issued = issued[unit];
++		switch( unit )
++		{
++		case 0:
++			entry->afterObject = cached_texture_object;
++			entry->afterMode = cached_texture_mode;
++			break;
++		case 1:
++		case 3:
++			entry->afterObject = cached_normalmap;
++			entry->afterMode = STUDIO_TEXTURE_MODE_BASE;
++			break;
++		case 2:
++			entry->afterObject = cached_cubemap_texture;
++			entry->afterMode = STUDIO_TEXTURE_MODE_BASE;
++			break;
++		case 4:
++			entry->afterObject = cached_aux_texture;
++			entry->afterMode = cached_aux_mode;
++			break;
++		case 5:
++			entry->afterObject = cached_colormask;
++			entry->afterMode = STUDIO_TEXTURE_MODE_BASE;
++			break;
++		}
++	}
++	pWO52MaterialCache( &desc );
++}
+ #endif
+ 
+ /*
+@@ -5355,7 +5715,9 @@ AddMeshToDrawList
+ 
+ ====================
+ */
+-void CStudioModelRenderer::AddMeshToDrawList( studiohdr_t *phdr, const vbomesh_t *mesh, bool lightpass, bool cached_materials )
++void CStudioModelRenderer::AddMeshToDrawList( studiohdr_t *phdr,
++	const vbomesh_t *mesh, int bodypart, int meshIndex, bool lightpass,
++	bool cached_materials )
+ {
+ #if defined( XASH_IOS )
+ 	unsigned long long wo49_token = 0;
+@@ -5436,6 +5798,8 @@ void CStudioModelRenderer::AddMeshToDrawList( studiohdr_t *phdr, const vbomesh_t
+ 	entry->additive = FBitSet( mat->flags, STUDIO_NF_ADDITIVE ) ? true : false;
+ #if defined( XASH_IOS )
+ 	entry->wo49_token = wo49_token;
++	entry->wo52_bodypart = bodypart;
++	entry->wo52_mesh = meshIndex;
+ #endif
+ 	if( entry->additive )
+ 		m_pModelInstance->bHasAdditiveMeshes = true;
+@@ -5462,18 +5826,21 @@ void CStudioModelRenderer::AddBodyPartToDrawList( studiohdr_t *phdr, mbodypart_s
+ 	if( !pSubModel ) return; // blank submodel, just ignore
+ 
+ 	for( int i = 0; i < pSubModel->nummesh; i++ )
+-		AddMeshToDrawList( phdr, &pSubModel->meshes[i], lightpass, cached_materials );
++		AddMeshToDrawList( phdr, &pSubModel->meshes[i], bodypart, i,
++			lightpass, cached_materials );
+ }
+ 
+ void CStudioModelRenderer::DrawMeshFromBuffer( const vbomesh_t *mesh
+ #if defined( XASH_IOS )
+-	, unsigned long long wo49_token
++	, unsigned long long wo49_token, unsigned long long wo52_token
+ #endif
+ )
+ {
+ #if defined( XASH_IOS )
+ 	if( wo49_token && pWO49TopologyArm )
+ 		pWO49TopologyArm( wo49_token );
++	if( wo52_token && pWO52MaterialArm )
++		pWO52MaterialArm( wo52_token );
+ #endif
+ 	pglBindVertexArray( mesh->vao );
+ 	pglBindBufferARB( GL_ELEMENT_ARRAY_BUFFER_ARB, mesh->ibo );
+@@ -5488,6 +5855,8 @@ void CStudioModelRenderer::DrawMeshFromBuffer( const vbomesh_t *mesh
+ 		pWO49TopologyFinish( wo49_token );
+ 	if( wo49_token && pWO49TransformFinish )
+ 		pWO49TransformFinish( wo49_token );
++	if( wo52_token && pWO52MaterialFinish )
++		pWO52MaterialFinish( wo52_token );
+ #endif
+ 
+ 	r_stats.c_total_tris += (mesh->numElems / 3);
+@@ -5733,10 +6102,57 @@ void CStudioModelRenderer::DrawLightForMeshList( plight_t *pl )
+ 			texture_object = tr.studio_screen_tex[m_pCurrentEntity->index];
+ 		}
+ 
++#if defined( XASH_IOS )
++		int wo52_requested[6] = { 0 };
++		int wo52_before[6] = { 0 };
++		int wo52_before_mode[6] = { 0 };
++		int wo52_issued[6] = { 0 };
++		int wo52_aux_mode = STUDIO_TEXTURE_MODE_INVALID;
++		int wo52_aux_texture = -1;
++		if( RI->currentshader->status & SHADER_USE_INTERIOR )
++		{
++			wo52_aux_mode = STUDIO_TEXTURE_MODE_INTERIOR;
++			wo52_aux_texture = tr.materials[iTexnum].gl_interiormap_id;
++		}
++		else if( tr.materials[iTexnum].gl_blendtex_id > 0 )
++		{
++			wo52_aux_mode = STUDIO_TEXTURE_MODE_BLEND;
++			wo52_aux_texture = tr.materials[iTexnum].gl_blendtex_id;
++		}
++		wo52_requested[0] = texture_object;
++		wo52_before[0] = cached_texture_object;
++		wo52_before_mode[0] = cached_texture_mode;
++		if( RI->currentshader->status & SHADER_USE_BUMP )
++		{
++			wo52_requested[3] = tr.materials[iTexnum].gl_normalmap_id;
++			wo52_before[3] = cached_normalmap;
++			wo52_before_mode[3] = STUDIO_TEXTURE_MODE_BASE;
++		}
++		if( wo52_aux_mode != STUDIO_TEXTURE_MODE_INVALID )
++		{
++			wo52_requested[4] = wo52_aux_texture;
++			wo52_before[4] = cached_aux_texture;
++			wo52_before_mode[4] = cached_aux_mode;
++		}
++		if( tr.materials[iTexnum].gl_colormask_id > 0 )
++		{
++			wo52_requested[5] = tr.materials[iTexnum].gl_colormask_id;
++			wo52_before[5] = cached_colormask;
++			wo52_before_mode[5] = STUDIO_TEXTURE_MODE_BASE;
++		}
++		const unsigned long long wo52_token = WO52BeginMaterialTrace( entry,
++			mat, pskinref[pMesh->skinref], iTexnum, texture_mode, texture_object,
++			3, wo52_aux_mode,
++			wo52_aux_texture, -1, true, meshparams );
++#endif
++
+ 		if( texture_mode == STUDIO_TEXTURE_MODE_COLORMAP ||
+ 			cached_texture != iTexnum || cached_texture_object != texture_object ||
+ 			cached_texture_mode != texture_mode )
+ 		{
++#if defined( XASH_IOS )
++			wo52_issued[0] = 1;
++#endif
+ 			if( texture_mode == STUDIO_TEXTURE_MODE_COLORMAP )
+ 				IEngineStudio.StudioSetupSkin( m_pStudioHeader, pskinref[pMesh->skinref] );
+ 			else
+@@ -5748,6 +6164,9 @@ void CStudioModelRenderer::DrawLightForMeshList( plight_t *pl )
+ 
+ 		if( RI->currentshader->status & SHADER_USE_BUMP && cached_normalmap != tr.materials[iTexnum].gl_normalmap_id )
+ 		{
++#if defined( XASH_IOS )
++			wo52_issued[3] = 1;
++#endif
+ 			GL_Bind( GL_TEXTURE3, tr.materials[iTexnum].gl_normalmap_id );
+ 			cached_normalmap = tr.materials[iTexnum].gl_normalmap_id;
+ 		}
+@@ -5768,6 +6187,9 @@ void CStudioModelRenderer::DrawLightForMeshList( plight_t *pl )
+ 		if( aux_mode != STUDIO_TEXTURE_MODE_INVALID &&
+ 			( cached_aux_texture != aux_texture || cached_aux_mode != aux_mode || cached_aux_material != iTexnum ) )
+ 		{
++#if defined( XASH_IOS )
++			wo52_issued[4] = 1;
++#endif
+ 			GL_Bind( GL_TEXTURE4, aux_texture );
+ 			cached_aux_texture = aux_texture;
+ 			cached_aux_mode = aux_mode;
+@@ -5816,6 +6238,9 @@ void CStudioModelRenderer::DrawLightForMeshList( plight_t *pl )
+ 				if( tr.materials[iTexnum].gl_colormask_id > 0 &&
+ 					cached_colormask != tr.materials[iTexnum].gl_colormask_id )
+ 				{
++#if defined( XASH_IOS )
++					wo52_issued[5] = 1;
++#endif
+ 					GL_Bind( GL_TEXTURE5, tr.materials[iTexnum].gl_colormask_id ); // u_ColorMask
+ 					cached_colormask = tr.materials[iTexnum].gl_colormask_id;
+ 				}
+@@ -5826,9 +6251,14 @@ void CStudioModelRenderer::DrawLightForMeshList( plight_t *pl )
+ 		else
+ 			R_SetRenderColor( RI->currententity );
+ 
++#if defined( XASH_IOS )
++		WO52RecordMaterialCache( wo52_token, true, wo52_requested,
++			wo52_before, wo52_before_mode, wo52_issued );
++#endif
++
+ 		DrawMeshFromBuffer( pMesh
+ #if defined( XASH_IOS )
+-			, entry->wo49_token
++			, entry->wo49_token, wo52_token
+ #endif
+ 		);
+ 	}
+@@ -6086,10 +6516,67 @@ void CStudioModelRenderer::DrawStudioMeshes( void )
+ 			texture_object = tr.DroneViewTex;
+ 		}
+ 
++#if defined( XASH_IOS )
++		int wo52_requested[6] = { 0 };
++		int wo52_before[6] = { 0 };
++		int wo52_before_mode[6] = { 0 };
++		int wo52_issued[6] = { 0 };
++		int wo52_aux_mode = STUDIO_TEXTURE_MODE_INVALID;
++		int wo52_aux_texture = -1;
++		if( RI->currentshader->status & SHADER_USE_INTERIOR )
++		{
++			wo52_aux_mode = STUDIO_TEXTURE_MODE_INTERIOR;
++			wo52_aux_texture = tr.materials[iTexnum].gl_interiormap_id;
++		}
++		else if( tr.materials[iTexnum].gl_blendtex_id > 0 )
++		{
++			wo52_aux_mode = STUDIO_TEXTURE_MODE_BLEND;
++			wo52_aux_texture = tr.materials[iTexnum].gl_blendtex_id;
++		}
++		const int wo52_cubemap_texture =
++			( RI->currentshader->status & SHADER_USE_CUBEMAPS ) ?
++			( m_pModelInstance->cubemap ? m_pModelInstance->cubemap->texture :
++			tr.blackCubeTexture ) : -1;
++		wo52_requested[0] = texture_object;
++		wo52_before[0] = cached_texture_object;
++		wo52_before_mode[0] = cached_texture_mode;
++		if( RI->currentshader->status & SHADER_USE_BUMP )
++		{
++			wo52_requested[1] = tr.materials[iTexnum].gl_normalmap_id;
++			wo52_before[1] = cached_normalmap;
++			wo52_before_mode[1] = STUDIO_TEXTURE_MODE_BASE;
++		}
++		if( wo52_cubemap_texture > 0 )
++		{
++			wo52_requested[2] = wo52_cubemap_texture;
++			wo52_before[2] = cached_cubemap_texture;
++			wo52_before_mode[2] = STUDIO_TEXTURE_MODE_BASE;
++		}
++		if( wo52_aux_mode != STUDIO_TEXTURE_MODE_INVALID )
++		{
++			wo52_requested[4] = wo52_aux_texture;
++			wo52_before[4] = cached_aux_texture;
++			wo52_before_mode[4] = cached_aux_mode;
++		}
++		if( tr.materials[iTexnum].gl_colormask_id > 0 )
++		{
++			wo52_requested[5] = tr.materials[iTexnum].gl_colormask_id;
++			wo52_before[5] = cached_colormask;
++			wo52_before_mode[5] = STUDIO_TEXTURE_MODE_BASE;
++		}
++		const unsigned long long wo52_token = WO52BeginMaterialTrace( entry,
++			mat, pskinref[pMesh->skinref], iTexnum, texture_mode, texture_object,
++			1, wo52_aux_mode,
++			wo52_aux_texture, wo52_cubemap_texture, false, meshparams );
++#endif
++
+ 		if( texture_mode == STUDIO_TEXTURE_MODE_COLORMAP ||
+ 			cached_texture != iTexnum || cached_texture_object != texture_object ||
+ 			cached_texture_mode != texture_mode )
+ 		{
++#if defined( XASH_IOS )
++			wo52_issued[0] = 1;
++#endif
+ 			if( texture_mode == STUDIO_TEXTURE_MODE_COLORMAP )
+ 				IEngineStudio.StudioSetupSkin( m_pStudioHeader, pskinref[pMesh->skinref] );
+ 			else
+@@ -6101,6 +6588,9 @@ void CStudioModelRenderer::DrawStudioMeshes( void )
+ 
+ 		if( RI->currentshader->status & SHADER_USE_BUMP && cached_normalmap != tr.materials[iTexnum].gl_normalmap_id )
+ 		{
++#if defined( XASH_IOS )
++			wo52_issued[1] = 1;
++#endif
+ 			GL_Bind( GL_TEXTURE1, tr.materials[iTexnum].gl_normalmap_id ); // u_NormalMap
+ 			cached_normalmap = tr.materials[iTexnum].gl_normalmap_id;
+ 		}
+@@ -6121,6 +6611,9 @@ void CStudioModelRenderer::DrawStudioMeshes( void )
+ 		if( aux_mode != STUDIO_TEXTURE_MODE_INVALID &&
+ 			( cached_aux_texture != aux_texture || cached_aux_mode != aux_mode || cached_aux_material != iTexnum ) )
+ 		{
++#if defined( XASH_IOS )
++			wo52_issued[4] = 1;
++#endif
+ 			GL_Bind( GL_TEXTURE4, aux_texture );
+ 			cached_aux_texture = aux_texture;
+ 			cached_aux_mode = aux_mode;
+@@ -6182,6 +6675,9 @@ void CStudioModelRenderer::DrawStudioMeshes( void )
+ 				if( tr.materials[iTexnum].gl_colormask_id > 0 &&
+ 					cached_colormask != tr.materials[iTexnum].gl_colormask_id )
+ 				{
++#if defined( XASH_IOS )
++					wo52_issued[5] = 1;
++#endif
+ 					GL_Bind( GL_TEXTURE5, tr.materials[iTexnum].gl_colormask_id ); // u_ColorMask
+ 					cached_colormask = tr.materials[iTexnum].gl_colormask_id;
+ 				}
+@@ -6201,6 +6697,9 @@ void CStudioModelRenderer::DrawStudioMeshes( void )
+ 				if( cached_cubemap != m_pModelInstance->cubemap ||
+ 					cached_cubemap_texture != cubemap_texture )
+ 				{
++#if defined( XASH_IOS )
++					wo52_issued[2] = 1;
++#endif
+ 					GL_Bind( GL_TEXTURE2, cubemap_texture );
+ 					// box mins
+ 					cubemap_params[0] = m_pModelInstance->cubemap->mins;
+@@ -6218,6 +6717,9 @@ void CStudioModelRenderer::DrawStudioMeshes( void )
+ 			{
+ 				if( cached_cubemap != NULL || cached_cubemap_texture != cubemap_texture )
+ 				{
++#if defined( XASH_IOS )
++					wo52_issued[2] = 1;
++#endif
+ 					GL_Bind( GL_TEXTURE2, cubemap_texture );
+ 					cubemap_params[0] = g_vecZero;
+ 					cubemap_params[1] = g_vecZero;
+@@ -6241,10 +6743,15 @@ void CStudioModelRenderer::DrawStudioMeshes( void )
+ 			}
+ 		}
+ 
++#if defined( XASH_IOS )
++		WO52RecordMaterialCache( wo52_token, false, wo52_requested,
++			wo52_before, wo52_before_mode, wo52_issued );
++#endif
++
+ 		r_stats.c_studio_polys += (pMesh->numElems / 3);
+ 		DrawMeshFromBuffer( pMesh
+ #if defined( XASH_IOS )
+-			, entry->wo49_token
++			, entry->wo49_token, wo52_token
+ #endif
+ 		);
+ 	}
+@@ -6381,7 +6888,7 @@ void CStudioModelRenderer::DrawStudioMeshesShadow( void )
+ 
+ 		DrawMeshFromBuffer( pMesh
+ #if defined( XASH_IOS )
+-			, entry->wo49_token
++			, entry->wo49_token, 0
+ #endif
+ 		);
+ 	}
+diff --git a/client/render/r_studio.h b/client/render/r_studio.h
+index 517a1a1..e2789bb 100644
+--- a/client/render/r_studio.h
++++ b/client/render/r_studio.h
+@@ -199,6 +199,8 @@ typedef struct
+ 	bool additive;		// additive mesh
+ #if defined( XASH_IOS )
+ 	unsigned long long wo49_token;	// diagnostics-only producer correlation
++	int wo52_bodypart;
++	int wo52_mesh;
+ #endif
+ } gl_studiomesh_t;
+ 
+@@ -324,7 +326,8 @@ private:
+ 
+ 	virtual word ChooseStudioProgram( studiohdr_t *phdr, mstudiomaterial_t *mat, bool lightpass );
+ 
+-	virtual void AddMeshToDrawList( studiohdr_t *phdr, const vbomesh_t *mesh, bool lightpass, bool solidPass );
++	virtual void AddMeshToDrawList( studiohdr_t *phdr, const vbomesh_t *mesh,
++		int bodypart, int meshIndex, bool lightpass, bool solidPass );
+ 
+ 	virtual void AddBodyPartToDrawList( studiohdr_t *phdr, mbodypart_t *bodyparts, int bodypart, bool lightpass, bool solid );
+ 
+@@ -332,11 +335,18 @@ private:
+ 	unsigned long long WO49ProduceTopology( const vbomesh_t *mesh );
+ 	bool WO49BeginTransform( const gl_studiomesh_t *entry, const vbomesh_t *mesh,
+ 		int num_bones, bool bones_upload, float foliage_sway_height );
++	unsigned long long WO52BeginMaterialTrace( const gl_studiomesh_t *entry,
++		const mstudiomaterial_t *mat, int materialSlot, int diffuseObject, int textureMode,
++		int textureObject, int normalUnit, int auxMode, int auxTexture,
++		int cubemapTexture, bool lightpass, const Vector meshparams[3] );
++	void WO52RecordMaterialCache( unsigned long long token, bool lightpass,
++		const int requestedObject[6], const int beforeObject[6],
++		const int beforeMode[6], const int issued[6] );
+ #endif
+ 
+ 	inline void DrawMeshFromBuffer( const vbomesh_t *mesh
+ #if defined( XASH_IOS )
+-		, unsigned long long wo49_token
++		, unsigned long long wo49_token, unsigned long long wo52_token
+ #endif
+ 	);
+ 
+diff --git a/client/render/r_world.cpp b/client/render/r_world.cpp
+index d262e30..8ef4205 100644
+--- a/client/render/r_world.cpp
++++ b/client/render/r_world.cpp
+@@ -1824,6 +1824,9 @@ loading the new map
+ */
+ void Mod_PrepareModelInstances( void )
+ {
++#if defined( XASH_IOS )
++	R_IOSWO52MaterialTransition( "Mod_PrepareModelInstances" );
++#endif
+ 	// invalidate model handles
+ 	for( int i = 1; i < RENDER_GET_PARM( PARM_MAX_ENTITIES, 0 ); i++ )
+ 	{
+@@ -1845,6 +1848,9 @@ loading the new map
+ */
+ void Mod_ThrowModelInstances( void )
+ {
++#if defined( XASH_IOS )
++	R_IOSWO52MaterialTransition( "Mod_ThrowModelInstances" );
++#endif
+ 	// engine already released entity array so we can't release
+ 	// model instance for each entity personally 
+ 	g_StudioRenderer.DestroyAllModelInstances();
+@@ -1866,6 +1872,9 @@ Mod_LoadWorld
+ */
+ static void Mod_LoadWorld( model_t *mod, const byte *buf )
+ {
++#if defined( XASH_IOS )
++	R_IOSWO52MaterialTransition( "Mod_LoadWorld" );
++#endif
+ 	dheader_t *header;
+ 	dextrahdr_t *extrahdr;
+ 	int i;
