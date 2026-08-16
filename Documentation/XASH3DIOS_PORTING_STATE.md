@@ -1641,3 +1641,59 @@ Expected new log markers: **none**. Workflow URL/ID/result: **none**. IPA/artifa
 Remaining risks: terrain stays unavailable until a migration route passes native conformance; current NG-GL4ES branch history is mutable and the old `8eca1a14` comparison is not presently reproducible; the three material defects remain unfixed pending authorization; a future cache repair must cover every actual selected-object family without sacrificing within-pass reuse; shader compilation latency and the later transition termination remain separate; and Bundle 81 is not a generally accepted gameplay candidate.
 
 Stop state: **Work Order 51 Phase A Outcome B is complete. Stop for orchestrator review.** Do not implement or begin Phase B, build, run CI, create or upload an IPA, contact Arjun, request evidence/testing, or reopen terrain with a narrower diagnostic patch.
+
+## Work Order 51 Phase B - Bundle 85 consolidated material-state repair
+
+Candidate/run and acceptance status: **Outcome A, Bundle 85 is build-qualified and published but is not device-tested or device-accepted.** This worker does not request a device test. The accepted Bundle 69 direct-drawable architecture, Bundle 71 native-ES3 32-bit index invariant, Bundle 81 per-texture-unit target realization, Diffusion menu/touch/callback/map behavior, exact source pins, and unrelated user changes are preserved. Terrain/texture arrays, GL4ES shader conversion, transition behavior, and shader-compilation latency remain outside this candidate.
+
+### Candidate, commits, workflow, artifact, and publication
+
+- Final behavioral/build commit: `c7f18b6e234a0efc4e6de7f5e1c2b6d71327352a` (`Repair Diffusion studio material-state invariants`). Exact pins remain engine/executable `9505a1c01f597e23c3acb7cbb8852b9dcfb0a038`, Diffusion `14d156bf3a6993c172697fac83a937836c3b5561`, MainUI `8c68de2f2325a0130953719efc3ae413eb24e01a`, SDL `5d249570393f7a37e037abf22cd6012a4cc56a71`, and GL4ES `81547d986798e876de8b434193920b606a72363f`.
+- Sole retained qualifying workflow: GitHub Actions push run `31958083850`, successful, head `c7f18b6e234a0efc4e6de7f5e1c2b6d71327352a`: `https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/31958083850`. The automatic pull-request twin `31958085306` was canceled and produced no retained candidate. Skipped `Build & Deploy Engine` runs are not candidates.
+- Disclosed prequalification failure: push run `31957328896` at superseded SHA `ad5b9f3933587bceb651aab3436fef4f00f57e626` stopped before Diffusion compilation because two non-semantic end-of-file newline hunks did not apply on Linux; it produced no IPA/artifact. Its PR twin `31957332861` was canceled. Removing only those EOF hunks, replaying from the exact pin, and amending the same behavioral unit produced the final commit above; runtime semantics did not change.
+- Retained GitHub artifact: `Xash3DiOS-arm64-unsigned`, artifact ID `9266557105`, archive size `8,592,491` bytes, archive digest `sha256:2e70331aa05cd3ebb454dbfd1ce823964ccfd3e42cadb6013764d84f622e2bed`, expiry `2026-08-30T16:21:07Z`: `https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/31958083850/artifacts/9266557105`.
+- Verified IPA: `xash3d-fwgs-ios-arm64.ipa`, `8,690,958` bytes, SHA-256 `89109695341BFE8E92C8E024982D8B15423812022BCF58E274E09D0EA40A1168`.
+- Exactly one tempfile.org upload of that verified IPA: information page `https://tempfile.org/Qpb2BedypS9/`; direct download `https://tempfile.org/Qpb2BedypS9/download`; expiry `2026-08-17T16:27:00.301Z`. Upload and metadata readback report the exact filename and `8,690,958` bytes; the security endpoint reports `safe`, no warning and no suspicious patterns, with server SHA-256 `89109695341bfe8e92c8e024982d8b15423812022bcf58e274e09d0ea40a1168`. Direct-URL headers independently report HTTP 200, the exact filename/content length, and the same expiry.
+
+### Verified failure boundary and structural cause
+
+The first material-state divergence is in pinned Diffusion's studio producer, before engine `GL_Bind` and before GL4ES. `DrawStudioMeshes`, `RenderDynLightList`, and `DrawStudioMeshesShadow` end authoritative passes with `GL_CleanUpTextureUnits(0)`, which invalidates engine texture-unit state, while `CStudioModelRenderer` previously retained private member cache identities. The next sorted draw could therefore treat a material as already bound and suppress the application `GL_Bind` that Bundle 81 correctly realizes. The old base key was only material `iTexnum`; it did not represent the selected white/fallback/animated frame/monitor entity/drone object or selection mode. Dependent normal, cubemap, interior/blend, and colormask identities likewise lacked a complete post-cleanup lifetime invariant.
+
+Two independent uniform producer defects are confirmed at the same application boundary. Solid studio variants have exact linked `u_StudioParams` vec4 extents of 1 for additive/no-chrome, 2 for additive/chrome, and 3 for non-additive, but the producer unconditionally submitted count 3; pinned GL4ES correctly rejects an over-count rather than truncating it. The packaged foliage shader declares `u_FoliageSwayHeight` as float, but solid studio used the integer upload API while dynamic-light and depth siblings already used float.
+
+### Structural repair and why it satisfies the order
+
+Diffusion now owns an explicit studio material-cache epoch. Every audited authoritative cleanup immediately invalidates all base and dependent identities, forcing the next complete bind while retaining unchanged same-pass reuse. Base decisions are keyed by material, actual selected object, and selection mode across base, white, fallback, animated, monitor/entity-screen, and drone routes; the engine-owned colormap remap remains intentionally forced because its actual object is not observable at this layer. Normal, cubemap object/owner, interior-versus-blend auxiliary object/material, and colormask identities are independently represented. Shader switches use the same centralized reset. No brute-force per-draw texture flushing and no GL4ES, SDL, drawable, index, menu, terrain, asset, or transition mutation was introduced.
+
+Solid-studio shader metadata now derives the exact 1/2/3 extent from the same additive/chrome directives that construct the variant, reflects the linked active `GL_FLOAT_VEC4` array extent after link, and rejects a program unless producer metadata, linked extent, and upload count agree. `DrawStudioMeshes` uploads only that exact count. There is no GL4ES clamp, name-based inference, or coercion. Solid foliage now uses `pglUniform1fARB` with an explicit float value, matching the unchanged float shader declaration and its dynamic-light/depth siblings.
+
+### Exact files and validation
+
+Behavioral files changed:
+
+- `scripts/ios/diffusion-wo51-material-state-ios.patch`
+- `scripts/ios/validate-ios-material-state.py`
+- `scripts/ios/builddiffusion.sh`
+- `scripts/ios/verify_ipa.sh`
+
+This durable report additionally changes `Documentation/XASH3DIOS_PORTING_STATE.md`. The runtime patch changes only pinned Diffusion `client/render/r_shader.cpp`, `client/render/r_shader.h`, `client/render/r_studio.cpp`, and `client/render/r_studio.h` during the iOS build.
+
+Validation performed: complete authoritative-ledger authority check; Codebase Memory-first symbol/call-path inspection followed by exact source inspection; complete cleanup-to-next-bind and solid/dlight/depth uniform trace; clean exact-pin patch replay in CI order; deterministic positive fixtures proving first complete rebind, unchanged same-pass reuse, actual object/mode changes, auxiliary mode changes, cubemap owner changes and cleanup epochs; rejection mutations for stale cleanup, incomplete object/mode keys, missing animation, unconditional count 3, wrong counts for each 1/2/3 class, missing linked-extent rejection, integer foliage declaration/call, and GL4ES coercion; Diffusion policy plus Bundle 69 direct-drawable, Bundle 71 uint-index/index-trace, Bundle 81 per-unit texture-target, WO49 topology, and WO49 transform positive/rejection suites; Python syntax and `git diff --check`.
+
+The successful macOS workflow reapplied every exact pin, installed the GLES shader validator, passed all preservation and WO51 positive/rejection gates, retained the shared animated-model/one-bone-rigid shader policy, built the complete engine, Half-Life client/server, Diffusion client/server/menu, MainUI, SDL, and GL4ES graph with `XASH_IOS=1`, then passed the IPA contract and artifact upload. Independent extraction verifies `CFBundleVersion=85`, `MinimumOSVersion=12.0`, file sharing enabled, all five new markers, 13 of 13 Mach-O files thin arm64, and 11 game dylibs.
+
+Expected new engine.log marker prefixes:
+
+- `iOS material-state policy:`
+- `iOS studio texture cache epoch:`
+- `iOS studio params exact count:`
+- `iOS foliage uniform type:`
+- `iOS material-state terminal:`
+
+Single device test requested: **none**. Only the orchestrator may authorize any Bundle 85 device action.
+
+Remaining risks: Bundle 85 is build-qualified, not device-accepted; device evidence may reveal a separate material, asset, lighting, or presentation defect after the three proven producer defects are removed. Landscape remains unsupported pending the separate renderer-migration roadmap. Synchronous shader compilation latency and the later map-transition crash/termination remain independent and unchanged. None authorizes a follow-up patch, workflow, artifact, upload, user contact, or test request.
+
+Durable ledger path and commit: `Documentation/XASH3DIOS_PORTING_STATE.md`. Behavioral commit is `c7f18b6e234a0efc4e6de7f5e1c2b6d71327352a`. This complete report is published in one documentation-only `[skip ci]` commit; its exact hash is mirrored into the authoritative Google Docs ledger and final handoff because a Git commit cannot contain its own hash.
+
+Stop state: **Work Order 51 Phase B Outcome A implementation, validation, sole retained Bundle-85 workflow/artifact, independent IPA verification, exactly one tempfile.org upload, and both durable-ledger updates are complete. Stop for orchestrator review.** Do not contact Arjun, request logs/evidence/device testing, claim device acceptance, modify code, start another workflow, create another artifact/upload, or begin Phase C or any later work order.
