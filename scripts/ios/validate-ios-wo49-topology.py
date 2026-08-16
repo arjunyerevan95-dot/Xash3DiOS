@@ -250,7 +250,7 @@ def validate(files: dict[str, str], repo: pathlib.Path | None,
         studio = files["studio"]
         diff_patch = files["diff_patch"]
         produce = section(studio, "unsigned long long CStudioModelRenderer::WO49ProduceTopology(",
-                          "/*\n====================\nAddMeshToDrawList")
+                          "bool CStudioModelRenderer::WO49BeginTransform(")
         add_mesh = section(studio, "void CStudioModelRenderer::AddMeshToDrawList(",
                            "void CStudioModelRenderer::AddBodyPartToDrawList(")
         for token in (
@@ -300,7 +300,7 @@ def validate(files: dict[str, str], repo: pathlib.Path | None,
 def self_test(files: dict[str, str], require_diffusion: bool) -> list[str]:
     failures: list[str] = []
     cases: list[tuple[str, str, str, str]] = [
-        ("pre-realization hook", "fpe", "realize_bufferIndex();\n    ios_wo49_topology_realized", "ios_wo49_topology_realized(\"early\", mode, count, type, indices);\n    realize_bufferIndex();\n    /*"),
+        ("pre-realization hook", "fpe", "realize_bufferIndex();\n    ios_wo49_transform_before_draw(\"fpe_glDrawElements\", mode, count, type);\n    ios_wo49_topology_realized(\"fpe_glDrawElements\", mode, count, type, indices);", "ios_wo49_topology_realized(\"early\", mode, count, type, indices);\n    realize_bufferIndex();\n    ios_wo49_transform_before_draw(\"fpe_glDrawElements\", mode, count, type);"),
         ("missing direct", "drawing", "ios_wo49_topology_set_active(ios_wo49_token);", "missing_direct(ios_wo49_token);"),
         ("missing replay", "listdraw", "ios_wo49_topology_set_replay(", "missing_replay("),
         ("index only", "trace", "program->va_size[index]", "0 /* attributes omitted */"),

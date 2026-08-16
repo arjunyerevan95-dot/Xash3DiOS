@@ -26,6 +26,8 @@ git -C 3rdparty/gl4es/gl4es apply --check "$GITHUB_WORKSPACE/scripts/ios/gl4es-i
 git -C 3rdparty/gl4es/gl4es apply "$GITHUB_WORKSPACE/scripts/ios/gl4es-index-trace-ios.patch" || die
 git -C 3rdparty/gl4es/gl4es apply --check "$GITHUB_WORKSPACE/scripts/ios/gl4es-wo49-topology-ios.patch" || die
 git -C 3rdparty/gl4es/gl4es apply "$GITHUB_WORKSPACE/scripts/ios/gl4es-wo49-topology-ios.patch" || die
+git -C 3rdparty/gl4es/gl4es apply --check "$GITHUB_WORKSPACE/scripts/ios/gl4es-wo49-transform-ios.patch" || die
+git -C 3rdparty/gl4es/gl4es apply "$GITHUB_WORKSPACE/scripts/ios/gl4es-wo49-transform-ios.patch" || die
 python3 "$GITHUB_WORKSPACE/scripts/ios/validate-ios-drawable-bridge.py" \
 	"$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/SDL" \
 	"$GITHUB_WORKSPACE/3rdparty/gl4es/gl4es" --self-test || die
@@ -34,6 +36,9 @@ python3 "$GITHUB_WORKSPACE/scripts/ios/validate-ios-uint-elements.py" \
 python3 "$GITHUB_WORKSPACE/scripts/ios/validate-ios-index-trace.py" \
 	"$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/3rdparty/gl4es/gl4es" --self-test || die
 python3 "$GITHUB_WORKSPACE/scripts/ios/validate-ios-wo49-topology.py" \
+	"$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/3rdparty/gl4es/gl4es" \
+	--gl4es-only --self-test || die
+python3 "$GITHUB_WORKSPACE/scripts/ios/validate-ios-wo49-transform.py" \
 	"$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/3rdparty/gl4es/gl4es" \
 	--gl4es-only --self-test || die
 mkdir -p build || die

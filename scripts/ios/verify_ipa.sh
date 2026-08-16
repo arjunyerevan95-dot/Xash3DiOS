@@ -148,8 +148,36 @@ for topology_api in \
 	fi
 done
 
+for transform_marker in \
+	'WO49 transform policy:' \
+	'WO49 transform producer:' \
+	'WO49 transform clip:' \
+	'WO49 transform program:' \
+	'WO49 transform uniform:' \
+	'WO49 transform native:' \
+	'WO49 transform terminal:'; do
+	if ! grep -q "$transform_marker" "$GL4ES_RENDERER_STRINGS"; then
+		echo "Renderer is missing WO49 transform marker: $transform_marker" >&2
+		exit 1
+	fi
+done
+
+for transform_api in \
+	'gl4es_iOSWO49TransformBegin' \
+	'gl4es_iOSWO49TransformFinish'; do
+	if ! grep -q "$transform_api" "$GL4ES_RENDERER_STRINGS"; then
+		echo "Renderer is missing WO49 transform API: $transform_api" >&2
+		exit 1
+	fi
+done
+
 if ! grep -q 'gl4es_iOSWO49TopologyProducer' "$DIFFUSION_CLIENT_STRINGS"; then
 	echo "Diffusion client is missing the WO49 pre-shader producer bridge" >&2
+	exit 1
+fi
+
+if ! grep -q 'gl4es_iOSWO49TransformBegin' "$DIFFUSION_CLIENT_STRINGS"; then
+	echo "Diffusion client is missing the WO49 transform producer bridge" >&2
 	exit 1
 fi
 
