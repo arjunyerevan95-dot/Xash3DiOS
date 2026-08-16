@@ -1518,3 +1518,64 @@ Remaining risks: the landscape compatibility path requires a coherent GLES3 shad
 Durable ledger path and commit: `Documentation/XASH3DIOS_PORTING_STATE.md`. This report is published in one documentation-only `[skip ci]` commit; its exact hash is mirrored into the authoritative Google Docs ledger and final handoff because a commit cannot contain its own hash.
 
 Stop state: Work Order 50 Phase A Outcome C source audit and durable report are complete. **Stop for orchestrator review.** Do not modify renderer/runtime code, build, start GitHub Actions, create an IPA/artifact/upload, contact Arjun, request evidence/testing, or begin Phase B or any later phase.
+
+## Work Order 50 Phase B - Outcome B architectural proof gate
+
+Candidate/run and acceptance status: **Outcome B. No candidate was built or published.** The required complete GLES3 texture-array route cannot be bounded inside the exact pinned GL4ES architecture while satisfying Work Order 50's native proof, lifecycle, shader-conversion, preservation, and all-or-nothing requirements. The separately bounded studio cache, `u_StudioParams`, and foliage repairs are deliberately not implemented because Phase B forbids a partial or studio-only candidate.
+
+### Authorization and preserved baseline
+
+The complete authoritative Google Docs ledger was read through its newest entry, `WORK ORDER 50 PHASE B - CONSOLIDATED TEXTURE-ARRAY AND MATERIAL-STATE STRUCTURAL REPAIR`. The authorized scope was one coherent repair containing all four proven classes: complete native GLES3 texture arrays through GL4ES; studio texture-cache invalidation and actual-object keying; exact per-variant `u_StudioParams` counts; and the solid foliage float upload. The gate permits Outcome A only after the entire route passes native/source proof, otherwise Outcome B requires stopping before a build.
+
+The audit began from clean branch `agent/ios-proof-of-life` at `f7a5b4bae2c22ae616827dbb22d00386f78d2f81`. Exact source pins were verified directly: engine/executable `9505a1c01f597e23c3acb7cbb8852b9dcfb0a038`, Diffusion `14d156bf3a6993c172697fac83a937836c3b5561`, Diffusion MainUI `8c68de2f2325a0130953719efc3ae413eb24e01a`, SDL `5d249570393f7a37e037abf22cd6012a4cc56a71`, and GL4ES `81547d986798e876de8b434193920b606a72363f`. Bundle 69 direct-drawable presentation, Bundle 71 native GLES3 uint indices, Bundle 81 per-unit target selection, the real Diffusion menu/touch/callback/map path, and all unrelated accepted behavior remain byte-for-byte unchanged.
+
+### Exact first unbounded boundary
+
+The first unavoidable boundary is **GL4ES program conversion/linking**, owned by `src/gl/shaderconv.c::ConvertShader`, before a terrain program can reflect or sample an array:
+
+- Diffusion `client/render/r_shader.cpp::GL_ProcessShader` generates `#version 130` source. Terrain-capable `BmodelSolid` and `BmodelDlight` fragments combine `sampler2DArray`/`texture2DArray` with legacy `attribute`, `varying`, `gl_FragColor`, `texture2D`, `texture2DProj`, and `textureCube` constructs.
+- Pinned `ConvertShader` unconditionally selects `GLESHeader[0]`, emitting `#version 100`. Its only higher-version selection block is compiled out under `#if 0` with the source comment that higher GLSL support "requires much more work." Even if enabled unchanged, it recognizes only source version `120`, not Diffusion's `130`.
+- The dormant ESSL-300 header defines `varying` as `out` for both stages. Fragment varyings must be `in`; it also supplies no declared fragment output for `gl_FragColor` and no ESSL-300 conversion for the legacy texture lookup family. Therefore it is incomplete scaffolding, not a hidden usable array path.
+- `ConvertShader` is the common 833-line translator used by every linked application program, with fixed-function builtin insertion, varying accounting, matrix rewriting, shader-key needs, and program redo compatibility. A source-name or Diffusion-only textual exception would not establish a coherent GL4ES capability and would violate the required unsupported-combination rejection contract.
+
+This boundary alone prevents the required ESSL-300 conversion, native link, and native sample fixture. It is not repairable by extension advertisement, enum aliases, or a local sampler token replacement.
+
+### Additional architecture that would have to change as one subsystem
+
+The source audit confirms that reaching the first boundary would still leave multiple coupled, currently absent facilities:
+
+| Ownership | Exact pinned state | Required architectural change |
+| --- | --- | --- |
+| `src/gl/texture.h`, `state.h`, `stack.[ch]` | `ENABLED_TEXTURE_LAST` contains 1D/2D/3D/rectangle/cube only; bound and saved state are dimensioned by that enum. | Add a distinct array object/target through creation, saved state, queries, push/pop, cleanup, deletion, and restoration. |
+| `src/gl/texture_3d.c`, `gles.h`, `loader.[ch]` | Exported core/EXT 3D entry points are stubs that forward to 2D and discard depth/zoffset; no native `glTexImage3D`/`glTexSubImage3D` loader signatures exist. | Add verified native GLES3 ABI loading plus full allocation/subupload/error/unpack semantics. |
+| `src/gl/texture_params.c`, `glstate.[ch]`, `blit.c` | Bundle 81 correctly picks each loop unit, but the actual native cache remains one `actual_tex2d` value per unit and realization always calls native `GL_TEXTURE_2D`. | Introduce target-aware actual bindings and extend every direct/list/blit/cleanup/restoration route without regressing Bundle 81. |
+| `src/gl/program.[ch]`, `uniform.c`, `fpe.c` | Reflection and uniform-type handling recognize only `GL_SAMPLER_2D` and `GL_SAMPLER_CUBE`; texture-unit routing assumes those enum-to-target cases. | Add array sampler reflection, type validation, unit assignment, FBO conflict handling, cache, sync, and native realization. |
+| `src/glx/hardext.[ch]`, `src/gl/init.c` | The NOEGL iOS build tests a singleton current context; `hardext.esversion` remains the ES2 backend selection and only special cases individual ES3 core features. No array capability/limits or reset lifecycle exists. | Add post-current-context entry-point/limit discovery and an explicit reset/re-establish contract. |
+| SDL/GL4ES lifecycle bridge | SDL owns EAGL context creation, currentness, resize, foreground/background, and destruction; GL4ES has no array-capability lifecycle callback. | Add a cross-component lifecycle API while preserving Bundle 69 drawable ownership and invalidating all target/program capability state safely. |
+| Native proof infrastructure | Existing iOS validators are deterministic source/model fixtures. The workflow cross-compiles an iPhoneOS arm64 payload but has no simulator/device GLES3 array execution harness. | Create and validate a real current-context allocation/subupload/mixed-unit/link/sample/readback harness before any candidate build. |
+
+The engine side already routes multilayer images through `ref/gl/gl_image.c::{GL_LoadTextureArray,GL_UploadTexture,GL_TextureImageRAW}`; Diffusion already provides the terrain layer data and array sampler declarations. Those consumers do not remove the missing GL4ES translator, object, loader, reflection, native-state, and lifecycle ownership.
+
+### Why Outcome A cannot satisfy the local/source proof
+
+Work Order 50 requires, before a candidate build, deterministic native proof of layer 0, layer 1 and highest-layer content; nonzero-layer subupload; mip behavior; mixed 2D/cube/array units; cleanup/rebind; native array reflection/link/sample; and context invalidation/re-establishment. The repository has no executable iOS simulator/device harness for those operations, and the current Windows worker cannot execute the iPhoneOS arm64 OpenGLES payload. Static Python models cannot prove native EAGL allocation, link or sampling and therefore cannot be represented as satisfying the gate.
+
+Adding only the bounded studio repairs would leave the required array route and landscape visual gate unresolved. Building that subset, advertising the extension, or producing a diagnostics candidate is explicitly forbidden. No runtime, patch, shader, build-policy, workflow, validator, IPA, or upload file is changed.
+
+### Smallest defensible architectural alternative
+
+Treat GLES3 texture arrays as a separately owned renderer subsystem before another gameplay candidate: first adopt or develop a GL4ES baseline where ESSL-300 stage conversion, true array objects/uploads, array sampler reflection/routing, target-aware native binding caches, context lifecycle, and a simulator/device conformance harness are first-class and validated together. Only after that subsystem passes the Work Order 50 array fixtures should it be integrated with the preserved Bundle 69/71/81 patch stack and the three bounded Diffusion studio fixes in one candidate. Patching the pinned ES2-oriented translator in-place without that conformance project is not a bounded porting repair.
+
+This alternative does not authorize a GL_TEXTURE_2D fallback, atlas, asset substitution, terrain disable, source-name shader exception, string-only advertisement, or partial studio IPA.
+
+### Proof-gate validation and publication state
+
+Validation performed: full authoritative-ledger read and newest-order check; Codebase Memory-first architecture, symbol, caller/callee and ownership inspection; exact applied-tree inspection at all five pins; Diffusion terrain source generation, shader family and resource path trace; GL4ES target/object, upload stub, native loader, extension discovery, program conversion, reflection, uniform, realization, stack/state and context-lifecycle trace; established workflow/native-test capability audit; and competing Outcome-A proof requirements checked one by one. The source/apply trees were read only.
+
+Candidate/bundle: none. Behavioral/build commit: none. Workflow URL/ID/result: none. Duplicate workflow disposition: none. GitHub artifact: none. IPA filename/size/SHA-256: none. tempfile page/direct URL/expiry: none. Expected runtime markers: none, because no executable changed.
+
+Exact file changed by this Outcome-B handoff: `Documentation/XASH3DIOS_PORTING_STATE.md` only. This report is published in one documentation-only `[skip ci]` commit; its exact hash is mirrored into the authoritative Google Docs ledger and final handoff because a commit cannot contain its own hash.
+
+Remaining independent risks: Bundle 81 remains only partially device-accepted; landscape remains unavailable; the studio private-cache lifetime/key defect, exact 1/2/3 `u_StudioParams` producer counts, and solid foliage float upload remain source-proven but intentionally unfixed; synchronous shader compilation latency and the later ch1map0-to-ch1map1 termination remain separate; and no gameplay candidate is accepted.
+
+Stop state: **Work Order 50 Phase B stops at Outcome B before implementation or build.** Do not contact Arjun, request evidence or device testing, publish a partial IPA, implement a studio-only subset, advertise texture arrays partially, or begin Phase C or any later phase. Stop for orchestrator review.
