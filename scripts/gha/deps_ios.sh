@@ -21,4 +21,14 @@ sudo cp -vr Products/SDL2.xcframework/ios-arm64/SDL2.framework /Library/Framewor
 
 cd "$GITHUB_WORKSPACE" || exit 1
 
-git clone https://github.com/FWGS/hlsdk-portable hlsdk -b mobile_hacks --depth=1
+HLSDK_REF=${HLSDK_REF:-079f2387eb59e4a045647d9057240628130f0058}
+git init -q hlsdk
+git -C hlsdk remote add origin https://github.com/FWGS/hlsdk-portable.git
+git -C hlsdk fetch -q --depth 1 origin "$HLSDK_REF" || exit 1
+git -C hlsdk checkout -q --detach FETCH_HEAD || exit 1
+
+HLSDK_ACTUAL_REF=$(git -C hlsdk rev-parse HEAD) || exit 1
+if [ "$HLSDK_ACTUAL_REF" != "$HLSDK_REF" ]; then
+	echo "Expected Half-Life SDK $HLSDK_REF, got $HLSDK_ACTUAL_REF" >&2
+	exit 1
+fi

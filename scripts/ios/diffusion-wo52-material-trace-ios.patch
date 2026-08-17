@@ -28,7 +28,7 @@ index fa86eed..5ebfd09 100644
  		g_pParticleSystems->ClearSystems();
  
 diff --git a/client/render/r_shader.cpp b/client/render/r_shader.cpp
-index e66cbed..2a856e4 100644
+index 6e6018e..2a856e4 100644
 --- a/client/render/r_shader.cpp
 +++ b/client/render/r_shader.cpp
 @@ -1031,6 +1031,9 @@ static glsl_program_t *GL_FindUberShader( const char *glname, const char *option
@@ -52,13 +52,6 @@ index e66cbed..2a856e4 100644
  	if( prog != NULL )
  	{
  		// add to hash table
-@@ -3263,4 +3270,4 @@ void GL_FreeGPUShaders( void )
- 	memset( glsl_programsHashTable, 0, sizeof( glsl_programsHashTable ) );
- 
- 	GL_BindShader( GL_NONE );
--}
-\ No newline at end of file
-+}
 diff --git a/client/render/r_studio.cpp b/client/render/r_studio.cpp
 index 34e97c8..faa92d4 100644
 --- a/client/render/r_studio.cpp
