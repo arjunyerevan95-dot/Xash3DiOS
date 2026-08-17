@@ -799,10 +799,10 @@ index 2af26a66..5c547bc8 100644
 +    }
 +}
 diff --git a/src/gl/indextrace.h b/src/gl/indextrace.h
-index 7f603195..ed4fd650 100644
+index 7f603195..05ec9c0e 100644
 --- a/src/gl/indextrace.h
 +++ b/src/gl/indextrace.h
-@@ -12,6 +12,92 @@
+@@ -12,6 +12,94 @@
  #define IOS_WO49_TRANSFORM_VERTEX_LIGHTING 0x04u
  #define IOS_WO49_TRANSFORM_BONE_WEIGHTING 0x08u
  
@@ -810,7 +810,9 @@ index 7f603195..ed4fd650 100644
 +#define IOS_WO52_MODE_COLORMAP 2
 +#define IOS_WO52_MATERIAL_TOKEN_CAP 256u
 +#define IOS_WO52_MATERIAL_UNIT_CAP 6u
++#ifndef IOS_WO52_MATERIAL_LIST_CAP
 +#define IOS_WO52_MATERIAL_LIST_CAP 32u
++#endif
 +
 +typedef struct ios_wo52_material_unit_desc_s {
 +    unsigned int unit;
@@ -895,7 +897,7 @@ index 7f603195..ed4fd650 100644
  typedef struct ios_wo49_topology_attr_desc_s {
      unsigned int index;
      unsigned int enabled;
-@@ -136,4 +222,28 @@ void ios_wo49_transform_program_realized(void *program);
+@@ -136,4 +224,28 @@ void ios_wo49_transform_program_realized(void *program);
  void ios_wo49_transform_before_draw(const char *function, GLenum mode,
      GLsizei count, GLenum type);
  
@@ -946,10 +948,22 @@ index 4c2bdf5d..8ecd5b79 100644
      a->len += b->len;
      if(a->mode_inits) list_add_modeinit(a, b->mode);
 diff --git a/src/gl/list.h b/src/gl/list.h
-index b7a0ef31..7e6ef3d3 100644
+index b7a0ef31..9f8b8cfa 100644
 --- a/src/gl/list.h
 +++ b/src/gl/list.h
-@@ -241,6 +241,12 @@ typedef struct _renderlist_t {
+@@ -8,6 +8,11 @@
+ #include "attributes.h"
+ #include "gles.h"
+ 
++/* Shared with indextrace.h, but list.h must be self-contained. */
++#ifndef IOS_WO52_MATERIAL_LIST_CAP
++#define IOS_WO52_MATERIAL_LIST_CAP 32u
++#endif
++
+ typedef enum {
+ 	STAGE_NONE = 0,
+ 	STAGE_PUSH,
+@@ -241,6 +246,12 @@ typedef struct _renderlist_t {
      unsigned int ios_wo49_token_count;
      unsigned long long ios_wo49_vbo_bytes;
  

@@ -208,6 +208,9 @@ def validate(files: dict[str, str], require_diffusion: bool) -> list[str]:
         require(drawing + list_c, token, "render-list ownership", failures)
     require(list_h, "ios_wo52_tokens[IOS_WO52_MATERIAL_LIST_CAP]",
             "bounded render-list token storage", failures)
+    ordered(list_h, ("#define IOS_WO52_MATERIAL_LIST_CAP 32u",
+                     "ios_wo52_tokens[IOS_WO52_MATERIAL_LIST_CAP]"),
+            "self-contained render-list cap", failures)
 
     direct = section(fpe, "void APIENTRY_GL4ES fpe_glDrawElements(",
                      "void APIENTRY_GL4ES fpe_glDrawArraysInstanced(")
@@ -292,6 +295,9 @@ def self_test(files: dict[str, str], require_diffusion: bool) -> list[str]:
     cases = [
         ("unbounded tokens", "trace_h", "IOS_WO52_MATERIAL_TOKEN_CAP 256u",
          "IOS_WO52_MATERIAL_TOKEN_CAP 1024u"),
+        ("list cap not header-visible", "list_h",
+         "#define IOS_WO52_MATERIAL_LIST_CAP 32u",
+         "/* list cap declaration omitted */"),
         ("early native hook", "fpe", "ios_wo52_material_native(\"fpe_glDrawElements\");",
          "/* native observation removed */"),
         ("missing replay", "listdraw", "ios_wo52_material_set_replay(",
