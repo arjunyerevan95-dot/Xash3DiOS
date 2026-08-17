@@ -139,7 +139,7 @@ index 232acae3..f609f36d 100644
      #include "glesfuncs.inc"
  
 diff --git a/src/gl/indextrace.c b/src/gl/indextrace.c
-index 2af26a66..5c547bc8 100644
+index 2af26a66..483c3585 100644
 --- a/src/gl/indextrace.c
 +++ b/src/gl/indextrace.c
 @@ -6,6 +6,7 @@
@@ -150,7 +150,7 @@ index 2af26a66..5c547bc8 100644
  #include "../glx/hardext.h"
  #include "../../include/gl4esinit.h"
  
-@@ -234,6 +235,282 @@ static ios_wo49_transform_trace_t ios_wo49_transform;
+@@ -234,6 +235,284 @@ static ios_wo49_transform_trace_t ios_wo49_transform;
  static void ios_wo49_summary_if_due(unsigned long long frame, int force);
  static void ios_wo49_transform_terminal(const char *fallback_missing);
  
@@ -210,6 +210,8 @@ index 2af26a66..5c547bc8 100644
 +static unsigned int ios_wo52_material_terminal_count;
 +static unsigned int ios_wo52_material_incomplete_count;
 +static int ios_wo52_material_policy_emitted;
++
++static void ios_wo49_emit(const char *format, ...);
 +
 +static ios_wo52_material_record_t *ios_wo52_material_find(unsigned long long token)
 +{
@@ -433,7 +435,7 @@ index 2af26a66..5c547bc8 100644
  static const char *ios_index_family_name(unsigned int family)
  {
      switch(family) {
-@@ -1765,3 +2042,364 @@ static void ios_wo49_summary_if_due(unsigned long long frame, int force)
+@@ -1765,3 +2044,364 @@ static void ios_wo49_summary_if_due(unsigned long long frame, int force)
          "WO49 topology summary: tokens=%u cap=4 realized=%u mismatched=%u absent=%u terminal=1 stages=[%s] first_mismatch_per_token=bounded records_per_stage<=1 mutation=none",
          ios_wo49_record_count, realized, mismatched, absent, tokens);
  }
