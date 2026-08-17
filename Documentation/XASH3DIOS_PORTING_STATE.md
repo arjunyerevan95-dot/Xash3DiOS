@@ -1812,3 +1812,39 @@ Remaining risks: the current branch head contains an uncompiled diagnostics patc
 Durable ledger path: `Documentation/XASH3DIOS_PORTING_STATE.md`. This report is published in one documentation-only `[skip ci]` commit; its exact hash is mirrored into the authoritative Google Docs ledger and final handoff because a Git commit cannot contain its own hash.
 
 Stop state: **Work Order 52 Phase B is stopped at a failed full-build gate. No candidate or artifact is accepted or available. Stop for orchestrator review.** Do not contact Arjun, request logs/evidence/testing, start another workflow, upload anything, fix the declaration order, implement a renderer repair, or begin another phase without a new explicit work order.
+
+## Work Order 52 Phase B Correction - declaration fixed; single build stopped at Diffusion patch replay
+
+Candidate/run and acceptance status: **rejected before artifact publication; no installable candidate exists.** The authorized declaration-order correction passed its local compile and unchanged validation gates, but the one qualifying workflow failed later while applying the existing Diffusion WO52 patch. The failure gate therefore prohibits a retry, follow-up fix, IPA, upload, or device-test request.
+
+### Correction, scope, and verified boundary
+
+Starting exactly from branch head `72ef44bce54231dfedb3568c6e49595fd90539ba`, commit `383aa252bbef347cbd697da87305c543f4ec5580` changes only `scripts/ios/gl4es-wo52-material-trace-ios.patch`. It adds the exact matching forward declaration `static void ios_wo49_emit(const char *format, ...);` before the first WO52 call in generated GL4ES `src/gl/indextrace.c`. The existing definition, signature, emitted fields, token/cap policy, engine-console sink, diagnostic routes, runtime behavior, and every renderer/gameplay policy remain unchanged.
+
+The original authoritative boundary is resolved: exact GL4ES pin `81547d986798e876de8b434193920b606a72363f` replayed through the complete accepted iOS patch stack, and the affected translation unit compiled locally under Clang C11 with implicit-function declarations treated as errors. There is no longer an implicit declaration or static/non-static conflict for `ios_wo49_emit`.
+
+The one qualifying push workflow, [32010810711](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32010810711), passed the drawable, uint-index, index-trace, WO49 topology/transform/texture-unit, and WO52 validators, configured and built the engine, and completed the Half-Life client/server build. It then failed in `scripts/ios/builddiffusion.sh` while applying the unchanged `scripts/ios/diffusion-wo52-material-trace-ios.patch`: `error: patch failed: client/render/r_shader.cpp:3263`, followed by `error: client/render/r_shader.cpp: patch does not apply`. This is the first authoritative new build error. It is a separate Diffusion patch-replay defect and was not modified because the correction order explicitly forbids speculative later fixes after the single workflow.
+
+The automatic pull-request duplicate [32010815714](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32010815714) was cancelled. The general C/C++ push and pull-request workflows [32010810636](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32010810636) and [32010815705](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32010815705) were policy-skipped and are not qualifying candidates.
+
+### Validation performed
+
+- Exact branch/head and single-file diff inspection; generated/patched source inspection in both GL4ES working copies.
+- Exact pinned GL4ES replay through `gl4es-ios`, drawable bridge, uint elements, index trace, WO49 topology, WO49 transform, WO49 texture unit, and corrected WO52 material trace patches.
+- Real Clang `-fsyntax-only -std=gnu11 -Werror=implicit-function-declaration` compile of the replayed `src/gl/indextrace.c`; only two pre-existing Windows CRT `strncpy` deprecation warnings remained.
+- Unchanged positive and rejection suites: drawable bridge; uint elements; index trace; WO49 topology; WO49 transform; WO49 texture unit; Bundle 85 material state; WO52 material trace; Diffusion shared-animated/rigid-one-bone policy; Python compilation; `git diff --check`.
+- Full macOS Actions log inspected through the exact first Diffusion patch-application failure.
+
+### Artifact, markers, risks, and stop state
+
+IPA filename/link, GitHub artifact, tempfile.org object, byte size, bundle version, thin-arm64 inventory, packaged marker verification, and SHA-256 are all **none** because the build failed before `Verify IPA contract` and `Upload unsigned IPA`.
+
+Expected source-only marker contract remains unchanged: `WO52 material trace policy:`, `producer:`, `shader:`, `bind:`, `gl4es:`, `native:`, `transition:`, `terminal:`, and `summary:`. No marker is claimed from an IPA because no IPA was created.
+
+Structural cause: the authorized GL4ES declaration-order defect is fixed. The material-rendering cause remains unresolved because the discriminator still has no executable artifact. The current publication blocker is the unchanged WO52 Diffusion patch's EOF/context hunk at `client/render/r_shader.cpp:3263` not applying after the preceding pinned patch stack on the macOS runner; its repair was outside this correction's one-workflow authority.
+
+Remaining risks: the WO52 diagnostics are still not packaged or device-validated; the exact Diffusion patch-replay mismatch requires a new explicit authorization before any edit or build; the true studio material divergence, terrain arrays, shader latency, and later map-transition termination remain independent.
+
+Durable ledger path: `Documentation/XASH3DIOS_PORTING_STATE.md`. This report is published in a documentation-only `[skip ci]` commit; its exact hash is mirrored into the authoritative Google Docs ledger because a Git commit cannot contain its own hash.
+
+Stop state: **Work Order 52 Phase B Correction is stopped at its single-workflow failure gate.** Do not retry, change the Diffusion patch, create/upload an IPA, contact Arjun, request evidence/testing, implement a renderer repair, or begin another phase. Await orchestrator review.
