@@ -1768,3 +1768,47 @@ Remaining risks: the screenshots do not provide machine-readable model/material 
 Durable ledger path and commit: `Documentation/XASH3DIOS_PORTING_STATE.md`. This audit is published in one documentation-only `[skip ci]` commit; its exact hash is mirrored into the authoritative Google Docs ledger and final handoff because a commit cannot contain its own hash.
 
 Stop state: **Work Order 52 Phase A Outcome B audit and both-ledger reporting are complete. Stop for orchestrator review.** Do not implement the discriminator, modify runtime code, build, start GitHub Actions, create an IPA/artifact/upload, contact Arjun, request evidence/testing, or begin Phase B or any later work order.
+
+## Work Order 52 Phase B - diagnostics implementation stopped at failed build gate
+
+Candidate/run and acceptance status: **rejected before artifact publication; no device candidate exists.** The authorized producer-to-native discriminator was implemented and passed its source, exact-pin, positive, rejection, and preservation gates, but the sole corrected publication run failed while compiling GL4ES. IPA contract verification and upload never ran. Bundle 85 remains partial progress and is still not accepted.
+
+### Authority, preserved boundary, and implementation
+
+The authoritative Google Docs ledger was read completely through `WORK ORDER 52 PHASE B - ONE-RUN STUDIO MATERIAL/SAMPLER DISCRIMINATOR`, then reread immediately before this report; no newer authorization exists. The work remained diagnostics-only. Bundle 69 direct-drawable ownership, Bundle 71 native GLES3 uint indices, Bundle 81 per-unit texture-target selection, Bundle 85 material-state fixes, Diffusion menu/touch/callback behavior, terrain exclusions, and every unrelated source path were preserved.
+
+Implementation commit `6ac650fd97838b5d9bac2777ecc01c6b90ac34ab` adds one fixed-cap token chain across Diffusion material production, shader/uniform metadata, engine `GL_Bind`, GL4ES logical binding and draw-route ownership, post-realization immediate pre-native shadow state, scene transitions, one of six terminal classifiers, and completeness accounting. It caps selection at 256 identities, units at 6, and render-list tokens at 32; deep-copies names into fixed storage; emits at most one record per stage/token through the existing engine-console sink; does not query or mutate GL state, drain errors, allocate dynamically, alter draw order, or change renderer policy. Commit `00ae2fb2df900e314f6392ed427a03259223c831` makes the 32-token list cap self-contained in `list.h` after the first compile attempt proved that the initial declaration was not visible there, and adds the matching rejection mutation.
+
+The intended diagnostic boundary is unchanged from Phase A: the unresolved device defect remains between Diffusion's selected studio material object and the native texture/sampler/program state consumed by the affected draw. The implementation was designed to classify producer selection, bind/cache suppression, GL4ES logical-to-native realization, sampler/program routing, captured color/material/shader state, or an explicitly missing/overflowed stage. It does not claim or implement a renderer repair.
+
+### Validation and exact build boundary
+
+Local/source validation completed: Python compilation; exact Diffusion `14d156bf3a6993c172697fac83a937836c3b5561` and GL4ES `81547d986798e876de8b434193920b606a72363f` patch reversibility/replay checks; full WO52 positive fixtures and rejection mutations for early/missing hooks, route loss, unbounded storage, stdout, state mutation, error draining, stale attribute queries, sampler-type omission, unsupported claims, and the header-visibility defect; Diffusion shared-animated/rigid-one-bone policy; Bundle 69 drawable, Bundle 71 uint/index-trace, Bundle 81 per-unit target, WO49 topology/transform, and Bundle 85 material-state positive/rejection suites; and staged `git diff --check`.
+
+The first push workflow, [31971603395](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/31971603395), failed without an artifact because `src/gl/list.h` used `IOS_WO52_MATERIAL_LIST_CAP` before that header could see its declaration. Its automatic PR duplicate [31971605149](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/31971605149) was cancelled; the general C/C++ workflows were policy-skipped. The bounded header fix and rejection fixture were then published in `00ae2fb2df900e314f6392ed427a03259223c831`.
+
+The corrected push workflow, [32007677554](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32007677554), also failed in `Build engine, Half-Life, and Diffusion modules` before contract verification or artifact upload. The first authoritative boundary is GL4ES `src/gl/indextrace.c`: calls to the existing static engine-log helper `ios_wo49_emit` at lines 370 and 391 precede its declaration, followed by `static declaration of 'ios_wo49_emit' follows non-static declaration` at line 595 under Clang's C99 implicit-declaration error. Its automatic PR duplicate [32007682782](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32007682782) was cancelled; the general C/C++ workflows were policy-skipped. This is a diagnostics implementation declaration-order defect, not evidence about the yellow-material renderer cause.
+
+No third workflow, follow-up compile patch, renderer repair, IPA, GitHub artifact, tempfile.org upload, device contact, evidence request, or test request is authorized or created. IPA filename, byte size, SHA-256, GitHub artifact link, tempfile information/direct link, and expiry are all **none** because no IPA exists. Thin-arm64 and packaged-marker verification could not run.
+
+### Exact files changed and expected markers
+
+Behavioral/diagnostic commits changed:
+
+- `ref/gl/gl_backend.c`
+- `scripts/gha/build_ios.sh`
+- `scripts/ios/builddiffusion.sh`
+- `scripts/ios/verify_ipa.sh`
+- `scripts/ios/diffusion-wo52-material-trace-ios.patch`
+- `scripts/ios/gl4es-wo52-material-trace-ios.patch`
+- `scripts/ios/validate-ios-wo52-material-trace.py`
+
+This report additionally changes `Documentation/XASH3DIOS_PORTING_STATE.md`. The unbuilt marker contract is `WO52 material trace policy:`, `producer:`, `shader:`, `bind:`, `gl4es:`, `native:`, `transition:`, `terminal:`, and `summary:`. These strings exist in source and packaging checks but are **not expected from any installable IPA**, because no IPA was produced.
+
+Structural cause: the scene-stable yellow material cause remains unresolved; the authorized discriminator did not reach an executable artifact. The concrete stop cause is the GL4ES diagnostic helper declaration order above. Why the change addresses the work order: the source design spans every required producer/cache/route/native/transition stage with bounded non-mutating instrumentation and deterministic terminal results, but it does **not** satisfy the full build/publication gate and therefore cannot be represented as a qualified candidate.
+
+Remaining risks: the current branch head contains an uncompiled diagnostics patch; no runtime behavior or marker has been validated on device; the true material divergence remains unknown; terrain arrays, shader compilation latency, and later map-transition termination remain independent. A future correction requires a new explicit orchestrator authorization. If a later authorized device run of a build-qualified discriminator still cannot classify the first divergence, end micro-diagnostic iterations and move to a broader renderer capture or native conformance harness as Work Order 52 requires.
+
+Durable ledger path: `Documentation/XASH3DIOS_PORTING_STATE.md`. This report is published in one documentation-only `[skip ci]` commit; its exact hash is mirrored into the authoritative Google Docs ledger and final handoff because a Git commit cannot contain its own hash.
+
+Stop state: **Work Order 52 Phase B is stopped at a failed full-build gate. No candidate or artifact is accepted or available. Stop for orchestrator review.** Do not contact Arjun, request logs/evidence/testing, start another workflow, upload anything, fix the declaration order, implement a renderer repair, or begin another phase without a new explicit work order.
