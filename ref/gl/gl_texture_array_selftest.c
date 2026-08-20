@@ -24,7 +24,6 @@ extern GLuint gl4es_glCreateProgram( void );
 extern void gl4es_glAttachShader( GLuint program, GLuint shader );
 extern void gl4es_glBindAttribLocation( GLuint program, GLuint index, const GLcharARB *name );
 extern void gl4es_glLinkProgram( GLuint program );
-extern void gl4es_glGetProgramiv( GLuint program, GLenum pname, GLint *params );
 extern void gl4es_glGetActiveUniform( GLuint program, GLuint index, GLsizei bufSize,
 	GLsizei *length, GLint *size, GLenum *type, GLcharARB *name );
 extern void gl4es_glUseProgram( GLuint program );
@@ -93,7 +92,8 @@ void R_IOSTextureArraySelftest( void )
 	GLuint textures[4] = { 0 };
 	GLuint vertexShader = 0, fragmentShader = 0, program = 0;
 	GLint maxLayers = 0, binding2D = 0, bindingArray = 0;
-	GLint layerLocation, samplerLocation, uniforms = 0;
+	GLint layerLocation, samplerLocation;
+	GLuint uniforms = 0;
 	GLint width = gpGlobals->width, height = gpGlobals->height;
 	int failures = 0, samplerFound = 0;
 	unsigned checksum = 2166136261u;
@@ -168,7 +168,7 @@ void R_IOSTextureArraySelftest( void )
 	if( !vertexShader || !fragmentShader ) failures++;
 	if( !failures )
 	{
-		GLint linked = GL_FALSE;
+		GLuint linked = GL_FALSE;
 		program = gl4es_glCreateProgram();
 		gl4es_glAttachShader( program, vertexShader );
 		gl4es_glAttachShader( program, fragmentShader );
