@@ -108,6 +108,7 @@ static void IOS_PrepareView( void )
 
 void IOS_LaunchDialog( void )
 {
+	static NSString *const textureArraySelftestArgs = @"-dev 2 -log -ref gl4es -gl4es_texture_array_selftest";
 	NSLog(@"System Version is %@",[[UIDevice currentDevice] systemVersion]);
 	NSString *ver = [[UIDevice currentDevice] systemVersion];
 	g_iOSVer = [ver floatValue];
@@ -132,18 +133,13 @@ void IOS_LaunchDialog( void )
 	{
 		ret = fread( &settings, sizeof( settings ), 1, settingsfile ) == 1;
 	}
+	(void)ret;
 
 
 	[alert addTextFieldWithConfigurationHandler:^(UITextField *textField) {
 		[textField setPlaceholder:@"Launch Options"];
-		if (ret && ( settings.magic == SETTINGS_MAGIC ))
-		{
-			[textField setText:@(settings.args)];
-		}
-		else
-		{
-			[textField setText:@"-dev 2 -log"];
-		}
+		[textField setText:textureArraySelftestArgs];
+		[textField setEnabled:NO];
 		[textField setAutocapitalizationType:UITextAutocapitalizationTypeNone];
 	}];
 

@@ -1580,6 +1580,7 @@ void GL_OnContextCreated( void )
 #if XASH_IOS
 	R_IOSDirectDrawableContextCreated();
 	set_index_trace_logger( R_IOSIndexTraceLog );
+	R_IOSTextureArraySelftest();
 #endif
 
 	// merge glBegin/glEnd in beams and console

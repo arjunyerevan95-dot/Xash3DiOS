@@ -227,6 +227,25 @@ if ! grep -q 'WO49 texture policy: target-source=per-unit route=all-realize_text
 	exit 1
 fi
 
+for texture_array_marker in \
+	'iOS texture array selftest policy:' \
+	'iOS texture array selftest object:' \
+	'iOS texture array selftest upload:' \
+	'iOS texture array selftest shader:' \
+	'iOS texture array selftest sample:' \
+	'iOS texture array selftest lifecycle:' \
+	'iOS texture array selftest terminal:'; do
+	if ! grep -q "$texture_array_marker" "$GL4ES_RENDERER_STRINGS"; then
+		echo "Renderer is missing texture-array selftest marker: $texture_array_marker" >&2
+		exit 1
+	fi
+done
+
+if ! grep -q -- '-gl4es_texture_array_selftest' "$ENGINE_STRINGS"; then
+	echo "Engine is missing the selftest-only launch/termination gate" >&2
+	exit 1
+fi
+
 if ! grep -q 'gl4es_iOSWO49TopologyProducer' "$DIFFUSION_CLIENT_STRINGS"; then
 	echo "Diffusion client is missing the WO49 pre-shader producer bridge" >&2
 	exit 1

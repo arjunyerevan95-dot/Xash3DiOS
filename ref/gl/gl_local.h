@@ -449,6 +449,7 @@ qboolean R_Init( void );
 void R_Shutdown( void );
 void GL_SetupAttributes( int safegl );
 void GL_OnContextCreated( void );
+void R_IOSTextureArraySelftest( void );
 void GL_InitExtensions( void );
 void GL_ClearExtensions( void );
 int GL_LoadTexture( const char *name, const byte *buf, size_t size, int flags );
