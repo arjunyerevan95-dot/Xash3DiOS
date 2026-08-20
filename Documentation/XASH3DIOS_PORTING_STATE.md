@@ -1907,3 +1907,65 @@ Remaining risks: Bundle 94 has not been run on an iPhone and is not accepted; th
 Durable ledger path: `Documentation/XASH3DIOS_PORTING_STATE.md`. This report is published in a documentation-only `[skip ci]` commit; its exact hash is mirrored into the authoritative Google Docs ledger and final handoff because a Git commit cannot contain its own hash. Repository-ledger and Google Docs readbacks are required before handoff.
 
 Stop state: **Work Order 52 Phase C Outcome A is complete at the orchestrator-review gate.** Do not contact Arjun, request evidence or device testing, claim device acceptance, modify runtime behavior, start another workflow, create another artifact or tempfile object, begin Phase D, Work Order 53, or any later phase. Await orchestrator review.
+
+## Work Order 52 Phase D - inactive-sampler location-zero alias repaired; Bundle 96 produced
+
+Selected work order and outcome: **WORK ORDER 52 PHASE D — PROVE AND REPAIR INACTIVE-SAMPLER LOCATION-ZERO ALIAS; Outcome A.** Bundle version 96 is one build-qualified structural-repair candidate. It is not device-accepted. Bundle 94 is decisive evidence and must not be retested.
+
+### Verified boundary and structural cause
+
+The complete accepted Bundle-94 evidence places the first bad material-uniform boundary inside the studio renderer before the affected native draw. All 118 audited tokens whose optional unit-2 sampler was recorded at location zero corrupted native `u_MeshParams`; all 138 tokens without that alias preserved it. Ordinary unit-0 diffuse sampling remained correct. Representative corrupt values such as `[-2785.5, -2588, -446]` are cubemap box/origin data, not mesh parameters.
+
+Exact pinned-source inspection proves the ownership defect. Diffusion `GL_CreateUberShader` zero-initializes each `glsl_program_t`. The iOS canonical shader policy deliberately rejects optional `REFLECTION_CUBEMAP`, `BUMP`, `INTERIOR`, `SPECULAR`, and `EMBOSS` directives, so their inactive uniforms are not reflected or assigned. The studio shader builder nevertheless derived `SHADER_USE_CUBEMAPS` and related runtime status from the requested material feature instead of the directives actually admitted to the shader. The zero-filled inactive `u_Cubemap` field was therefore treated as a valid location. `DrawStudioMeshes` later issued `glUniform3fv(location=0, count=3, cubemap_params)`, overwriting the real active `u_MeshParams` vec3 array at location zero. The corrupted values then reached the GL4ES/native draw and produced the stable tan/yellow material substitution.
+
+The GL4ES ownership/lifetime audit independently confirms the invariant already implemented there: a missing uniform lookup begins and remains `-1`, active reflected locations retain their real location including zero, uploads to location `-1` are no-ops, type and extent are checked, relink clears and rebuilds reflection/cache state, variant/FPE mapping uses exact uniform names, and program destruction releases uniform/cache state. No GL4ES behavioral fallback or hardcoded location repair is justified.
+
+### Structural repair and exact files changed
+
+Implementation commit `5cf496cef94a61b44404b2d790981d3b065d98a2` changes exactly:
+
+- `scripts/gha/build_ios.sh`
+- `scripts/ios/builddiffusion.sh`
+- `scripts/ios/diffusion-wo52-inactive-sampler-ios.patch`
+- `scripts/ios/gl4es-wo52-trace-cap-ios.patch`
+- `scripts/ios/validate-ios-inactive-sampler.py`
+- `scripts/ios/validate-ios-wo52-material-trace.py`
+- `scripts/ios/verify_ipa.sh`
+
+The Diffusion patch initializes every conditional solid-studio sampler/location field to `-1`, including cubemap box/sampler/reflect/fresnel, interior, blend, and colormask fields; it applies the corresponding `-1` invariant to dynamic-light conditional fields. A single `GL_AssignSamplerUnit` owner preserves every valid location, including active location zero, and makes a negative location an explicitly logged no-op before any GL upload. Every solid- and dynamic-light studio sampler assignment uses that owner.
+
+Runtime feature/status flags are now derived from the directives actually admitted to the compiled variant, not the material features merely requested before iOS canonical filtering. Thus a requested but filtered cubemap leaves its optional locations at `-1`, does not set the runtime cubemap flag, and cannot reach the conditional unit-2 bind or vec3 upload. The admitted desktop/optional-feature path remains intact. The existing WO52 diagnostic stream is capped from 256 to 16 records and labels the repair without changing draw state. Bundle 69 direct-drawable ownership, Bundle 71 native GLES3 uint indices, Bundle 81 per-unit texture-target selection, Bundle 85 material fixes, menu/touch/callback behavior, and all unrelated renderer/gameplay behavior are preserved.
+
+### Validation performed
+
+- Replayed the exact Diffusion pin `14d156bf3a6993c172697fac83a937836c3b5561` and GL4ES pin `81547d986798e876de8b434193920b606a72363f` through the accepted production patch order; the new patches pass forward/reverse application checks.
+- Ran the new executable source/lifecycle harness with self-tests. It proves: active location zero remains writable; an inactive sampler stores/returns `-1`; negative uploads are no-ops; unit-0 diffuse remains intact; optional units 1/2 are assigned only when admitted; and the invariant survives first link, cache hit, relink, variant switch, invalidation, and destroy/recreate.
+- Rejection fixtures fail on default-zero optional storage, absent-sampler upload through zero, hardcoded locations, request/admission mismatch, disabling all active cubemaps/materials, incorrect GL4ES missing-location behavior, negative-location writes, stale relink state, and uncapped WO52 diagnostics.
+- Passed the full WO52 material-trace, WO51 material-state, Diffusion mobile shader policy, WO49 topology/transform, drawable bridge, native GLES3 uint-elements, index-trace, GL4ES-only topology/transform/texture-unit, and WO52 GL4ES-only positive and rejection suites; Python compilation and `git diff --check` passed.
+- The local Windows host has no Bash/Apple linker, so the complete arm64 compile/link/package proof was delegated to the sole macOS Actions run. It successfully built the engine, Half-Life client/server, Diffusion client/server/menu, GL4ES renderer, translated mobile shaders, and IPA; `Verify IPA contract` passed.
+- Independent artifact inspection confirmed `CFBundleVersion=96`, `CFBundleExecutable=xash`, `CFBundleIdentifier=su.xash.engine`, `iPhoneOS`, `UIRequiredDeviceCapabilities=arm64`, and thin 64-bit arm64 Mach-O headers (`CFFAEDFE`, CPU bytes `0C000001`) for `xash` and every packaged dylib. The Diffusion client contains all three Phase-D markers below.
+- The separately downloaded tempfile object reproduced the exact local filename, size, and SHA-256. Tempfile metadata reports no warning or suspicious pattern; its security result is `safe` and reports the same hash.
+
+### Candidate, CI, IPA, and publication
+
+- Candidate/build status: **Bundle 96, build-qualified Outcome A candidate; not device-accepted.**
+- Workflow: [iOS Proof of Life run 32376179206](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32376179206), exact head `5cf496cef94a61b44404b2d790981d3b065d98a2`, **success**. Build, IPA-contract, and artifact-upload steps all succeeded. Exactly one qualifying workflow and one artifact were produced. Automatically triggered generic workflow `32376179291` was policy-skipped and produced no artifact.
+- GitHub artifact: `Xash3DiOS-arm64-unsigned`, ID `9409330973`, [artifact page](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32376179206/artifacts/9409330973), archive size `8,608,730` bytes, GitHub archive digest `7ecd1233cd8a1fb7b36fcebc63ad49ec6c27430ef39be692ab9a69521778b7fc`.
+- IPA: `xash3d-fwgs-ios-arm64.ipa`, `8,705,975` bytes, SHA-256 `F97A58069297F5017EEAF18E2E435BE399BB9C29D40E3AB98997A819E4E25807`.
+- Exactly one tempfile.org object: [information page](https://tempfile.org/LbqPTYCCqAR/); [direct IPA download](https://tempfile.org/LbqPTYCCqAR/download); expiry `2026-08-22T13:56:23.737Z`.
+
+Expected new runtime markers:
+
+- `iOS inactive sampler policy: active location 0 preserved; missing=-1; negative uploads skipped`
+- `iOS inactive sampler rejection: program=%s sampler=%s unit=%d location=%d upload=skipped`
+- `iOS material uniform proof: requested cubemap omitted by canonical profile; runtime status inactive; conditional locations=-1; draw uploads skipped`
+
+Why this addresses the cause: the repair is placed at both owners of the invalid state. Conditional location storage has the GL-defined missing value from construction onward, and runtime optional-feature status is based on shader admission. The guarded sampler assignment then preserves valid location zero while rejecting only missing locations. This prevents cubemap data from being uploaded through location zero without disabling materials, cubemaps that are actually compiled, unit-0 diffuse sampling, or any unrelated rendering path.
+
+Remaining risks: Bundle 96 has not been device-tested and is not accepted. Device evidence must confirm the 118/118 alias/corruption split disappears and the previously tan/yellow studio materials render normally. Terrain texture arrays, shader-start latency, and later `ch1map1` transition behavior remain separate and are not claimed fixed. The 16-record diagnostic cap is intentionally bounded; it may omit later nonessential records but retains the stable policy/proof markers. GitHub and tempfile retention are finite.
+
+Single device test the orchestrator may choose to relay: install only Bundle 96; launch with `-dev 2 -log -game diffusion -ref gl4es`; choose New Game -> Chapter 1 -> Medium once; wait up to two minutes without extra menu actions; capture one screenshot of the first stable gameplay view, one screenshot after moving/turning enough to show several studio materials, and return the complete resulting `engine.log`. Do not retest Bundle 94.
+
+Durable ledger path: `Documentation/XASH3DIOS_PORTING_STATE.md`. This report is published in one documentation-only `[skip ci]` commit after the implementation commit. Its exact hash is mirrored into the authoritative Google Docs ledger and final handoff because a commit cannot contain its own hash. Both ledgers are read back after publication.
+
+Stop state: **Work Order 52 Phase D Outcome A implementation, validation, the sole qualifying Bundle-96 workflow/artifact, independent IPA verification, exactly one tempfile.org upload, and both durable-ledger reports are complete. Stop for orchestrator review.** Do not contact Arjun, request evidence or testing directly, claim device acceptance, start another workflow, create another artifact/upload, implement a further repair, begin Phase E, Work Order 53, or any later phase.
