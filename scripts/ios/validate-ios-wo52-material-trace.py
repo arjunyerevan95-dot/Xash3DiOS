@@ -155,6 +155,13 @@ def validate(files: dict[str, str], require_diffusion: bool) -> list[str]:
     for marker in MARKERS:
         require(trace, marker, "engine.log marker", failures)
         require(verify, marker, "packaged marker contract", failures)
+    engine_bind_contract = section(
+        verify, "if ! grep -q 'gl4es_iOSWO52EngineBind'", "fi"
+    )
+    require(engine_bind_contract, '"$GL4ES_RENDERER_STRINGS"',
+            "packaged engine-bind bridge owner", failures)
+    reject(engine_bind_contract, r'"\$ENGINE_STRINGS"',
+           "packaged engine-bind bridge owner", failures)
     for result in TERMINALS:
         require(trace, result, "terminal classifier", failures)
 
@@ -316,6 +323,9 @@ def self_test(files: dict[str, str], require_diffusion: bool) -> list[str]:
         ("unsupported terminal", "trace", TERMINALS[4], "all renderer state correct"),
         ("missing sampler type", "trace", "sampler->type != expected_type",
          "sampler->type == expected_type"),
+        ("wrong packaged engine-bind owner", "verify",
+         "if ! grep -q 'gl4es_iOSWO52EngineBind' \"$GL4ES_RENDERER_STRINGS\"",
+         "if ! grep -q 'gl4es_iOSWO52EngineBind' \"$ENGINE_STRINGS\""),
     ]
     if require_diffusion:
         cases.extend((

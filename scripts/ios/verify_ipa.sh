@@ -232,7 +232,7 @@ if ! grep -q 'gl4es_iOSWO52MaterialBegin' "$DIFFUSION_CLIENT_STRINGS"; then
 	exit 1
 fi
 
-if ! grep -q 'gl4es_iOSWO52EngineBind' "$ENGINE_STRINGS"; then
+if ! grep -q 'gl4es_iOSWO52EngineBind' "$GL4ES_RENDERER_STRINGS"; then
 	echo "Engine is missing the WO52 engine bind bridge" >&2
 	exit 1
 fi
