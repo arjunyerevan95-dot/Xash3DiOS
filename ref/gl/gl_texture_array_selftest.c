@@ -5,6 +5,12 @@
 #define GL_TEXTURE_BINDING_2D_ARRAY 0x8C1D
 #define GL_MAX_ARRAY_TEXTURE_LAYERS 0x88FF
 #define GL_SAMPLER_2D_ARRAY 0x8DC1
+#ifndef GL_TEXTURE0
+#define GL_TEXTURE0 0x84C0
+#define GL_TEXTURE1 0x84C1
+#define GL_TEXTURE2 0x84C2
+#define GL_TEXTURE3 0x84C3
+#endif
 
 extern void gl4es_glTexStorage3D( GLenum target, GLsizei levels,
 	GLenum internalformat, GLsizei width, GLsizei height, GLsizei depth );
