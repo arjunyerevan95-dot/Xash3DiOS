@@ -1848,3 +1848,62 @@ Remaining risks: the WO52 diagnostics are still not packaged or device-validated
 Durable ledger path: `Documentation/XASH3DIOS_PORTING_STATE.md`. This report is published in a documentation-only `[skip ci]` commit; its exact hash is mirrored into the authoritative Google Docs ledger because a Git commit cannot contain its own hash.
 
 Stop state: **Work Order 52 Phase B Correction is stopped at its single-workflow failure gate.** Do not retry, change the Diffusion patch, create/upload an IPA, contact Arjun, request evidence/testing, implement a renderer repair, or begin another phase. Await orchestrator review.
+
+## Work Order 52 Phase C - complete build stack normalized; Bundle 94 diagnostics candidate produced
+
+Outcome and candidate/acceptance status: **Outcome A. Bundle version 94 is a build-qualified, diagnostics-only WO52 candidate; it is not device-accepted.** The complete deterministic WO52 chain now replays, compiles, links, packages, passes the IPA contract, and publishes exactly one retained GitHub artifact and one tempfile.org object. This order makes no renderer or gameplay repair and requests no device test.
+
+### Commits, exact pins, and production patch order
+
+- Starting clean remote head: `9785d6c15151d8788e08b3c56e670a1dace5ffba`.
+- Build-normalization candidate commit: `9cb19028af9a1769b45d75fb4f53fee5031d62f3`.
+- One authorized CI-specific verifier correction: `5c38946ff99e6398825ee665fbc100284c82ba2f`.
+- Exact source revisions: Xash3D `9785d6c15151d8788e08b3c56e670a1dace5ffba`; GL4ES `81547d986798e876de8b434193920b606a72363f`; NanoGL `7f654d2de2680c7f6007aef5159ed63247741620`; SDL `5d249570393f7a37e037abf22cd6012a4cc56a71` (`2.32.10`); Half-Life SDK `079f2387eb59e4a045647d9057240628130f0058`; Diffusion `14d156bf3a6993c172697fac83a937836c3b5561`; Diffusion MainUI `8c68de2f2325a0130953719efc3ae413eb24e01a`; Diffusion executable `9505a1c01f597e23c3acb7cbb8852b9dcfb0a038`.
+- NanoGL production order: `nanogl-large-primitive.patch`.
+- SDL production order: `sdl2-drawable-bridge-ios.patch`.
+- GL4ES production order: `gl4es-ios.patch`, `gl4es-drawable-bridge-ios.patch`, `gl4es-uint-elements-ios.patch`, `gl4es-index-trace-ios.patch`, `gl4es-wo49-topology-ios.patch`, `gl4es-wo49-transform-ios.patch`, `gl4es-wo49-texture-unit-ios.patch`, `gl4es-wo52-material-trace-ios.patch`.
+- Diffusion production order: `diffusion-ios.patch`, `diffusion-shaders-ios.patch`, `diffusion-wo49-topology-ios.patch`, `diffusion-wo49-transform-ios.patch`, `diffusion-wo51-material-state-ios.patch`, `diffusion-wo52-material-trace-ios.patch`.
+
+The deterministic defects were build-chain defects only. `scripts/ios/diffusion-wo52-material-trace-ios.patch` was regenerated against the exact post-WO51 source state: its stale `r_shader.cpp` base blob was corrected and a no-op EOF-newline hunk was removed. All six resulting Diffusion WO52 files are semantically identical, ignoring host EOL representation, to the previously intended fully applied diagnostic source. `scripts/gha/deps_ios.sh` now fetches, detaches, and verifies the exact Half-Life SDK commit instead of cloning a moving branch.
+
+The first qualifying workflow proved a packaging-only ownership error after all builds succeeded: `verify_ipa.sh` searched the `xash` executable for `gl4es_iOSWO52EngineBind`, although its consumer is `ref/gl/gl_backend.c` and is packaged in `libref_gl4es.dylib`. The permitted CI-specific correction checks the correct binary and extends the unchanged WO52 validator with a rejection fixture that rejects the former wrong-binary assertion. It changes no packaged runtime behavior.
+
+### Exact files changed
+
+- `scripts/gha/deps_ios.sh`
+- `scripts/ios/diffusion-wo52-material-trace-ios.patch`
+- `scripts/ios/verify_ipa.sh`
+- `scripts/ios/validate-ios-wo52-material-trace.py`
+- `Documentation/XASH3DIOS_PORTING_STATE.md`
+
+No engine, renderer, GL4ES runtime patch, Diffusion diagnostic body, shader, material, texture, terrain, sampler, uniform, index, transform, presentation, gameplay, menu, touch, transition, lifecycle, MSAA, timing, or asset-policy source changed.
+
+### Local proof and CI result
+
+Fresh exact-pin trees replayed the full NanoGL, SDL, GL4ES, and Diffusion production stacks with no rejects or skipped WO52 patch. All 14 modified GL4ES C translation units compiled under Clang GNU C11 with implicit declarations, incompatible pointers, integer conversion, and return-type failures promoted to errors. All four modified Diffusion C++ translation units (`r_misc.cpp`, `r_shader.cpp`, `r_studio.cpp`, `r_world.cpp`) compiled under Clang GNU C++17 with `XASH_IOS=1`. The NanoGL batch test compiled, linked, and passed.
+
+The drawable bridge, uint-elements, index-trace, WO49 topology, WO49 transform, WO49 texture-unit, WO51 material-state, WO52 material-trace, and Diffusion iOS policy positive/rejection suites all passed. Python compilation and `git diff --check` passed. The final WO52 verifier self-test specifically rejects checking the engine-bind consumer in `ENGINE_STRINGS`.
+
+Host Windows could not exercise Apple Objective-C/Objective-C++, iPhoneOS linking, or the GL4ES-translated shader gate. Its strongest attempted full builds were bounded by host/toolchain prerequisites: Diffusion Waf configuration requires Unix `libm`; the engine host configuration lacked initialized recursive submodules in the restricted Windows Git helper; Half-Life CMake could not complete the host RC/lld toolchain probe. The macOS workflow then covered those unavailable gates and successfully built the SDL arm64 framework, engine, Half-Life client/server, Diffusion client/server/menu, GL4ES renderer, translated mobile shaders, and IPA.
+
+- First qualifier: [workflow 32021080139](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32021080139), commit `9cb19028af9a1769b45d75fb4f53fee5031d62f3`: engine/Half-Life/Diffusion build succeeded; failed only at the incorrect IPA bridge-owner assertion; no artifact retained.
+- Final permitted qualifier: [workflow 32355333619](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32355333619), commit `5c38946ff99e6398825ee665fbc100284c82ba2f`: **success**, including IPA contract and upload.
+- Duplicate handling: both candidate pushes used `[skip ci]`; no automatic qualifying duplicate or duplicate artifact was created. No third workflow was run.
+
+### Artifact, IPA, marker, and architecture verification
+
+- Retained GitHub artifact: `Xash3DiOS-arm64-unsigned`, ID `9401577451`, [artifact page](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32355333619/artifacts/9401577451), archive size `8,605,889` bytes, GitHub archive digest `fdb01fb1cc3aef2cd71d45d887cf566698370605ae2b430f4cfab208efaf0acd`.
+- IPA: `xash3d-fwgs-ios-arm64.ipa`, `8,705,206` bytes, SHA-256 `2D93C13E913F908BA81E22420A950D502893BC7F2827A270D39CA31204BD0E47`, `CFBundleVersion=94`, `CFBundleExecutable=xash`.
+- Exactly one tempfile.org object: [information page](https://tempfile.org/NUyct1xEmKb/); [direct IPA download](https://tempfile.org/NUyct1xEmKb/download); expiry `2026-08-22T09:51:06.122Z`. API and direct-header readback report the exact filename and byte size; the server security endpoint reports the same SHA-256, `safe`, no warning, and no suspicious pattern.
+- Independent Mach-O header inspection verified thin 64-bit arm64 (`CFFAEDFE`, CPU `0C000001`) for `xash`, `libref_gl4es.dylib`, SDL2, and the Diffusion client/server/menu dylibs.
+- The packaged GL4ES renderer contains `gl4es_iOSWO52EngineBind` and every unchanged expected marker: `WO52 material trace policy:`, `producer:`, `shader:`, `bind:`, `gl4es:`, `native:`, `transition:`, `terminal:`, and `summary:`. The Diffusion client contains the accepted canonical-material/shared-animated-layout/on-demand-shader marker.
+
+### Structural boundary, semantic preservation, risks, and stop state
+
+Verified boundary: Work Order 52 Phase C resolved the deterministic patch/application/dependency/package-verifier chain. It does not resolve or reinterpret the device-visible scene-stable material divergence. Structural cause of the former build blocker was stale Diffusion patch context plus a moving Half-Life dependency; the first CI-only failure was an artifact-owner assertion against the wrong Mach-O image. The normalized patch produces the exact same WO52 diagnostic program and the final verifier checks the image that actually owns the bridge.
+
+Remaining risks: Bundle 94 has not been run on an iPhone and is not accepted; the actual producer-to-native material divergence remains unresolved until orchestrator-authorized device evidence exists. Terrain arrays, shader latency, and later map-transition termination remain independent. The tempfile object is temporary; the retained GitHub artifact expires under the workflow retention policy.
+
+Durable ledger path: `Documentation/XASH3DIOS_PORTING_STATE.md`. This report is published in a documentation-only `[skip ci]` commit; its exact hash is mirrored into the authoritative Google Docs ledger and final handoff because a Git commit cannot contain its own hash. Repository-ledger and Google Docs readbacks are required before handoff.
+
+Stop state: **Work Order 52 Phase C Outcome A is complete at the orchestrator-review gate.** Do not contact Arjun, request evidence or device testing, claim device acceptance, modify runtime behavior, start another workflow, create another artifact or tempfile object, begin Phase D, Work Order 53, or any later phase. Await orchestrator review.
