@@ -2038,3 +2038,53 @@ Remaining risks: Track A's future repair boundary is broad enough to require an 
 Durable ledger path: `Documentation/XASH3DIOS_PORTING_STATE.md`. This report is published in one documentation-only `[skip ci]` commit; its exact commit is mirrored into the authoritative Google Docs ledger after publication because a Git commit cannot contain its own hash. Both ledgers are read back after the Google Docs append.
 
 Stop state: **Work Order 53 Phase A is complete at the orchestrator-review gate: Track A Outcome A, Track B Outcome C.** Do not implement either repair, add diagnostics, build, run CI, produce/upload an IPA, contact Arjun, request a new device test, begin Phase B, Work Order 54, or any later phase without a new explicit orchestrator-authored work order.
+
+## Work Order 53 Phase B - Outcome B at the complete-route proof gate
+
+Selected work order and outcome: **WORK ORDER 53 PHASE B — COMPLETE GLES3 TEXTURE-ARRAY PATH FOR DIFFUSION LANDSCAPES. Outcome B.** The full source-to-native texture-array route cannot be completed and proven safely inside the authorized branch, exact pins, existing external-context architecture, and single-qualifying-workflow gate. No partial feature advertisement, runtime change, diagnostic change, build, workflow, artifact, IPA, or tempfile.org object was produced.
+
+### Authority, baseline, and preserved invariants
+
+- The authoritative Google Docs ledger was read through its newest complete entry and Work Order 53 Phase B was confirmed as the first uncompleted work order after the accepted Phase A report.
+- The audit began from a clean local and fetched remote `agent/ios-proof-of-life` head at `7ca216f6c4a7dc01051c3485d717dab75db63791`. Bundle 96's implementation commit remains `5cf496cef94a61b44404b2d790981d3b065d98a2` and is preserved exactly.
+- Exact source pins remain GL4ES `81547d986798e876de8b434193920b606a72363f`, Diffusion `14d156bf3a6993c172697fac83a937836c3b5561`, MainUI `8c68de2f2325a0130953719efc3ae413eb24e01a`, executable/engine `9505a1c01f597e23c3acb7cbb8852b9dcfb0a038`, SDL `5d249570393f7a37e037abf22cd6012a4cc56a71`, and Half-Life SDK `079f2387eb59e4a045647d9057240628130f0058`.
+- Bundle 69 direct-drawable ownership, Bundle 71 native-ES3 uint elements, Bundle 81 per-unit target-source selection, Bundle 96 inactive-sampler handling, canonical studio materials, Diffusion menu/touch/gameplay behavior, and Track B transition quarantine are unchanged.
+
+### Exact Outcome-B boundary
+
+The first complete-route proof failure is not the legacy extension string. It is the coupled **GLSL-130-to-native-ESSL-300 program route plus native current-context conformance requirement**:
+
+1. Applied pinned Diffusion still emits `#version 130` in `client/render/r_shader.cpp::GL_ProcessShader`. Terrain-enabled bmodel programs mix `sampler2DArray`/`texture2DArray` with legacy `attribute`, `varying`, `gl_FragColor`, `texture2D`, `texture2DProj`, and `textureCube` syntax.
+2. Applied pinned GL4ES `src/gl/shaderconv.c::ConvertShader` always selects `GLESHeader[0]`, which emits ESSL 100. Its higher-version branch remains compiled out with the source warning that higher GLSL requires substantially more work. The dormant ESSL-300 header maps `varying` to `out` for both stages, provides no fragment input/output repair, does not translate the legacy lookup family, and does not admit Diffusion's GLSL 130 source. It therefore cannot compile a coherent native array-sampler program.
+3. `src/gl/program.c` and `src/gl/uniform.c` classify, cache, initialize, and route only `GL_SAMPLER_2D` and `GL_SAMPLER_CUBE`. `GL_SAMPLER_2D_ARRAY` has no cache size, integer-uniform classification, texture-unit type, reflection route, or required-target realization.
+4. The iOS workflow cross-compiles an iPhoneOS arm64 payload and packages an IPA. It has no iOS Simulator/device execution job, XCTest/EAGL conformance target, `simctl` launch, or offscreen array upload/sample/readback test. Consequently the required multiple-layer, nonzero-mip, subimage, sampler-coordinate, delete/rebind, and context-recreation invariants cannot be proven by the sole qualifying workflow. A successful compile would not satisfy the order's native proof gate.
+
+Every downstream route remains incomplete as well:
+
+- `src/gl/texture.h` has no distinct array member in `texture_enabled_t`. `what_target(GL_TEXTURE_2D_ARRAY)` falls through to `ENABLED_TEX2D`; `to_target`, enable masks, saved state, and `texture_state_t::bound` therefore cannot preserve an array target independently.
+- Applied Bundle-81 `realize_textures` correctly derives a target per unit, but all non-cube targets still share `glstate->actual_tex2d` and are natively rebound with `gles_glBindTexture(GL_TEXTURE_2D, ...)`. An array object would alias 2D cache/state rather than retain its native target.
+- `src/gl/texture_3d.c` explicitly implements “3d stubs.” `gl4es_glTexImage3D` and `gl4es_glTexSubImage3D` call 2D wrappers, discard the supplied target/depth/z-offset semantics, and `glTexStorage3D` allocates only level zero through that same stub. This contradicts the engine's proven multilayer/mipmap producer contract in `ref/gl/gl_image.c`.
+- `hardext_t` has no texture-array capability, maximum-layer value, native 3D-entry-point admission, or generation-scoped reset state. The NOEGL/NO_LOADER iOS build probes the SDL-owned current context only through the existing singleton initialization path; the direct-drawable lifecycle bridge exposes presentation generations but no renderer-wrapper array capability invalidation/re-probe contract.
+- `BuildExtensionsList` correctly omits `GL_EXT_texture_array`. Diffusion's literal token check is narrow, but changing it or advertising the token before the complete route exists would enter invalid object, upload, shader, reflection, and draw semantics.
+
+Structural cause: the exact pinned GL4ES is an ES2-oriented desktop-compatibility translator whose texture object model, native binding cache, upload ABI, shader conversion, reflection, and lifecycle ownership all lack arrays. Native `OpenGL ES 3.0 Metal` capability is necessary but not sufficient. The required repair is a separately testable renderer-wrapper migration, not an additive enum or upload function.
+
+### Why no implementation or candidate is responsible
+
+Work Order 53 Phase B permits Outcome A only when every route is present and proven, and explicitly requires Outcome B when the complete route cannot be implemented safely. Adding only `GL_TEXTURE_2D_ARRAY`, forwarding only `glTexImage3D`, accepting ES3 in Diffusion, translating only `sampler2DArray`, or advertising the legacy token would each leave independently proven contract violations. A source-name shader exception, 2D flattening, layer-zero fallback, atlas, or GLES2 downgrade is likewise forbidden.
+
+Completing the route would require one coordinated subsystem across at least capability/lifecycle discovery, texture object and push/pop state, target-aware native caches, 3D allocation/subupload and pixel-store/PBO conversion, program/uniform/fixed-pipeline sampler classification, full stage-correct ESSL-300 translation, Diffusion admission, context teardown/recreation, engine-log markers, and an executable native EAGL conformance harness. Implementing that migration without a runnable prequalification harness and then relying on the only authorized workflow to discover Apple/native defects would violate the one-candidate proof gate rather than prove it.
+
+No Track B transition, crash, save fallback, server activation, shader-latency, gameplay, menu, touch, drawable, index, sampler-location, material, or asset behavior was touched.
+
+### Validation, publication, and stop state
+
+- Used Codebase Memory first for engine texture-array producers, capability owners, and renderer entry points, then inspected the ignored pinned GL4ES and Diffusion sources directly.
+- Fetched and verified the clean remote branch. Cloned exact pinned GL4ES and Diffusion audit trees. The complete current GL4ES iOS patch order replayed cleanly: base iOS, direct drawable, uint elements, index trace, WO49 topology, WO49 transform, WO49 texture-unit, WO52 material trace, and WO52 trace cap. Relevant current Diffusion client patches and exact terrain consumers were inspected at their pin.
+- Reconfirmed the engine allocation/upload consumer, Diffusion admission and terrain shader families, GL4ES target/state, upload stubs, shader converter, reflection/uniform routing, hardext lifecycle, build defines, and the sole iOS workflow's execution surface.
+- Candidate/build status: **none; Outcome B before build**. Workflow ID/URL/result: **none; no workflow authorized after proof failure and none started**. Artifact and IPA filename/link/size/SHA-256: **none**. tempfile.org link/expiry: **none**. Expected new runtime markers: **none**, because no executable changed.
+- Exact repository file changed by Phase B: `Documentation/XASH3DIOS_PORTING_STATE.md` only. The authoritative Google Docs ledger receives this same report. The repository report is published in one documentation-only `[skip ci]` commit and both ledgers are read back.
+
+Remaining risks: landscapes remain unavailable. A future order would need to authorize a renderer-wrapper migration and a native simulator/device conformance milestone before any gameplay candidate; merely expanding workflow count would not remove the architectural work. Bundle 96 remains only the current device baseline for its accepted inactive-sampler subsystem. The `ch1map1` termination remains quarantined pending external iOS termination evidence.
+
+Stop state: **Work Order 53 Phase B is complete at Outcome B and the orchestrator-review gate.** Do not implement or publish a partial texture-array route, build, run CI, create/upload an IPA, request device testing or evidence, contact Arjun, modify Track B, begin Work Order 54, or start any later phase without a new explicit orchestrator-authored work order.
