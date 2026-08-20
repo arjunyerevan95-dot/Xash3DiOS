@@ -78,6 +78,16 @@ for material_marker in \
 	fi
 done
 
+for inactive_sampler_marker in \
+	'iOS inactive sampler policy:' \
+	'iOS inactive sampler rejection:' \
+	'iOS material uniform proof:'; do
+	if ! grep -q "$inactive_sampler_marker" "$DIFFUSION_CLIENT_STRINGS"; then
+		echo "Diffusion client is missing inactive-sampler marker: $inactive_sampler_marker" >&2
+		exit 1
+	fi
+done
+
 DIFFUSION_MENU_STRINGS="$VERIFY_ROOT/diffusion-menu.strings"
 strings "$DIFFUSION_MENU_PATH" > "$DIFFUSION_MENU_STRINGS"
 if ! grep -q 'iOS mobile menu policy: decorative background map disabled; UI callbacks remain active' "$DIFFUSION_MENU_STRINGS"; then

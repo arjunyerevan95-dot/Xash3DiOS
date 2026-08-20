@@ -166,8 +166,8 @@ def validate(files: dict[str, str], require_diffusion: bool) -> list[str]:
         require(trace, result, "terminal classifier", failures)
 
     for token in (
-        "IOS_WO52_MATERIAL_TOKEN_CAP 256u", "IOS_WO52_MATERIAL_UNIT_CAP 6u",
-        "IOS_WO52_MATERIAL_LIST_CAP 32u", "identities<=256",
+        "IOS_WO52_MATERIAL_TOKEN_CAP 16u", "IOS_WO52_MATERIAL_UNIT_CAP 6u",
+        "IOS_WO52_MATERIAL_LIST_CAP 32u", "identities<=16",
         "records_per_stage<=1", "fixed-storage=1",
         "error_queue=untouched", "mutation=none", "state_restored=not-mutated",
         "first-draw+first-post-transition", "direct+deferred+renderlist+replay",
@@ -300,7 +300,7 @@ def validate(files: dict[str, str], require_diffusion: bool) -> list[str]:
 def self_test(files: dict[str, str], require_diffusion: bool) -> list[str]:
     failures: list[str] = []
     cases = [
-        ("unbounded tokens", "trace_h", "IOS_WO52_MATERIAL_TOKEN_CAP 256u",
+        ("unbounded tokens", "trace_h", "IOS_WO52_MATERIAL_TOKEN_CAP 16u",
          "IOS_WO52_MATERIAL_TOKEN_CAP 1024u"),
         ("list cap not header-visible", "list_h",
          "#define IOS_WO52_MATERIAL_LIST_CAP 32u",
