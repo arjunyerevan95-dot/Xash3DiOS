@@ -14,6 +14,28 @@
 
 extern void gl4es_glTexStorage3D( GLenum target, GLsizei levels,
 	GLenum internalformat, GLsizei width, GLsizei height, GLsizei depth );
+extern GLuint gl4es_glCreateShader( GLenum shaderType );
+extern void gl4es_glShaderSource( GLuint shader, GLsizei count,
+	const GLcharARB * const *string, const GLint *length );
+extern void gl4es_glCompileShader( GLuint shader );
+extern void gl4es_glGetShaderiv( GLuint shader, GLenum pname, GLint *params );
+extern void gl4es_glDeleteShader( GLuint shader );
+extern GLuint gl4es_glCreateProgram( void );
+extern void gl4es_glAttachShader( GLuint program, GLuint shader );
+extern void gl4es_glBindAttribLocation( GLuint program, GLuint index, const GLcharARB *name );
+extern void gl4es_glLinkProgram( GLuint program );
+extern void gl4es_glGetProgramiv( GLuint program, GLenum pname, GLint *params );
+extern void gl4es_glGetActiveUniform( GLuint program, GLuint index, GLsizei bufSize,
+	GLsizei *length, GLint *size, GLenum *type, GLcharARB *name );
+extern void gl4es_glUseProgram( GLuint program );
+extern GLint gl4es_glGetUniformLocation( GLuint program, const GLcharARB *name );
+extern void gl4es_glUniform1i( GLint location, GLint v0 );
+extern void gl4es_glUniform1f( GLint location, GLfloat v0 );
+extern void gl4es_glEnableVertexAttribArray( GLuint index );
+extern void gl4es_glDisableVertexAttribArray( GLuint index );
+extern void gl4es_glVertexAttribPointer( GLuint index, GLint size, GLenum type,
+	GLboolean normalized, GLsizei stride, const GLvoid *pointer );
+extern void gl4es_glDeleteProgram( GLuint program );
 
 static int R_IOSArrayDrainError( const char *step )
 {
@@ -27,16 +49,16 @@ static int R_IOSArrayDrainError( const char *step )
 
 static GLuint R_IOSArrayCompile( GLenum type, const char *source )
 {
-	GLuint shader = pglCreateShaderObjectARB( type );
+	GLuint shader = gl4es_glCreateShader( type );
 	GLint length = Q_strlen( source );
 	GLint status = GL_FALSE;
-	pglShaderSourceARB( shader, 1, (const GLcharARB **)&source, &length );
-	pglCompileShaderARB( shader );
-	pglGetObjectParameterivARB( shader, GL_OBJECT_COMPILE_STATUS_ARB, &status );
+	gl4es_glShaderSource( shader, 1, (const GLcharARB * const *)&source, &length );
+	gl4es_glCompileShader( shader );
+	gl4es_glGetShaderiv( shader, GL_OBJECT_COMPILE_STATUS_ARB, &status );
 	if( !status )
 	{
 		gEngfuncs.Con_Printf( "iOS texture array selftest shader: compile=FAIL stage=0x%04x\n", type );
-		pglDeleteObjectARB( shader );
+		gl4es_glDeleteShader( shader );
 		return 0;
 	}
 	return shader;
@@ -147,18 +169,18 @@ void R_IOSTextureArraySelftest( void )
 	if( !failures )
 	{
 		GLint linked = GL_FALSE;
-		program = pglCreateProgramObjectARB();
-		pglAttachObjectARB( program, vertexShader );
-		pglAttachObjectARB( program, fragmentShader );
-		pglBindAttribLocationARB( program, 0, "a_Position" );
-		pglLinkProgramARB( program );
-		pglGetObjectParameterivARB( program, GL_OBJECT_LINK_STATUS_ARB, &linked );
+		program = gl4es_glCreateProgram();
+		gl4es_glAttachShader( program, vertexShader );
+		gl4es_glAttachShader( program, fragmentShader );
+		gl4es_glBindAttribLocation( program, 0, "a_Position" );
+		gl4es_glLinkProgram( program );
+		gl4es_glGetProgramiv( program, GL_OBJECT_LINK_STATUS_ARB, &linked );
 		if( !linked ) failures++;
-		pglGetObjectParameterivARB( program, GL_OBJECT_ACTIVE_UNIFORMS_ARB, &uniforms );
+		gl4es_glGetProgramiv( program, GL_OBJECT_ACTIVE_UNIFORMS_ARB, &uniforms );
 		for( int i = 0; i < uniforms; ++i )
 		{
 			GLcharARB name[64]; GLsizei length = 0; GLint size = 0; GLenum type = 0;
-			pglGetActiveUniformARB( program, i, sizeof( name ), &length, &size, &type, name );
+			gl4es_glGetActiveUniform( program, i, sizeof( name ), &length, &size, &type, name );
 			if( !Q_strcmp( name, "u_Array" ) && type == GL_SAMPLER_2D_ARRAY ) samplerFound = 1;
 		}
 		if( !samplerFound ) failures++;
@@ -171,21 +193,21 @@ void R_IOSTextureArraySelftest( void )
 			{ 0, 0, width/2, height/2 }, { width/2, 0, width-width/2, height/2 },
 			{ 0, height/2, width/2, height-height/2 }, { width/2, height/2, width-width/2, height-height/2 }
 		};
-		pglUseProgramObjectARB( program );
-		samplerLocation = pglGetUniformLocationARB( program, "u_Array" );
-		layerLocation = pglGetUniformLocationARB( program, "u_Layer" );
-		pglUniform1iARB( samplerLocation, 0 );
+		gl4es_glUseProgram( program );
+		samplerLocation = gl4es_glGetUniformLocation( program, "u_Array" );
+		layerLocation = gl4es_glGetUniformLocation( program, "u_Layer" );
+		gl4es_glUniform1i( samplerLocation, 0 );
 		pglActiveTexture( GL_TEXTURE0 );
 		pglEnable( GL_TEXTURE_2D_ARRAY );
 		pglBindTexture( GL_TEXTURE_2D_ARRAY, textures[0] );
-		pglEnableVertexAttribArrayARB( 0 );
-		pglVertexAttribPointerARB( 0, 2, GL_FLOAT, GL_FALSE, 0, quad );
+		gl4es_glEnableVertexAttribArray( 0 );
+		gl4es_glVertexAttribPointer( 0, 2, GL_FLOAT, GL_FALSE, 0, quad );
 		pglClearColor( 0.1f, 0.1f, 0.1f, 1.0f );
 		pglClear( GL_COLOR_BUFFER_BIT );
 		for( int layer = 0; layer < 4; ++layer )
 		{
 			pglViewport( viewports[layer][0], viewports[layer][1], viewports[layer][2], viewports[layer][3] );
-			pglUniform1fARB( layerLocation, (GLfloat)layer );
+			gl4es_glUniform1f( layerLocation, (GLfloat)layer );
 			pglDrawArrays( GL_TRIANGLE_STRIP, 0, 4 );
 		}
 		pglFinish();
@@ -197,15 +219,15 @@ void R_IOSTextureArraySelftest( void )
 			for( int c = 0; c < 4; ++c ) checksum = ( checksum ^ pixel[c] ) * 16777619u;
 			if( !R_IOSArrayNear( pixel, expected[layer] )) failures++;
 		}
-		pglDisableVertexAttribArrayARB( 0 );
+		gl4es_glDisableVertexAttribArray( 0 );
 		if( !R_IOSArrayDrainError( "sampling-readback" )) failures++;
 	}
 	gEngfuncs.Con_Printf( "iOS texture array selftest sample: quadrants=4 layers=0,1,2,3 checksum=%08x result=%s\n", checksum, failures ? "FAIL" : "PASS" );
 
-	pglUseProgramObjectARB( 0 );
-	if( program ) pglDeleteObjectARB( program );
-	if( vertexShader ) pglDeleteObjectARB( vertexShader );
-	if( fragmentShader ) pglDeleteObjectARB( fragmentShader );
+	gl4es_glUseProgram( 0 );
+	if( program ) gl4es_glDeleteProgram( program );
+	if( vertexShader ) gl4es_glDeleteShader( vertexShader );
+	if( fragmentShader ) gl4es_glDeleteShader( fragmentShader );
 	pglDeleteTextures( 4, textures );
 	pglGenTextures( 1, &textures[0] );
 	pglBindTexture( GL_TEXTURE_2D_ARRAY, textures[0] );
