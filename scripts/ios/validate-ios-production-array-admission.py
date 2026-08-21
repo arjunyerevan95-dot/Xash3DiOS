@@ -184,6 +184,12 @@ def validate(files: dict[str, str]) -> list[str]:
         require(files["shader_gate"], token, "full terrain shader gate", failures)
     for marker in contract.get("markers", []):
         require(files["verify"], marker, "IPA marker inspection", failures)
+    require(
+        files["verify"],
+        "grep -q 'iOS production texture array engine:' \"$GL4ES_RENDERER_STRINGS\"",
+        "engine gate marker owner",
+        failures,
+    )
     for token in (
         "cmake --build build --target install", "./scripts/ios/builddiffusion.sh",
         "client_arm64.dylib", "server_arm64.dylib", "menu_arm64.dylib",
@@ -221,6 +227,7 @@ def fixtures(files: dict[str, str]) -> list[str]:
         ("missing diffuse array", "terrain", "LOAD_TEXTURE_ARRAY( (const char**)texnames, 0 )", "LOAD_TEXTURE( texnames[0], NULL, 0, 0 )"),
         ("missing normal array", "terrain", "LOAD_TEXTURE_ARRAY( (const char **)normalmaps, TF_NORMALMAP )", "LOAD_TEXTURE( normalmaps[0], NULL, 0, TF_NORMALMAP )"),
         ("sampler unit mismatch", "shader", "u_LayerMap, GL_TEXTURE5", "u_LayerMap, GL_TEXTURE4"),
+        ("engine marker wrong binary", "verify", "grep -q 'iOS production texture array engine:' \"$GL4ES_RENDERER_STRINGS\"", "grep -q 'iOS production texture array engine:' \"$ENGINE_STRINGS\""),
         ("ordinary startup changed", "launch", "-dev 2 -log -game diffusion -ref gl4es -gl4es_texture_array_selftest", "-dev 2 -game diffusion -enable_terrain"),
     )
     for label, key, old, new in mutations:

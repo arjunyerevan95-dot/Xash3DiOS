@@ -113,7 +113,7 @@ if ! grep -q 'iOS production texture array provider:' "$GL4ES_RENDERER_STRINGS";
 	exit 1
 fi
 
-if ! grep -q 'iOS production texture array engine:' "$ENGINE_STRINGS"; then
+if ! grep -q 'iOS production texture array engine:' "$GL4ES_RENDERER_STRINGS"; then
 	echo "Engine is missing the production texture-array gate marker" >&2
 	exit 1
 fi
