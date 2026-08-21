@@ -10,6 +10,7 @@ import sys
 
 BASELINE = "9cf4cf1fea8e1aa8e83b9f110452582302b3877f"
 ALLOWED_PATHS = {
+    ".github/workflows/ios-proof-of-life.yml",
     "engine/common/host.c",
     "engine/client/dll_int/ref_common.c",
     "ref/gl/gl_opengl.c",
