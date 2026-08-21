@@ -13,9 +13,11 @@ import sys
 
 BASELINE = "5b5cb89f1d9ec9c6b2291003c815c0019d065e1d"
 ALLOWED_PATHS = {
+    "Documentation/XASH3DIOS_PORTING_STATE.md",
     "engine/client/dll_int/ref_common.c",
     "engine/common/host.c",
     "engine/common/model.c",
+    "engine/platform/ios/launchdialog.m",
     "ref/gl/gl_opengl.c",
     "scripts/gha/build_ios.sh",
     "scripts/ios/validate-ios-renderer-contract.py",
@@ -197,7 +199,7 @@ def validate(files: dict[str, object]) -> list[str]:
     if host.count("Host_InitRendererContract(") != 3:
         failures.append("shared initializer must have one definition plus one selftest and one normal call")
     ordered(host, (
-        'iOS texture array selftest boot: filesystem-independent',
+        'iOS texture array selftest boot: gameinfo-ready game=diffusion',
         "Host_InitRendererContract( )",
         "CL_Init();",
     ), "selftest contract ordering", failures)

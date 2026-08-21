@@ -108,7 +108,7 @@ static void IOS_PrepareView( void )
 
 void IOS_LaunchDialog( void )
 {
-	static NSString *const textureArraySelftestArgs = @"-dev 2 -log -ref gl4es -gl4es_texture_array_selftest";
+	static NSString *const textureArraySelftestArgs = @"-dev 2 -log -game diffusion -ref gl4es -gl4es_texture_array_selftest";
 	NSLog(@"System Version is %@",[[UIDevice currentDevice] systemVersion]);
 	NSString *ver = [[UIDevice currentDevice] systemVersion];
 	g_iOSVer = [ver floatValue];

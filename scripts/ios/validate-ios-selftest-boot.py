@@ -1,26 +1,23 @@
 #!/usr/bin/env python3
-"""Validate Work Order 56 Phase C's filesystem-independent iOS self-test boot."""
+"""Validate WO56 Phase G's normal Diffusion-bootstrap iOS self-test route."""
 
 from __future__ import annotations
 
 import argparse
+import copy
 import pathlib
 import subprocess
 import sys
 
-BASELINE = "9cf4cf1fea8e1aa8e83b9f110452582302b3877f"
-CANDIDATE = "a96c03c79f49ae71ae50011da3b9360d0e88fbac"
+BASELINE = "42be8465ec8752182f65005e8419a0cf634faf69"
 ALLOWED_PATHS = {
-    ".github/workflows/ios-proof-of-life.yml",
     "engine/common/host.c",
-    "engine/client/dll_int/ref_common.c",
-    "ref/gl/gl_opengl.c",
-    "ref/gl/gl_texture_array_selftest.c",
-    "scripts/gha/build_ios.sh",
+    "engine/platform/ios/launchdialog.m",
+    "scripts/ios/validate-ios-renderer-contract.py",
     "scripts/ios/validate-ios-selftest-boot.py",
     "scripts/ios/verify_ipa.sh",
 }
-LOCKED_ARGS = '-dev 2 -log -ref gl4es -gl4es_texture_array_selftest'
+LOCKED_ARGS = "-dev 2 -log -game diffusion -ref gl4es -gl4es_texture_array_selftest"
 TERMINAL_FAIL = "iOS texture array selftest terminal: FAIL failures=1 diffusion_started=0"
 
 
@@ -33,14 +30,18 @@ def require(text: str, token: str, label: str, failures: list[str]) -> None:
         failures.append(f"{label}: missing {token!r}")
 
 
+def reject(text: str, token: str, label: str, failures: list[str]) -> None:
+    if token in text:
+        failures.append(f"{label}: forbidden {token!r}")
+
+
 def ordered(text: str, tokens: tuple[str, ...], label: str, failures: list[str]) -> None:
     cursor = -1
     for token in tokens:
-        position = text.find(token, cursor + 1)
-        if position < 0:
+        cursor = text.find(token, cursor + 1)
+        if cursor < 0:
             failures.append(f"{label}: missing or out of order {token!r}")
             return
-        cursor = position
 
 
 def block(text: str, start: str, end: str, label: str, failures: list[str]) -> str:
@@ -60,50 +61,73 @@ def validate(files: dict[str, str]) -> list[str]:
     harness = files["harness"]
     client = files["client"]
     launch = files["launch"]
+    system = files["system"]
     build = files["build"]
     verify = files["verify"]
 
+    host_init = block(host, "static void Host_InitCommon(", "static void Host_FreeCommon", "Host_InitCommon", failures)
     for token in (
         "static qboolean host_ios_texture_array_selftest;",
         'host_ios_texture_array_selftest = Sys_CheckParm( "-gl4es_texture_array_selftest" );',
-        'iOS texture array selftest boot: armed',
-        'iOS texture array selftest boot: filesystem-independent',
+        "iOS texture array selftest boot: armed",
+        "iOS texture array selftest boot: gameinfo-ready game=diffusion",
     ):
-        require(host, token, "early arm/filesystem bypass", failures)
-    require(host, "&& !host_ios_texture_array_selftest", "selftest shutdown config bypass", failures)
-    ordered(host, (
+        require(host, token, "normal-bootstrap arm", failures)
+    reject(host, "filesystem-independent", "withdrawn no-game route", failures)
+    reject(host_init, "FI->GameInfo = fake_gameinfo", "fabricated game information", failures)
+    reject(host_init, 'title = "Xash3D"', "fallback title", failures)
+    ordered(host_init, (
         "Sys_ParseCommandLine( argc, (const char **)argv );",
         'host_ios_texture_array_selftest = Sys_CheckParm( "-gl4es_texture_array_selftest" );',
         "FS_Init();",
-        "Image_Init();",
-        "Sound_Init();",
-        'Con_Printf( "iOS texture array selftest boot: filesystem-independent\\n" );',
-        "return;",
         "FS_LoadGameInfo();",
-    ), "host initialization boundary", failures)
-    filesystem_marker = host.find("iOS texture array selftest boot: filesystem-independent")
-    filesystem_branch = host.rfind("if( host_ios_texture_array_selftest )", 0, filesystem_marker)
-    filesystem_end = host.find("#endif", filesystem_marker)
-    if filesystem_marker < 0 or filesystem_branch < 0 or filesystem_end < 0:
-        failures.append("filesystem-independent branch is not bounded")
-    elif "FS_LoadGameInfo" in host[filesystem_branch:filesystem_end]:
-        failures.append("filesystem-independent branch calls FS_LoadGameInfo")
+        'Q_stricmp( GI->gamefolder, "diffusion" )',
+        "iOS texture array selftest boot: gameinfo-ready game=diffusion",
+        "Host_CheckGameLibraries();",
+        "Cvar_PostFSInit();",
+    ), "normal game-information startup", failures)
+    fs_load = host_init.find("FS_LoadGameInfo();")
+    if fs_load < 0:
+        failures.append("normal game-information startup: FS_LoadGameInfo is absent")
+    else:
+        before_fs_load = host_init[:fs_load]
+        if "iOS texture array selftest boot: gameinfo-ready" in before_fs_load:
+            failures.append("gameinfo-ready marker precedes FS_LoadGameInfo")
+        flagged_prefix = before_fs_load[before_fs_load.find("FS_Init();") :]
+        if "return;" in flagged_prefix:
+            failures.append("self-test can return after FS_Init but before FS_LoadGameInfo")
+    gameinfo_gate = block(
+        host_init,
+        "FS_LoadGameInfo();",
+        "Host_CheckGameLibraries();",
+        "Diffusion game-information gate",
+        failures,
+    )
+    for token in ("GI =", "FI->GameInfo =", "title =", "icon =", '"valve"'):
+        reject(gameinfo_gate, token, "fabricated/fallback game information", failures)
+    require(gameinfo_gate, TERMINAL_FAIL, "bounded game-information failure", failures)
+    require(gameinfo_gate, "Sys_Quit(", "bounded game-information failure", failures)
 
     host_main = host[host.find("int EXPORT Host_Main") :]
     host_selftest = block(
         host_main,
         "if( host_ios_texture_array_selftest )\n\t{",
         "// init commands and vars",
-        "Host_Main selftest route",
+        "Host_Main self-test route",
         failures,
     )
-    for token in ("CL_Init();", TERMINAL_FAIL, "Sys_Quit("):
+    for token in ("Host_InitRendererContract( )", "CL_Init();", TERMINAL_FAIL, "Sys_Quit("):
         require(host_selftest, token, "bounded Host_Main dispatch", failures)
-    for forbidden in ("Mod_Init();", "NET_Init();", "SV_Init();", "FS_LoadGameInfo();"):
-        if forbidden in host_selftest:
-            failures.append(f"bounded Host_Main dispatch reaches forbidden {forbidden}")
-    if host.find("if( host_ios_texture_array_selftest )", host.find("Host_Main(")) > host.find("Mod_Init();"):
-        failures.append("Host_Main selftest dispatch occurs after normal subsystem initialization")
+    for forbidden in ("Mod_Init();", "NET_Init();", "SV_Init();", "CL_LoadProgs"):
+        reject(host_selftest, forbidden, "pre-module Host_Main dispatch", failures)
+    ordered(host_main, (
+        "if( host_ios_texture_array_selftest )",
+        "Host_InitRendererContract( )",
+        "CL_Init();",
+        "Mod_Init();",
+        "SV_Init();",
+    ), "self-test before ordinary modules", failures)
+    require(host, "&& !host_ios_texture_array_selftest", "self-test config-write bypass", failures)
 
     for token in (
         "R_IOSTextureArraySelftestMode",
@@ -112,37 +136,27 @@ def validate(files: dict[str, str]) -> list[str]:
         "iOS texture array selftest renderer initialization failed",
     ):
         require(renderer_loader, token, "bounded renderer failure", failures)
-    renderer_failure = block(
-        renderer_loader,
-        "if( R_IOSTextureArraySelftestMode() && !success )",
-        "if( !success && !COM_StringEmptyOrNULL( r_refdll.string )",
-        "selftest renderer failure",
-        failures,
-    )
-    require(renderer_failure, TERMINAL_FAIL, "bounded renderer failure", failures)
     ordered(renderer_loader, (
+        "R_ValidateIOSTextureArrayRendererContract( )",
         'Sys_GetParmFromCmdLine( "-ref", requested_cmdline )',
         "R_LoadRenderer( requested_cmdline, false )",
         "if( R_IOSTextureArraySelftestMode() && !success )",
-        "Sys_Quit( \"iOS texture array selftest renderer initialization failed\" )",
-        "if( !success && !COM_StringEmptyOrNULL( r_refdll.string )",
-    ), "renderer failure before fallback", failures)
-    for token in (
-        "if( R_IOSTextureArraySelftestMode( ))\n\t\treturn true;",
-        "R_CreateBuiltinTextures();",
-        "CL_FillTriAPI( &gTriApi );",
-        "SCR_Init();",
-    ):
-        require(renderer_loader, token, "selftest/ordinary renderer split", failures)
+        'Sys_Quit( "iOS texture array selftest renderer initialization failed" )',
+    ), "renderer contract/load/failure order", failures)
+    require(renderer_loader, "if( R_IOSTextureArraySelftestMode( ))\n\t\treturn true;", "minimal self-test renderer init", failures)
 
     ordered(context, (
+        "iOS texture array selftest contract: complete count=57",
         "initialize_gl4es();",
-        'iOS texture array selftest boot: renderer-ready',
-        'iOS texture array selftest boot: dispatched',
+        "iOS texture array selftest boot: renderer-ready",
+        "iOS texture array selftest boot: dispatched",
         "R_IOSTextureArraySelftest();",
-    ), "current-context dispatch", failures)
-    require(context, 'if( gEngfuncs.Sys_CheckParm( "-gl4es_texture_array_selftest" ))\n\t\treturn true;', "minimal renderer init", failures)
-    require(context, '#if XASH_IOS && XASH_GL4ES\n\tif( !gEngfuncs.Sys_CheckParm( "-gl4es_texture_array_selftest" ))\n\t\tR_ShutdownImages();\n#else\n\tR_ShutdownImages();\n#endif', "partial-init shutdown", failures)
+    ), "post-context pre-module dispatch", failures)
+    if context.count("R_IOSTextureArraySelftest();") != 1:
+        failures.append("texture-array harness must have exactly one dispatch call")
+    require(context, 'if( gEngfuncs.Sys_CheckParm( "-gl4es_texture_array_selftest" ))\n\t\treturn true;', "minimal renderer return", failures)
+    require(context, '#if XASH_IOS && XASH_GL4ES\n\tif( !gEngfuncs.Sys_CheckParm( "-gl4es_texture_array_selftest" ))\n\t\tR_ShutdownImages();', "partial-init renderer shutdown", failures)
+
     for token in (
         "static qboolean dispatched;",
         "if( dispatched )",
@@ -153,48 +167,55 @@ def validate(files: dict[str, str]) -> list[str]:
         require(harness, token, "single dispatch/terminal", failures)
     ordered(harness, ("if( dispatched )", "dispatched = true;", "iOS texture array selftest policy:"), "run-once guard", failures)
 
-    require(client, 'Sys_Quit( "iOS texture array selftest complete" )', "post-dispatch clean exit", failures)
+    ordered(client, (
+        "CL_InitLocal();",
+        "VID_Init();",
+        'Sys_Quit( "iOS texture array selftest complete" )',
+        "CL_LoadProgs( libpath )",
+    ), "terminal before client module", failures)
+    if client.count('Sys_Quit( "iOS texture array selftest complete" )') != 1:
+        failures.append("post-dispatch terminal must occur exactly once")
+    require(system, "Host_ShutdownWithReason( reason );\n\tHost_ExitInMain();", "bounded terminal unwind", failures)
+    require(host, "if( host.shutdown_issued )\n\t\treturn;", "idempotent host shutdown", failures)
+
     require(launch, LOCKED_ARGS, "locked launcher arguments", failures)
+    reject(launch, "-game valve", "Valve substitution", failures)
     require(launch, "setEnabled:NO", "locked launcher field", failures)
     require(build, "validate-ios-selftest-boot.py", "qualification validator", failures)
     for marker in (
         "iOS texture array selftest boot: armed",
-        "iOS texture array selftest boot: filesystem-independent",
+        "iOS texture array selftest boot: gameinfo-ready game=diffusion",
+        "iOS texture array selftest contract: complete count=57",
         "iOS texture array selftest boot: renderer-ready",
         "iOS texture array selftest boot: dispatched",
     ):
-        require(verify, marker, "IPA boot marker contract", failures)
+        require(verify, marker, "IPA marker contract", failures)
+    require(verify, "Proprietary game asset is packaged", "IPA game-asset rejection", failures)
 
-    for token in (
-        "FS_LoadGameInfo();", "Host_CheckGameLibraries();", "Cvar_PostFSInit();",
-        "Mod_Init();", "NET_Init();", "SV_Init();", "SCR_Init();",
-    ):
-        require(host + renderer_loader, token, "ordinary launch preserved", failures)
+    for token in ("FS_LoadGameInfo();", "Mod_Init();", "NET_Init();", "SV_Init();", "SCR_Init();", "CL_LoadProgs( libpath )"):
+        require(host + renderer_loader + client, token, "ordinary startup preserved", failures)
     return failures
 
 
 def fixtures(files: dict[str, str]) -> list[str]:
     failures: list[str] = []
     mutations = (
-        ("arm removed", "host", "host_ios_texture_array_selftest = Sys_CheckParm", "host_ios_texture_array_selftest = false && Sys_CheckParm"),
-        ("filesystem bypass removed", "host", "iOS texture array selftest boot: filesystem-independent", "selftest filesystem bypass removed"),
-        ("config write restored", "host", "&& !host_ios_texture_array_selftest", "&& true"),
-        ("game-info leak", "host", 'Con_Printf( "iOS texture array selftest boot: filesystem-independent\\n" );', 'FS_LoadGameInfo(); Con_Printf( "iOS texture array selftest boot: filesystem-independent\\n" );'),
+        ("missing -game diffusion", "launch", LOCKED_ARGS, "-dev 2 -log -ref gl4es -gl4es_texture_array_selftest"),
+        ("Valve substitution", "launch", "-game diffusion", "-game valve"),
+        ("pre-gameinfo marker", "host", "FS_LoadGameInfo();", 'Con_Printf( "iOS texture array selftest boot: gameinfo-ready game=diffusion\\n" );\n\tFS_LoadGameInfo();'),
+        ("pre-gameinfo return", "host", "FS_LoadGameInfo();", "if( host_ios_texture_array_selftest ) return;\n\tFS_LoadGameInfo();"),
+        ("fake gameinfo", "host", "FS_LoadGameInfo();", "FI->GameInfo = fake_gameinfo;\n\tFS_LoadGameInfo();"),
+        ("fallback title", "host", "FS_LoadGameInfo();", 'title = "Xash3D";\n\tFS_LoadGameInfo();'),
+        ("pre-context dispatch", "context", "initialize_gl4es();", "R_IOSTextureArraySelftest();\n\tinitialize_gl4es();"),
+        ("duplicate dispatch", "context", "R_IOSTextureArraySelftest();", "R_IOSTextureArraySelftest();\n\t\tR_IOSTextureArraySelftest();"),
+        ("post-module terminal", "client", 'Sys_Quit( "iOS texture array selftest complete" );', "/* delayed until after CL_LoadProgs */"),
+        ("missing terminal shutdown", "client", 'Sys_Quit( "iOS texture array selftest complete" );', "return;"),
         ("normal launch hijack", "host", "if( host_ios_texture_array_selftest )\n\t{\n\t\tif( !Host_InitRendererContract( ))", "if( true )\n\t{\n\t\tif( !Host_InitRendererContract( ))"),
-        ("renderer fallback", "renderer_loader", "if( R_IOSTextureArraySelftestMode() && !success )", "if( false && R_IOSTextureArraySelftestMode() && !success )"),
-        (
-            "missing failure terminal",
-            "renderer_loader",
-            'Con_Printf( "iOS texture array selftest boot: renderer-failed\\n" );\n\t\tCon_Printf( "' + TERMINAL_FAIL + '\\n" );',
-            'Con_Printf( "iOS texture array selftest boot: renderer-failed\\n" );\n\t\tCon_Printf( "selftest renderer failure\\n" );',
-        ),
-        ("dispatch removed", "context", "R_IOSTextureArraySelftest();", "/* selftest dispatch removed */"),
-        ("run-once removed", "harness", "if( dispatched )", "if( false && dispatched )"),
-        ("launcher changed", "launch", LOCKED_ARGS, "-dev 2 -log -ref gl4es -game diffusion"),
-        ("IPA marker removed", "verify", "iOS texture array selftest boot: dispatched", "selftest dispatched marker removed"),
+        ("contract order removed", "context", "iOS texture array selftest contract: complete count=57", "iOS texture array selftest contract: complete count=56"),
+        ("packaged asset rejection removed", "verify", "Proprietary game asset is packaged", "Game asset allowed"),
     )
     for label, key, old, new in mutations:
-        candidate = dict(files)
+        candidate = copy.deepcopy(files)
         if old not in candidate[key]:
             failures.append(f"fixture {label}: source token absent")
             continue
@@ -205,11 +226,13 @@ def fixtures(files: dict[str, str]) -> list[str]:
 
 
 def changed_paths(root: pathlib.Path) -> set[str]:
-    tracked = subprocess.run(
-        ["git", "-C", str(root), "diff", "--name-only", BASELINE, CANDIDATE, "--"],
-        check=True, capture_output=True, text=True,
-    ).stdout.splitlines()
-    return {path.replace("\\", "/") for path in tracked if path}
+    result = subprocess.run(
+        ["git", "-C", str(root), "diff", "--name-only", BASELINE, "HEAD", "--"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return {path.replace("\\", "/") for path in result.stdout.splitlines() if path}
 
 
 def main() -> int:
@@ -225,13 +248,14 @@ def main() -> int:
         "harness": read(root / "ref/gl/gl_texture_array_selftest.c"),
         "client": read(root / "engine/client/cl_main.c"),
         "launch": read(root / "engine/platform/ios/launchdialog.m"),
+        "system": read(root / "engine/common/system.c"),
         "build": read(root / "scripts/gha/build_ios.sh"),
         "verify": read(root / "scripts/ios/verify_ipa.sh"),
     }
     failures = validate(files)
     unexpected = changed_paths(root) - ALLOWED_PATHS
     if unexpected:
-        failures.append(f"Phase C scope changed: {sorted(unexpected)}")
+        failures.append(f"Phase G scope changed: {sorted(unexpected)}")
     if args.self_test:
         failures += fixtures(files)
     if failures:
@@ -239,7 +263,7 @@ def main() -> int:
         for failure in failures:
             print(f" - {failure}", file=sys.stderr)
         return 1
-    print("iOS selftest boot validation passed: filesystem-independent route and rejection fixtures")
+    print("iOS selftest boot validation passed: normal Diffusion bootstrap and rejection fixtures")
     return 0
 
 

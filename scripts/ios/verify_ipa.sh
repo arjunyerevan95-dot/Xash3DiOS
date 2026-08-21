@@ -108,6 +108,20 @@ ENGINE_STRINGS="$VERIFY_ROOT/engine.strings"
 strings "$SDL_PATH" > "$SDL_STRINGS"
 strings "$ENGINE_PATH" > "$ENGINE_STRINGS"
 
+if ! grep -Fq -- '-dev 2 -log -game diffusion -ref gl4es -gl4es_texture_array_selftest' "$ENGINE_STRINGS"; then
+	echo "Engine is missing the locked normal-Diffusion selftest launch arguments" >&2
+	exit 1
+fi
+
+PACKAGED_GAME_ASSET=$(find "$APP_PATH" -type f \( \
+	-iname '*.bsp' -o -iname '*.wad' -o -iname '*.pak' -o -iname '*.vpk' -o \
+	-iname '*.mdl' -o -iname '*.spr' -o -iname '*.dem' -o -iname '*.wav' -o \
+	-iname '*.mp3' \) -print -quit)
+if [ -n "$PACKAGED_GAME_ASSET" ]; then
+	echo "Proprietary game asset is packaged in the IPA: $PACKAGED_GAME_ASSET" >&2
+	exit 1
+fi
+
 if ! grep -q 'Native GLES3 core NPOT support enabled' "$GL4ES_RENDERER_STRINGS"; then
 	echo "GL4ES was built without the GLES3 full-NPOT capability fix" >&2
 	exit 1
@@ -248,11 +262,11 @@ fi
 
 for selftest_boot_marker in \
 	'iOS texture array selftest boot: armed' \
-	'iOS texture array selftest boot: filesystem-independent' \
+	'iOS texture array selftest boot: gameinfo-ready game=diffusion' \
 	'iOS texture array selftest contract: begin' \
 	'iOS texture array selftest contract: item name='; do
 	if ! grep -q "$selftest_boot_marker" "$ENGINE_STRINGS"; then
-		echo "Engine is missing filesystem-independent selftest marker: $selftest_boot_marker" >&2
+		echo "Engine is missing normal-bootstrap selftest marker: $selftest_boot_marker" >&2
 		exit 1
 	fi
 done
@@ -271,7 +285,7 @@ for selftest_renderer_marker in \
 	'iOS texture array selftest boot: renderer-ready' \
 	'iOS texture array selftest boot: dispatched'; do
 	if ! grep -q "$selftest_renderer_marker" "$GL4ES_RENDERER_STRINGS"; then
-		echo "Renderer is missing filesystem-independent selftest marker: $selftest_renderer_marker" >&2
+		echo "Renderer is missing normal-bootstrap selftest marker: $selftest_renderer_marker" >&2
 		exit 1
 	fi
 done

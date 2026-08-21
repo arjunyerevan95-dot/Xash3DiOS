@@ -112,7 +112,7 @@ static qboolean Host_RegisterRendererContractCvar( convar_t *var )
 	return false;
 }
 
-/* Shared by normal startup and the filesystem-independent iOS self-test. */
+/* Shared by normal startup and the normal-bootstrap iOS self-test. */
 static qboolean Host_InitRendererContract( void )
 {
 #if XASH_IOS
@@ -1177,15 +1177,19 @@ static void Host_InitCommon( int argc, char **argv, const char *progname, qboole
 		Host_RunTests( 1 );
 #endif
 
+	FS_LoadGameInfo();
 #if XASH_IOS
 	if( host_ios_texture_array_selftest )
 	{
-		Con_Printf( "iOS texture array selftest boot: filesystem-independent\n" );
-		return;
+		if( !GI || Q_stricmp( GI->gamefolder, "diffusion" ))
+		{
+			Con_Printf( "iOS texture array selftest terminal: FAIL failures=1 diffusion_started=0\n" );
+			Sys_Quit( "iOS texture array selftest requires Diffusion game information" );
+			return;
+		}
+		Con_Printf( "iOS texture array selftest boot: gameinfo-ready game=diffusion\n" );
 	}
 #endif
-
-	FS_LoadGameInfo();
 	Host_CheckGameLibraries();
 	Cvar_PostFSInit();
 
