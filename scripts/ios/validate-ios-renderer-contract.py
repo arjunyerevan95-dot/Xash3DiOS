@@ -306,11 +306,7 @@ def changed_paths(root: pathlib.Path) -> set[str]:
         ["git", "-C", str(root), "diff", "--name-only", BASELINE, "HEAD", "--"],
         check=True, capture_output=True, text=True,
     ).stdout.splitlines()
-    untracked = subprocess.run(
-        ["git", "-C", str(root), "ls-files", "--others", "--exclude-standard"],
-        check=True, capture_output=True, text=True,
-    ).stdout.splitlines()
-    return {path.replace("\\", "/") for path in tracked + untracked if path}
+    return {path.replace("\\", "/") for path in tracked if path}
 
 
 def main() -> int:
