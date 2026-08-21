@@ -1,64 +1,68 @@
 # Xash3DiOS Current State
 
-Last updated: `2026-08-21T21:21:29+05:30`
+Last updated: `2026-08-22T01:23:41+05:30`
 
 ## Repository
 
 - Project: Xash3DiOS / Half-Life Diffusion iOS port
 - Branch: `agent/ios-proof-of-life`
-- Local HEAD before Phase K materialization: `cc02ebaa192abb3a11ce5ea520649a096a68ed44`
-- Remote HEAD before Phase K materialization: `cc02ebaa192abb3a11ce5ea520649a096a68ed44`
-- Worktree before Phase K materialization: clean; local and remote equal
-- Phase I implementation candidate: `bc4b2b7181b3111053f14ff86e8ff634718acf30`
-- Phase I repository-ledger commit: `8c9fd723fcaa3aff77178a8496ba82427cc28881`
-- Phase J Outcome A record: `cc02ebaa192abb3a11ce5ea520649a096a68ed44`
+- Local HEAD at ControlPlane reconciliation: `a067869505778dcabd8ab47b6b2e583892f8ce36`
+- Remote HEAD at ControlPlane reconciliation: `a067869505778dcabd8ab47b6b2e583892f8ce36`
+- Worktree before ControlPlane reconciliation: clean; local and remote equal
+- Phase K implementation series: `c063202dc0c0111304e2d0a82a2506f1457f1454` → `12a80912c8c18870cad71e6116fbfeda2e26e2c3` → `38d429b189efc9a46e1a47f8463bf04797641fd6` → candidate `976c38f3d99d7ef6eaf348188fabf4fe4e722be9`
+- Phase K worker-report commit: `a067869505778dcabd8ab47b6b2e583892f8ce36`
 
 ## Current control state
 
 - Current issued work order: [WO-056](../WorkOrders/WO-056.md), Phase K
-- Status: active; authorized for one bounded production texture-array admission audit, coherent implementation, validation, and build qualification
-- Current phase: WO-056 Phase K — conditional production texture-array admission
-- First incomplete step: the preserved worker must audit the exact end-to-end production admission path and produce the source-proven capability/provenance table required by Phase K before or with one coherent implementation
-- Current blocker: production still reports `GL_EXT_texture_array - failed`; engine and Diffusion do not admit the otherwise device-qualified capability
-- Current unresolved boundary: the complete guarded route from GL4ES/native ES3 capability advertisement through engine and Diffusion gates, real landscape array loading, and unstripped terrain shaders
+- Status: worker-reported Outcome A; build-qualified and stopped at the orchestrator-review gate
+- Current phase: WO-056 Phase K Outcome A — conditional production texture-array admission build-qualified
+- First incomplete step: orchestrator review of the Phase K Outcome A evidence and decision whether to accept it and authorize a separately bounded physical-device production-terrain qualification phase
+- Current blocker: Bundle 124 has no device or gameplay evidence for real Diffusion landscape loading, shader execution, rendering, or transition behavior
+- Current unresolved boundary: production Diffusion terrain runtime acceptance using the now-conditionally admitted texture-array capability
 
 ## Qualification state
 
-- Highest qualified gate: WO-056 Phase J physical-device acceptance of Bundle 116's bounded native texture-array conformance contract
-- First unqualified gate: WO-056 Phase K production engine/Diffusion texture-array admission and build qualification
-- Latest qualified candidate: Bundle 116, candidate `bc4b2b7181b3111053f14ff86e8ff634718acf30`, workflow `32489923843`
-- Latest IPA: `xash3d-fwgs-ios-arm64.ipa`, `8,716,506` bytes, SHA-256 `4FD8D67DDAEBF1986AC795164B7CD20BA782319B9F29200C9EA76F1A4BA73806`
-- Device acceptance: iPhone 16 Pro Max, iOS 26.6, Apple A18 Pro GPU, drawable `2868x1320`
-- No Phase K candidate, workflow, artifact, IPA, or device evidence exists yet
+- Highest physical-device-qualified gate: WO-056 Phase J / Bundle 116 bounded native texture-array conformance
+- Highest build-qualified production gate: WO-056 Phase K / Bundle 124 conditional production texture-array admission
+- First unqualified gate: physical-device execution of the real Diffusion landscape loader and terrain shader/material path
+- Latest candidate: Bundle 124, candidate `976c38f3d99d7ef6eaf348188fabf4fe4e722be9`, workflow `32510363562`
+- Latest IPA: `xash3d-fwgs-ios-arm64.ipa`, `8,717,677` bytes, SHA-256 `FB62C2903E21152DCB74C709656F8FEF841ACE2A22C281F27B90AC02F0E1D04F`
+- Phase K is not device-accepted; no device test, gameplay test, or Arjun evidence request is currently authorized
+
+## Established Phase K result
+
+- GL4ES conditionally exposes `GL_EXT_texture_array` only for a live ES3+ provider with the required 3-D procedures, at least 16 layers, working ESSL 300, and the compiled qualified array routes.
+- The engine independently requires the token, upload procedures, and live layer limit before retaining `GL_TEXTURE_ARRAY_EXT`; disagreement clears the bit and limit.
+- Diffusion independently requires the token, at least 16 layers, and both array callbacks before retaining `R_TEXTURE_ARRAY_EXT`.
+- The real landscape loader now preserves weight, diffuse, and optional normal array creation with complete failure cleanup and no CPU/2-D/atlas/layer-zero fallback.
+- The iOS shader route preserves `GLSL_ALLOW_TEXTURE_ARRAY 1`, `TERRAIN_NUM_LAYERS`, `BMODEL_MULTI_LAYERS`, and the real terrain material features instead of advertising arrays while stripping their consumer.
+- Machine-readable contract: `scripts/ios/wo56k-production-array-admission-contract.json`.
 
 ## Surviving hypotheses and boundaries
 
-- Native texture arrays are a viable Apple GLES3/GL4ES primitive: Bundle 116 passed object identity, mutable/immutable/compressed upload, ESSL-300 translation/reflection, sampler update, VBO-backed drawing, four-layer sampling, direct-drawable readback, exact checksum, cleanup, and lifecycle on device.
-- The next defect boundary is admission/integration, not the native primitive: GL4ES production capability advertisement remains disabled, engine `GL_TEXTURE_ARRAY_EXT` and Diffusion `R_TEXTURE_ARRAY_EXT` remain false, and the landscape route is therefore unavailable.
-- An extension-string-only fix is unsafe. Phase K must prove the native entry points, limits, engine and Diffusion agreement, array-loader path, sampler/target contract, and terrain shader feature preservation as one bounded capability.
-- The iOS Diffusion shader patch currently filters `MULTI_LAYERS`; this must be audited because advertising arrays while stripping the terrain define would be an incomplete production admission.
+- Source, mutation, exact-pin replay, full arm64 build, and packaged-owner verification establish one coherent conditional production admission path.
+- Those gates do not prove that ordinary Diffusion terrain loads, renders, or transitions correctly on physical iOS hardware.
+- Bundle 116's device-qualified array primitive remains the runtime prerequisite; Bundle 124 extends it into production admission but has not exercised production terrain on device.
 - The independent `ch1map1` transition termination remains quarantined and unchanged.
 
 ## Latest important evidence
 
-- Phase J device log: `1-engine.log`, `23,255` bytes, `254` lines, SHA-256 `139B15982FEC0B4D34146B3F99A39D4758B36D77925394403B214BE9F5544FF5`
-- Phase J result: all 51 immediate calls `0x0000`, checksum `a915906d`, terminal `PASS failures=0 diffusion_started=0`, clean intentional shutdown
-- Qualifying workflow: `32489923843`, job `96794910555`, success; artifact `Xash3DiOS-arm64-unsigned`, ID `9449473335`
-- CI drift check: no relevant run active; Bundle 116 remains the newest qualifying evidence
-- Authoritative Google ledger Phase K order verified by readback at revision `AIroW37mgJWSAdh9os0FJ0VzXL-r36Dj5xAz9EfzGMg_oXINPkRe-WWO3uZKluW6OOn4DguV3EyefcmwR0ZwOd7v-shLklDwN20hf5dbH84`
-- Engine gate: `GL_CheckExtension("GL_EXT_texture_array", ..., "gl_texture_2d_array", GL_TEXTURE_ARRAY_EXT, 0)` and `GL_MAX_ARRAY_TEXTURE_LAYERS_EXT`
-- Diffusion gate: `R_TEXTURE_ARRAY_EXT` controls `GLSL_ALLOW_TEXTURE_ARRAY`; `LoadTerrainLayers` reaches `LOAD_TEXTURE_ARRAY` for landscape diffuse and normal layers
-- Terrain shaders use `sampler2DArray` under `GLSL_ALLOW_TEXTURE_ARRAY && BMODEL_MULTI_LAYERS`; the current iOS shader patch filters `MULTI_LAYERS`
+- Qualifying workflow: `32510363562`, job `96859751554`, success on exact candidate `976c38f3d99d7ef6eaf348188fabf4fe4e722be9`
+- Retained artifact: `Xash3DiOS-arm64-unsigned`, ID `9456949434`, archive SHA-256 `5ed24f8a6ad27dfaea62ed315329d8bdf79e95c5a0053a4ba36187236f42b744`
+- IPA: Bundle 124, `8,717,677` bytes, SHA-256 `FB62C2903E21152DCB74C709656F8FEF841ACE2A22C281F27B90AC02F0E1D04F`
+- Exact pins replayed: GL4ES `81547d986798e876de8b434193920b606a72363f`, Diffusion `14d156bf3a6993c172697fac83a937836c3b5561`, SDL `5d249570393f7a37e037abf22cd6012a4cc56a71`
+- Packaged verification: required production markers in their actual owners, 13 thin-arm64 Mach-O objects, and no proprietary game assets
+- Pre-qualification failures `32508365615`, `32509025360`, and `32509723819` are preserved negative evidence and produced no retained artifact
 - Complete evidence index: [Evidence/WO-056/manifest.md](../Evidence/WO-056/manifest.md)
 
 ## PortingOS experiment references
 
-- Completed: WO-056 Phase I / Bundle 116 native sampling/readback correction
-- Completed: WO-056 Phase J / Bundle 116 normal-bootstrap device acceptance
-- Active: WO-056 Phase K / conditional production texture-array admission
+- Completed and accepted prerequisite: WO-056 Phase J / Bundle 116 physical-device native array conformance
+- Worker-reported result awaiting orchestrator acceptance: WO-056 Phase K / Bundle 124 conditional production admission, Outcome A
 - Phase I contract: `scripts/ios/wo56i-sampling-readback-contract.json`
-- Phase K required contract: `scripts/ios/wo56k-production-array-admission-contract.json` or a semantically equivalent machine-readable contract named in the worker report
-- Canonical qualified tuple: candidate `bc4b2b71` / workflow `32489923843` / Bundle 116 / IPA hash above
+- Phase K contract: `scripts/ios/wo56k-production-array-admission-contract.json`
+- Canonical Phase K tuple: candidate `976c38f3` / workflow `32510363562` / Bundle 124 / IPA hash above
 
 ## Referenced decisions
 
@@ -71,10 +75,12 @@ Last updated: `2026-08-21T21:21:29+05:30`
 
 When the user says **“next order please”**, the orchestrator must: identify only the next justified bounded boundary; materialize it in the active repo-backed ControlPlane work-order/state/decision/evidence records; update both durable ledgers; validate, commit, and push the documentation/control-plane change; then notify the preserved worker to read and implement the published order. Do not create a replacement worker merely because notification is inconvenient or delayed.
 
+Every worker activation must also include a completion callback directive. After the worker has updated and read-back verified ControlPlane and both durable ledgers, pushed its final reporting commit, confirmed local/remote equality and the stop gate, it must message the delegating/source orchestrator directly. The callback must include the selected outcome, final commit, CI run/job/artifact and IPA identity where applicable, qualification boundary, first incomplete step, and explicit stop state. The orchestrator activation message must provide its current thread ID and host ID; do not hard-code a superseded orchestrator identity into future orders.
+
 ## Future orchestrator/worker bootstrap
 
 1. Read `Documentation/CURRENT_STATE.md`.
-2. Read the active `WorkOrders/WO-056.md`, currently Phase K.
+2. Read `WorkOrders/WO-056.md` (Phase K is worker-reported Outcome A at orchestrator review; it is not authorization for device testing).
 3. Read only the `Decisions/` and `Evidence/` records referenced there.
 4. Verify current Git/remote/CI state before acting.
 5. Use the historical Google Docs ledger only when deeper context is required.

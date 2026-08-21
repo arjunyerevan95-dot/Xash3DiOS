@@ -98,3 +98,21 @@ This manifest references the evidence used to close WO-056 Phases I and J at Out
 - Required Phase K artifact: `scripts/ios/wo56k-production-array-admission-contract.json` or the semantically equivalent machine-readable path named in the worker report.
 - Required CI evidence if Outcome A: exactly one qualifying workflow and artifact tied to one immutable candidate; all identifiers and IPA hash remain pending.
 - Phase K does not authorize device evidence. A build-qualified candidate, if produced, must stop at orchestrator review and must not be described as terrain/device-accepted.
+
+## Phase K Outcome A build evidence
+
+- Status: worker-reported Outcome A; build-qualified and awaiting orchestrator acceptance. No device/gameplay evidence was requested or produced.
+- Coherent implementation commit: `c063202dc0c0111304e2d0a82a2506f1457f1454`.
+- Qualification corrections: `12a80912c8c18870cad71e6116fbfeda2e26e2c3` and `38d429b189efc9a46e1a47f8463bf04797641fd6`.
+- Exact candidate: `976c38f3d99d7ef6eaf348188fabf4fe4e722be9`.
+- Repository-ledger report commit: `a067869505778dcabd8ab47b6b2e583892f8ce36`.
+- Contract: `scripts/ios/wo56k-production-array-admission-contract.json`.
+- Qualifying workflow: [32510363562 — success](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32510363562), job [96859751554](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32510363562/job/96859751554).
+- Retained artifact: [9456949434 — Xash3DiOS-arm64-unsigned](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32510363562/artifacts/9456949434), archive size `8,618,551` bytes, SHA-256 `5ed24f8a6ad27dfaea62ed315329d8bdf79e95c5a0053a4ba36187236f42b744`.
+- IPA: `xash3d-fwgs-ios-arm64.ipa`, Bundle 124, `8,717,677` bytes, SHA-256 `FB62C2903E21152DCB74C709656F8FEF841ACE2A22C281F27B90AC02F0E1D04F`.
+- Temporary mirror: [information page](https://tempfile.org/qyUGaEfR9Jp/) / [direct IPA](https://tempfile.org/qyUGaEfR9Jp/download), recorded expiry `2026-08-23T18:53:49.725Z`; round-trip size/hash matched.
+- Bounded negative workflows: `32508365615` (shader macro-value mismatch), `32509025360` (missing pinned Diffusion limit token), and `32509723819` (wrong packaged marker owner). They produced no retained artifact.
+- Exact pins: GL4ES `81547d986798e876de8b434193920b606a72363f`; Diffusion `14d156bf3a6993c172697fac83a937836c3b5561`; SDL `5d249570393f7a37e037abf22cd6012a4cc56a71`.
+- Package proof: required production markers in their actual owners, 13 thin-arm64 Mach-O objects, and zero proprietary game assets.
+- Durable reports: repository ledger Phase K Outcome A entry near line 2627 and the authoritative Google Docs ledger, both reported read-back verified by the worker.
+- Qualification boundary: production capability admission is build-qualified only. Real Diffusion terrain loading, shader execution, rendering, transition behavior, gameplay, and `ch1map1` remain outside this evidence.
