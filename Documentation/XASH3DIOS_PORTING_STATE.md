@@ -2362,3 +2362,64 @@ Remaining risks: the new data-free boot route, native EAGL/GL4ES initialization,
 Durable ledger path: `Documentation/XASH3DIOS_PORTING_STATE.md`. Both durable ledgers are read back after publication.
 
 Stop state: **Work Order 56 Phase C is complete at Outcome A and the orchestrator-review gate.** Do not ask Arjun for evidence or a device test, retest Bundle 105, start another workflow, create another candidate, advertise texture arrays to Diffusion, admit terrain, change normal game startup, begin a later phase or work order, or perform any additional implementation without a new explicit orchestrator-authored work order.
+
+## Work Order 56 Phase E - Outcome A: complete filesystem-independent renderer contract build-qualified
+
+Selected work order and outcome: **WORK ORDER 56 PHASE E — COMPLETE THE FILESYSTEM-INDEPENDENT RENDERER CONTRACT BOOTSTRAP. Outcome A.** The complete renderer prerequisite contract is now source-inventoried, shared with ordinary startup, runtime-checked before renderer readiness, mutation-enforced, arm64 build-qualified, IPA-verified, and published. Bundle 112 is a build-qualified self-test candidate. It is **not device-accepted**; no Arjun contact or device evidence is requested, Bundle 109 must not be retested, and no later phase or work order is started.
+
+### Device failure boundary and structural cause
+
+The authoritative Phase D evidence for Bundle 109, candidate `a96c03c79f49ae71ae50011da3b9360d0e88fbac`, proves that the Phase C boot repair worked: the log emitted `iOS texture array selftest boot: armed` and `filesystem-independent`, then began renderer loading without game data. The terminal boundary moved past the earlier missing-`valve` condition and stopped before `renderer-ready`, `dispatched`, or any harness terminal marker at `Host_ErrorInit: Error: engine didn't gave us r_showhull cvar pointer`. The earlier game-directory line was therefore nonterminal for the self-test route. Bundle 109 is rejected and is not retested.
+
+Pinned source and call-path inspection proves this was not a one-variable defect. `ref/common/ref_context.c::GetRefAPI` retrieves the complete `ENGINE_SHARED_CVAR_LIST` before renderer initialization. The Phase C reduced path already creates 25 of those 27 cvars through `CL_InitLocal`, `V_Init`, and engine `R_Init`, but it returns from normal `Host_Main` ordering before `host_allow_materials` registration and before `Mod_Init` registers `r_showhull`. `r_showhull` is merely the first absent entry reached in macro order; `host_allow_materials` would fail later. The complete pre-`renderer-ready` contract is 57 runtime items: 27 shared cvars, 22 non-null renderer-import callbacks, five engine parameters, and three renderer-global/video-state items. The machine-readable inventory records each cvar's symbol, default, flags, owner, normal initializer, and first consumer and records the provider/consumer contract for callbacks, parameters, and globals.
+
+### Implementation and preserved behavior
+
+- Implementation commit: `7a17296881e843c27748aafc942ec00084be8a7d` (`ios: initialize complete selftest renderer contract`).
+- Qualification-only correction commit: `35de5b04786d8ed4be91915dae50ee18e0da3886` (`ci: ignore checkout gitlinks in Phase E scope`). This is the final Bundle-112 candidate SHA.
+- Repository-ledger commit: the documentation-only `[skip ci]` commit containing this report; its immutable hash is mirrored into the authoritative Google Docs ledger and final worker handoff because a commit cannot contain its own hash.
+
+`Host_InitRendererContract` is one shared idempotent owner used by both the filesystem-independent self-test and ordinary `Host_Main`. It registers the original static `host_allow_materials` and `r_showhull` objects, accepts an already registered object only when ownership is identical, and bounds missing/ownership failure. `Mod_Init` no longer performs a second `r_showhull` registration. The ordinary path therefore retains the same defaults, flags, object owners, and downstream behavior while establishing both renderer prerequisites earlier through the same initializer. The self-test still performs no game-data, module, map, server, menu, Valve, or Diffusion initialization.
+
+Before loading the renderer, engine `R_Init` validates and emits all 55 engine-owned items: the 27 cvars in the exact shared-macro order, 22 renderer imports, four non-null pointer parameters, scalar `PARM_CONNSTATE`, and owned `refState`. After video/context setup and before `initialize_gl4es`, the renderer validates `refState.desktopBitsPixel` and drawable width/height, emits the remaining two items, and emits `complete count=57`. Invalid state emits the named missing marker and bounded terminal FAIL; renderer-side failures cross `Host_Error` and cannot fall through to GL4ES initialization or hide behind a later marker.
+
+### Validation, correction, and qualification evidence
+
+- Re-audited clean worktree, local/remote branch equality at starting head `5b5cb89f1d9ec9c6b2291003c815c0019d065e1d`, recent commits, uncommitted state, and active/recent Actions. No qualifying workflow was active before the candidate push. Read the repository ledger through Phase C and the authoritative Google Doc through the complete Phase D evidence and Phase E authorization; the ledgers were additive and nonconflicting.
+- Used the project code graph first, then exact literal/source inspection, to trace `Host_InitCommon`, `Host_Main`, `CL_InitLocal`, `VID_Init`, engine `R_Init`, `R_LoadRenderer`, renderer `GetRefAPI`, `GL_InitCommands`, renderer `R_Init`, `GL_SetupAttributes`, and `GL_OnContextCreated`. The audit covered every cvar/import/parameter/global consumed before `renderer-ready` and found no broader game-filesystem or game-module prerequisite.
+- `scripts/ios/wo56e-renderer-contract.json` is the machine-readable 57-item source inventory. `scripts/ios/validate-ios-renderer-contract.py --self-test` passed its positive proof and rejected removal of either missing cvar, duplicate registration, wrong default, wrong flags, post-renderer ordering, filesystem leakage, missing bounded terminal, wrong complete count, missing IPA proof, and incomplete callback inventory. The retained Phase C filesystem-independent validator and rejection fixtures also passed; Python execution and `git diff --check` passed.
+- Initial run [32469370518](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32469370518) is preserved as nonqualifying failure evidence. It passed every retained validator and stopped in the new Phase E validator before compilation because committed-scope validation also counted checked-out gitlink directories `SDL/` and `hlsdk/` as untracked Phase E files. It skipped IPA verification/upload and produced no artifact. The narrow correction qualifies the immutable baseline-to-candidate committed path set and does not alter implementation or contract semantics. Automatically triggered PR duplicate [32469374427](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32469374427) was cancelled.
+- Final qualification workflow [32470512686](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32470512686), job `96736111071`, completed **success** on exact head `35de5b04786d8ed4be91915dae50ee18e0da3886`. Its build step passed the texture-array, filesystem-independent boot, and 57-item renderer-contract validators and all retained suites; it built the engine plus Half-Life and Diffusion client/server/menu for iPhoneOS arm64. IPA verification passed every required embedded marker and reported Bundle 112, minimum iOS 12.0, 13 thin-arm64 Mach-O files, and 11 game dylibs. The upload step produced exactly one retained artifact. Automatically triggered PR duplicate [32470517284](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32470517284) was cancelled; no manual duplicate was launched.
+
+Candidate status: **Bundle 112 build-qualified, not device-accepted.** Acceptance status: **Phase E Outcome A source, rejection, full-build, IPA-contract, publication, and durable-reporting gates complete; runtime/device acceptance remains solely for a later orchestrator-authored decision.**
+
+### Artifact and IPA publication
+
+- GitHub artifact: [`Xash3DiOS-arm64-unsigned`](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32470512686/artifacts/9442496203), ID `9442496203`, archive size `8,616,682` bytes, archive SHA-256 `1746129ca8f90b0907977218029d46c0e8c65d7ed0b60691f650bb8335dfc9ca`, retained by GitHub for 14 days.
+- IPA: `Xash3DiOS-WO56E-bundle112-35de5b04-arm64-unsigned.ipa`, `8,713,373` bytes, SHA-256 `b6daf675750bce5b3698abbeca4e53bb1b362b1fef214514586cbaf743066138`.
+- Exactly one tempfile.org object: [information page](https://tempfile.org/i8Dqr3VUHED/); [direct IPA download](https://tempfile.org/i8Dqr3VUHED/download); 48-hour expiry. Tempfile metadata reports the exact filename and byte count, no warning or suspicious pattern, risk level `safe`, and the same SHA-256. A fresh direct-download round trip reproduced the exact byte count and SHA-256.
+
+### Exact repository files changed
+
+- `engine/client/dll_int/ref_common.c`
+- `engine/common/host.c`
+- `engine/common/model.c`
+- `ref/gl/gl_opengl.c`
+- `scripts/gha/build_ios.sh`
+- `scripts/ios/validate-ios-renderer-contract.py`
+- `scripts/ios/validate-ios-selftest-boot.py`
+- `scripts/ios/verify_ipa.sh`
+- `scripts/ios/wo56e-renderer-contract.json`
+- `Documentation/XASH3DIOS_PORTING_STATE.md` (this Outcome A report only)
+
+### Expected runtime markers, rejection boundary, and risks
+
+Expected successful order is: `boot: armed`; `boot: filesystem-independent`; `contract: begin`; 55 engine items as `contract: item name=<name> source=shared`; the two renderer/video items `global.refState.desktopBitsPixel` and `global.refState.drawableSize`; `contract: complete count=57`; `boot: renderer-ready`; `boot: dispatched`; then the existing bounded `policy:`, `object:`, `upload:`, `shader:`, `sample:`, `lifecycle:`, and `terminal:` harness markers. The successful terminal remains `iOS texture array selftest terminal: PASS failures=0 diffusion_started=0`.
+
+Any `contract: missing name=<name> reason=<reason>`, duplicate/wrong owner, wrong default or flags, missing or reordered item, count other than 57, filesystem/game/module evidence, marker after renderer readiness instead of before it, fallthrough after a failure, terminal FAIL, nonzero failure count, or nonzero `diffusion_started` rejects Bundle 112. The prior `r_showhull` pointer failure must be absent.
+
+Remaining risks: full arm64 compilation and IPA structure do not prove the shared 57-item contract, native EAGL/GL4ES initialization, array sampling/readback, compressed upload, or lifecycle behavior on a physical device. Bundle 112 is therefore not runtime/device-accepted. Ordinary startup preservation is source-, ownership-, fixture-, and build-proven but has no new device regression run in this phase. Texture-array terrain remains deliberately unadvertised, Diffusion landscape admission remains disabled, and the independent `ch1map1` transition issue remains quarantined. GitHub and tempfile retention are finite.
+
+Durable ledger path: `Documentation/XASH3DIOS_PORTING_STATE.md`. Both durable ledgers are read back after publication.
+
+Stop state: **Work Order 56 Phase E is complete at Outcome A and the orchestrator-review gate.** Do not contact Arjun, request device evidence or testing, retest Bundle 109, start another workflow, create another candidate or upload, advertise texture arrays to Diffusion, admit terrain, change unrelated startup/rendering behavior, begin a later phase or work order, or perform additional implementation without a new explicit orchestrator-authored work order.
