@@ -108,6 +108,21 @@ ENGINE_STRINGS="$VERIFY_ROOT/engine.strings"
 strings "$SDL_PATH" > "$SDL_STRINGS"
 strings "$ENGINE_PATH" > "$ENGINE_STRINGS"
 
+if ! grep -q 'iOS production texture array provider:' "$GL4ES_RENDERER_STRINGS"; then
+	echo "Renderer is missing the conditional production texture-array provider marker" >&2
+	exit 1
+fi
+
+if ! grep -q 'iOS production texture array engine:' "$ENGINE_STRINGS"; then
+	echo "Engine is missing the production texture-array gate marker" >&2
+	exit 1
+fi
+
+if ! grep -q 'iOS production texture array admission:' "$DIFFUSION_CLIENT_STRINGS"; then
+	echo "Diffusion client is missing the complete production texture-array admission marker" >&2
+	exit 1
+fi
+
 if ! grep -Fq -- '-dev 2 -log -game diffusion -ref gl4es -gl4es_texture_array_selftest' "$ENGINE_STRINGS"; then
 	echo "Engine is missing the locked normal-Diffusion selftest launch arguments" >&2
 	exit 1

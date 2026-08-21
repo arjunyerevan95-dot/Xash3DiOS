@@ -223,6 +223,14 @@ static const dllfunc_t texture3dextfuncs[] MAYBE_UNUSED =
 { GL_CALL( glCopyTexSubImage3D ) },
 };
 
+static const dllfunc_t texturearrayfuncs[] MAYBE_UNUSED =
+{
+{ GL_CALL( glTexImage3D ) },
+{ GL_CALL( glTexSubImage3D ) },
+{ GL_CALL( glCompressedTexImage3DARB ) },
+{ GL_CALL( glCompressedTexSubImage3DARB ) },
+};
+
 static const dllfunc_t texturecompressionfuncs[] MAYBE_UNUSED =
 {
 { GL_CALL( glCompressedTexImage3DARB ) },
@@ -914,8 +922,19 @@ static void GL_InitExtensionsBigGL( void )
 	}
 
 	// 2d texture array support
-	if( GL_CheckExtension( "GL_EXT_texture_array", texture3dextfuncs, ARRAYSIZE( texture3dextfuncs ), "gl_texture_2d_array", GL_TEXTURE_ARRAY_EXT, 0 ))
+	if( GL_CheckExtension( "GL_EXT_texture_array", texturearrayfuncs, ARRAYSIZE( texturearrayfuncs ), "gl_texture_2d_array", GL_TEXTURE_ARRAY_EXT, 0 ))
+	{
 		pglGetIntegerv( GL_MAX_ARRAY_TEXTURE_LAYERS_EXT, &glConfig.max_2d_texture_layers );
+		if( glConfig.max_2d_texture_layers < 16 )
+		{
+			GL_SetExtension( GL_TEXTURE_ARRAY_EXT, false );
+			glConfig.max_2d_texture_layers = 0;
+		}
+	}
+	#if XASH_IOS && XASH_GL4ES
+	gEngfuncs.Con_Printf( "iOS production texture array engine: procedures=4 max_layers=%d minimum=16 enabled=%d\n",
+		glConfig.max_2d_texture_layers, GL_Support( GL_TEXTURE_ARRAY_EXT ) ? 1 : 0 );
+	#endif
 
 	// cubemaps support
 	if( GL_CheckExtension( "GL_ARB_texture_cube_map", NULL, 0, "gl_texture_cubemap", GL_TEXTURE_CUBEMAP_EXT, 0 ))

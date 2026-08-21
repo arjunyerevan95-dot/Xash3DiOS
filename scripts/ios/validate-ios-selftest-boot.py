@@ -11,16 +11,33 @@ import sys
 
 BASELINE = "42be8465ec8752182f65005e8419a0cf634faf69"
 ALLOWED_PATHS = {
+    "Decisions/DEC-001.md",
+    "Decisions/DEC-002.md",
+    "Decisions/DEC-003.md",
+    "Decisions/DEC-004.md",
+    "Decisions/DEC-005.md",
+    "Decisions/DEC-006.md",
+    "Documentation/CURRENT_STATE.md",
     "Documentation/XASH3DIOS_PORTING_STATE.md",
+    "Evidence/WO-056/manifest.md",
+    "WorkOrders/WO-056.md",
     "engine/common/host.c",
     "engine/platform/ios/launchdialog.m",
+    "ref/gl/gl_opengl.c",
     "ref/gl/gl_texture_array_selftest.c",
+    "scripts/gha/build_ios.sh",
+    "scripts/ios/builddiffusion.sh",
+    "scripts/ios/diffusion-wo56-production-array-admission-ios.patch",
+    "scripts/ios/gl4es-wo56-production-array-admission-ios.patch",
     "scripts/ios/gl4es-wo56-texture-array-ios.patch",
+    "scripts/ios/validate-diffusion-mobile-shaders.py",
+    "scripts/ios/validate-ios-production-array-admission.py",
     "scripts/ios/validate-ios-renderer-contract.py",
     "scripts/ios/validate-ios-selftest-boot.py",
     "scripts/ios/validate-ios-texture-array.py",
     "scripts/ios/verify_ipa.sh",
     "scripts/ios/wo56i-sampling-readback-contract.json",
+    "scripts/ios/wo56k-production-array-admission-contract.json",
 }
 LOCKED_ARGS = "-dev 2 -log -game diffusion -ref gl4es -gl4es_texture_array_selftest"
 TERMINAL_FAIL = "iOS texture array selftest terminal: FAIL failures=1 diffusion_started=0"

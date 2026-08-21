@@ -162,8 +162,13 @@ def validate(files: dict[str, str]) -> list[str]:
         "inited = 0", "tested = 0", "memset(&hardext, 0",
     ):
         require(init + hardext + hardext_h, token, "context lifecycle reset", failures)
-    if "GL_EXT_texture_array" in getter:
-        failures.append("terrain admission/extension advertisement enabled prematurely")
+    for token in (
+        "hardext.texture_array && hardext.glsl300es",
+        "hardext.maxarraylayers >= 16",
+        "gl4es_texture_array_available()",
+        'strcat(extensions, "GL_EXT_texture_array ")',
+    ):
+        require(getter, token, "conditional production advertisement", failures)
 
     for marker in MARKERS:
         require(harness, marker, "selftest marker", failures)

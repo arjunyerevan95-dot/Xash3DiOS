@@ -28,14 +28,18 @@ UNSUPPORTED_DIRECTIVES = (
     "SPECULAR", "BUMP", "REFLECTION_CUBEMAP",
 )
 
-# Work Order 56 keeps runtime terrain admission disabled, but its foundation
-# must already translate the real pinned terrain shader shapes. These jobs are
-# intentionally not passed through the legacy mobile-profile sanitizer.
+# Work Order 56 Phase K admits only the complete production terrain feature.
+# These jobs are intentionally not passed through the ordinary mobile-profile
+# sanitizer and cover both the base and normal/specular/emboss array variants.
 TEXTURE_ARRAY_JOBS = (
     ("vertex", "bmodelsolid_vp.glsl", "#define BMODEL_APPLY_STYLE0\n#define TERRAIN_NUM_LAYERS 4\n#define BMODEL_MULTI_LAYERS\n"),
     ("fragment", "bmodelsolid_fp.glsl", "#define BMODEL_APPLY_STYLE0\n#define TERRAIN_NUM_LAYERS 4\n#define BMODEL_MULTI_LAYERS\n"),
     ("vertex", "bmodeldlight_vp.glsl", "#define BMODEL_LIGHT_PROJECTION\n#define TERRAIN_NUM_LAYERS 4\n#define BMODEL_MULTI_LAYERS\n"),
     ("fragment", "bmodeldlight_fp.glsl", "#define BMODEL_LIGHT_PROJECTION\n#define TERRAIN_NUM_LAYERS 4\n#define BMODEL_MULTI_LAYERS\n"),
+    ("vertex", "bmodelsolid_vp.glsl", "#define BMODEL_APPLY_STYLE0\n#define TERRAIN_NUM_LAYERS 4\n#define BMODEL_MULTI_LAYERS\n#define BMODEL_BUMP\n#define NORMAL_AG_PARABOLOID\n#define BMODEL_SPECULAR\n#define BMODEL_EMBOSS\n"),
+    ("fragment", "bmodelsolid_fp.glsl", "#define BMODEL_APPLY_STYLE0\n#define TERRAIN_NUM_LAYERS 4\n#define BMODEL_MULTI_LAYERS\n#define BMODEL_BUMP\n#define NORMAL_AG_PARABOLOID\n#define BMODEL_SPECULAR\n#define BMODEL_EMBOSS\n"),
+    ("vertex", "bmodeldlight_vp.glsl", "#define BMODEL_LIGHT_PROJECTION\n#define TERRAIN_NUM_LAYERS 4\n#define BMODEL_MULTI_LAYERS\n#define BMODEL_BUMP\n#define NORMAL_AG_PARABOLOID\n#define BMODEL_SPECULAR\n#define BMODEL_EMBOSS\n"),
+    ("fragment", "bmodeldlight_fp.glsl", "#define BMODEL_LIGHT_PROJECTION\n#define TERRAIN_NUM_LAYERS 4\n#define BMODEL_MULTI_LAYERS\n#define BMODEL_BUMP\n#define NORMAL_AG_PARABOLOID\n#define BMODEL_SPECULAR\n#define BMODEL_EMBOSS\n"),
 )
 
 
@@ -110,7 +114,10 @@ def jobs(source_root: Path):
     for path in (source_root / "glsl").glob("*_fp.glsl"):
         result.add(("fragment", path.name, ""))
 
-    result.update(TEXTURE_ARRAY_JOBS)
+    result.update(
+        (stage, filename, "#define GLSL_ALLOW_TEXTURE_ARRAY\n" + defines)
+        for stage, filename, defines in TEXTURE_ARRAY_JOBS
+    )
 
     return sorted(
         job for job in result

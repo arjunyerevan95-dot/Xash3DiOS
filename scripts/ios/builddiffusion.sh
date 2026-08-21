@@ -60,6 +60,8 @@ git -C "$SOURCE_DIR" apply --check "$ROOT_DIR/scripts/ios/diffusion-wo52-materia
 git -C "$SOURCE_DIR" apply "$ROOT_DIR/scripts/ios/diffusion-wo52-material-trace-ios.patch"
 git -C "$SOURCE_DIR" apply --check "$ROOT_DIR/scripts/ios/diffusion-wo52-inactive-sampler-ios.patch"
 git -C "$SOURCE_DIR" apply "$ROOT_DIR/scripts/ios/diffusion-wo52-inactive-sampler-ios.patch"
+git -C "$SOURCE_DIR" apply --check "$ROOT_DIR/scripts/ios/diffusion-wo56-production-array-admission-ios.patch"
+git -C "$SOURCE_DIR" apply "$ROOT_DIR/scripts/ios/diffusion-wo56-production-array-admission-ios.patch"
 python3 "$ROOT_DIR/scripts/ios/validate-diffusion-ios-policy.py" "$SOURCE_DIR"
 python3 "$ROOT_DIR/scripts/ios/validate-ios-wo49-topology.py" \
 	"$ROOT_DIR" "$ROOT_DIR/3rdparty/gl4es/gl4es" "$SOURCE_DIR" --self-test
@@ -70,6 +72,8 @@ python3 "$ROOT_DIR/scripts/ios/validate-ios-material-state.py" \
 python3 "$ROOT_DIR/scripts/ios/validate-ios-wo52-material-trace.py" \
 	"$ROOT_DIR" "$ROOT_DIR/3rdparty/gl4es/gl4es" "$SOURCE_DIR" --self-test
 python3 "$ROOT_DIR/scripts/ios/validate-ios-inactive-sampler.py" \
+	"$ROOT_DIR" "$ROOT_DIR/3rdparty/gl4es/gl4es" "$SOURCE_DIR" --self-test
+python3 "$ROOT_DIR/scripts/ios/validate-ios-production-array-admission.py" \
 	"$ROOT_DIR" "$ROOT_DIR/3rdparty/gl4es/gl4es" "$SOURCE_DIR" --self-test
 
 # Refuse to produce an IPA if any shader reachable through the iOS mobile

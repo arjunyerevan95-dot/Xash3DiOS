@@ -13,7 +13,16 @@ import sys
 
 BASELINE = "5b5cb89f1d9ec9c6b2291003c815c0019d065e1d"
 ALLOWED_PATHS = {
+    "Decisions/DEC-001.md",
+    "Decisions/DEC-002.md",
+    "Decisions/DEC-003.md",
+    "Decisions/DEC-004.md",
+    "Decisions/DEC-005.md",
+    "Decisions/DEC-006.md",
+    "Documentation/CURRENT_STATE.md",
     "Documentation/XASH3DIOS_PORTING_STATE.md",
+    "Evidence/WO-056/manifest.md",
+    "WorkOrders/WO-056.md",
     "engine/client/dll_int/ref_common.c",
     "engine/common/host.c",
     "engine/common/model.c",
@@ -21,13 +30,19 @@ ALLOWED_PATHS = {
     "ref/gl/gl_opengl.c",
     "ref/gl/gl_texture_array_selftest.c",
     "scripts/gha/build_ios.sh",
+    "scripts/ios/builddiffusion.sh",
+    "scripts/ios/diffusion-wo56-production-array-admission-ios.patch",
+    "scripts/ios/gl4es-wo56-production-array-admission-ios.patch",
     "scripts/ios/gl4es-wo56-texture-array-ios.patch",
+    "scripts/ios/validate-diffusion-mobile-shaders.py",
+    "scripts/ios/validate-ios-production-array-admission.py",
     "scripts/ios/validate-ios-renderer-contract.py",
     "scripts/ios/validate-ios-selftest-boot.py",
     "scripts/ios/validate-ios-texture-array.py",
     "scripts/ios/verify_ipa.sh",
     "scripts/ios/wo56e-renderer-contract.json",
     "scripts/ios/wo56i-sampling-readback-contract.json",
+    "scripts/ios/wo56k-production-array-admission-contract.json",
 }
 TERMINAL_FAIL = "iOS texture array selftest terminal: FAIL failures=1 diffusion_started=0"
 EXPECTED_COUNTS = {"cvars": 27, "callbacks": 22, "parameters": 5, "globals": 3}
