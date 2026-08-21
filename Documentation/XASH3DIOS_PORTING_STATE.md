@@ -2291,3 +2291,74 @@ Remaining risks: build and packaging qualification do not prove on-device array 
 Durable ledger path: `Documentation/XASH3DIOS_PORTING_STATE.md`. This report is published in one documentation-only `[skip ci]` commit; its exact hash is mirrored into the authoritative Google Docs ledger and final handoff because a Git commit cannot contain its own hash. Repository and Google Docs readbacks are required before handoff.
 
 Stop state: **Work Order 56 Phase A is complete at Outcome A and the orchestrator-review gate.** Do not request or run a device test, advertise texture arrays to Diffusion, admit terrain, begin Work Order 56 Phase B, start another workflow, create another candidate, contact Arjun, or begin any later work order. Await explicit orchestrator review.
+
+## Work Order 56 Phase C - Outcome A: filesystem-independent self-test boot build-qualified
+
+Selected work order and outcome: **WORK ORDER 56 PHASE C — FILESYSTEM-INDEPENDENT SELF-TEST BOOT CORRECTION. Outcome A.** The locked iOS texture-array self-test now arms at the earliest parsed-command-line boundary, bypasses only normal game-data validation, creates the existing video/EAGL/GL4ES renderer route, dispatches the existing conformance harness exactly once, and exits through a bounded terminal result. Bundle 109 is a build-qualified self-test candidate. It is **not device-accepted**; no Arjun evidence or device test is requested, and no later phase is started.
+
+### Prior failure boundary, source audit, and structural correction
+
+The authoritative Phase B device result for Bundle 105 (`9f7e799763045cd88621fe89c2a4a0202cb510ff`) showed that the locked arguments were intact, but normal host/filesystem startup selected `valve`, failed in `FS_LoadGameInfo(valve)`, and emitted none of the expected self-test markers. Bundle 105 is not retested. The verified structural cause was boot ordering: `Host_InitCommon` parsed the flag but required normal game-directory validation before `Host_Main` could reach `CL_Init`; the previous dispatch inside client/video initialization was therefore unreachable on a data-free install.
+
+The safe boundary is after base filesystem/platform setup but before `FS_LoadGameInfo` and before module, network, server, client-DLL, menu, game-DLL, map, Valve, or Diffusion startup. The correction arms a private iOS mode immediately after `Sys_ParseCommandLine`, emits `iOS texture array selftest boot: armed`, completes only the base services needed by the iOS video path, emits `filesystem-independent`, and returns before game-info loading. `Host_Main` then invokes `CL_Init` before normal subsystem registration; `VID_Init` creates the native context, the requested GL4ES renderer reaches its current-context initialization, emits `renderer-ready` and `dispatched`, and calls the unchanged self-test. The self-test has a one-dispatch guard. Successful self-test renderer initialization skips unrelated built-in image, screen, world, model, and TriAPI initialization. Requested-renderer failure emits a bounded terminal FAIL and quits instead of falling back to normal startup. Self-test shutdown skips the image teardown that was never initialized and does not write a normal game config. Without the flag, the existing filesystem validation, renderer fallback, launcher, game selection, Diffusion arguments/data path, and shutdown path are unchanged.
+
+The locked launch arguments remain exactly `-dev 2 -log -ref gl4es -gl4es_texture_array_selftest`. There is no `valve` folder workaround, no `-game diffusion`, no terrain admission, no real-game texture-array activation, and no shader, material, presentation, gameplay, touch, save-data, external-folder, timing, or `ch1map1` change.
+
+### Commits, candidate, and failed qualification evidence
+
+- Starting repository-ledger baseline: `9cf4cf1fea8e1aa8e83b9f110452582302b3877f`.
+- Boot/dispatch implementation: `273b8b10390a1822c1d17daadb09b93c594cf7d4`.
+- CI full-history correction for the authorized baseline scope proof: `5a7f3dd2aabbe2928b0ccf9ea2b116baf43c3b4f`.
+- Final committed-range scope correction and build-qualified candidate: `a96c03c79f49ae71ae50011da3b9360d0e88fbac`.
+- Repository-ledger commit: this documentation-only `[skip ci]` reporting commit; its immutable hash is mirrored into the authoritative Google Docs ledger and worker handoff because a Git commit cannot contain its own hash.
+
+Two nonqualifying manual correction runs stopped before compilation, packaging, or artifact creation and are retained as failure evidence. [Run 32458085432](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32458085432) reached the new validator but could not resolve the authorized baseline because the workflow checkout was shallow; the narrow correction set `fetch-depth: 0`. [Run 32458955881](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32458955881) passed every retained validator, then the new scope proof falsely counted the workflow's own dependency checkout, applied-submodule patches, generated SDL/Half-Life state, and build-number plist mutation as committed Phase C source changes. The narrow correction compares the immutable baseline-to-`HEAD` committed range, which still rejects any out-of-scope candidate commit while excluding CI workspace setup. Neither failed run produced an artifact or candidate IPA.
+
+Exactly one qualifying workflow was launched for the final candidate after confirming that `[skip ci]` had created no automatic duplicate. [Run 32459314753](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32459314753), job `96702858668`, completed `success` on candidate `a96c03c79f49ae71ae50011da3b9360d0e88fbac`. It produced Bundle 109, built the engine plus Half-Life and Diffusion modules, passed the IPA contract, verified 13 thin-arm64 Mach-O files and 11 game dylibs, and uploaded exactly one retained artifact.
+
+Candidate status: **build-qualified, not device-accepted**. Acceptance status: **Outcome A proof and publication gates complete; runtime/device acceptance remains solely for a later orchestrator decision.**
+
+### Validation and rejection proof
+
+- Re-audited clean/local/remote heads, recent commits, uncommitted state, and active/recent Actions before editing; no qualifying workflow was running.
+- Read the repository ledger through its latest entry and the authoritative Google Docs ledger through the complete Phase B result and Phase C authorization. The authoritative ledger was newer, not contradictory: it supplied the missing Phase B device evidence and Phase C work order.
+- Used the codebase graph first to trace `Host_InitCommon`, `Host_Main`, `CL_Init`, `VID_Init`, renderer initialization, current-context GL4ES initialization, and the existing self-test dispatch; literal/source inspection then established the exact early-return and normal-path boundaries.
+- Replayed the complete accepted iOS GL4ES patch stack, including the Work Order 56 patch, onto a fresh ignored clone of exact pin `81547d986798e876de8b434193920b606a72363f`; patch checks and applied-source `git diff --check` passed.
+- Passed the retained drawable, uint-element, index-trace, WO49 topology, WO49 transform, WO49 texture-unit, WO52 material-trace, and WO56 texture-array positive/rejection validators. Passed the new filesystem-independent boot validator's positive path and mutation fixtures covering early arming, filesystem bypass, locked arguments, ordinary-launch/Diffusion preservation, renderer-failure terminal behavior, dispatch, one-run guarding, IPA markers, and committed scope.
+- Passed Python compilation and repository `git diff --check`. The final CI independently repeated the validators, full exact-pin arm64 build, IPA inspection, embedded-marker verification, and thin-arm64 inspection.
+- Negative boundary proof is structural and mutation-enforced: the flagged route returns before `FS_LoadGameInfo`, cannot search for `valve`, cannot load menu/client/server/game DLLs or maps, cannot emit `Couldn't find game directory`, and cannot fall through from renderer failure to normal game startup. The unflagged route retains normal validation and failure behavior; Diffusion's established launch path remains unchanged.
+
+### Artifact and IPA publication
+
+- GitHub artifact: [`Xash3DiOS-arm64-unsigned`](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32459314753/artifacts/9438462527), ID `9438462527`, artifact ZIP size 8,611,795 bytes, SHA-256 `26f9c03fd7efa3aff261e8f802c55234c134d70f87efd5c428b5cb54feb5dbfb`.
+- IPA: `Xash3DiOS-WO56C-bundle109-a96c03c7-arm64-unsigned.ipa`, 8,711,557 bytes, SHA-256 `3ebeff5fe9542dd10afa04323f3cfc286acf8d759338b2937e202fd019863073`.
+- Tempfile information page: https://tempfile.org/56gwQPHtkrX/ ; direct IPA: https://tempfile.org/56gwQPHtkrX/download . The object uses the authorized 48-hour retention. Tempfile independently reports the exact filename and byte count with no security warning; a fresh direct-download round trip reproduced the same size and SHA-256.
+
+### Exact repository files changed
+
+- `.github/workflows/ios-proof-of-life.yml`
+- `engine/client/dll_int/ref_common.c`
+- `engine/common/host.c`
+- `ref/gl/gl_opengl.c`
+- `ref/gl/gl_texture_array_selftest.c`
+- `scripts/gha/build_ios.sh`
+- `scripts/ios/validate-ios-selftest-boot.py`
+- `scripts/ios/verify_ipa.sh`
+- `Documentation/XASH3DIOS_PORTING_STATE.md` (this Outcome A report only)
+
+### Expected runtime markers and stop state
+
+The ordered boot markers are:
+
+- `iOS texture array selftest boot: armed`
+- `iOS texture array selftest boot: filesystem-independent`
+- `iOS texture array selftest boot: renderer-ready`
+- `iOS texture array selftest boot: dispatched`
+
+They are followed by the existing bounded harness markers `policy:`, `object:`, `upload:`, `shader:`, `sample:`, `lifecycle:`, and `terminal:`. The successful terminal form remains `iOS texture array selftest terminal: PASS failures=0 diffusion_started=0`. Any absent/duplicated/out-of-order boot or stage marker, `FS_LoadGameInfo`/`valve`/DLL-load/game-directory evidence, normal-startup fallback, terminal FAIL, nonzero failures, or nonzero `diffusion_started` rejects the candidate.
+
+Remaining risks: the new data-free boot route, native EAGL/GL4ES initialization, array sampling/readback, compressed upload, and lifecycle behavior are build-proven but not yet exercised on a physical device. Bundle 109 is therefore not accepted for runtime use. Diffusion texture-array terrain remains deliberately disabled, ordinary game behavior is only regression-fixture/build checked in this phase, the independent `ch1map1` termination remains quarantined, and the tempfile object expires after 48 hours.
+
+Durable ledger path: `Documentation/XASH3DIOS_PORTING_STATE.md`. Both durable ledgers are read back after publication.
+
+Stop state: **Work Order 56 Phase C is complete at Outcome A and the orchestrator-review gate.** Do not ask Arjun for evidence or a device test, retest Bundle 105, start another workflow, create another candidate, advertise texture arrays to Diffusion, admit terrain, change normal game startup, begin a later phase or work order, or perform any additional implementation without a new explicit orchestrator-authored work order.
