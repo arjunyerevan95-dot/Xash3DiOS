@@ -158,7 +158,7 @@ def validate(files: dict[str, str]) -> list[str]:
         "u_LayerMap, GL_TEXTURE5", "u_NormalMap, GL_TEXTURE6",
     ):
         require(shader, token, "terrain shader/material admission", failures)
-    if shader.count('out->Printf( "#define GLSL_ALLOW_TEXTURE_ARRAY\\n" );') != 2:
+    if shader.count('out->Printf( "#define GLSL_ALLOW_TEXTURE_ARRAY 1\\n" );') != 2:
         failures.append("both Diffusion texture-array capability branches must emit GLSL_ALLOW_TEXTURE_ARRAY")
     if shader.count('GL_AddTerrainShaderDirective( options, "BMODEL_MULTI_LAYERS" )') != 2:
         failures.append("both solid and dlight terrain cache keys must retain BMODEL_MULTI_LAYERS")

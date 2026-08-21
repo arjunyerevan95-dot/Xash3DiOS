@@ -78,6 +78,21 @@ diff --git a/client/render/r_opengl.cpp b/client/render/r_opengl.cpp
 diff --git a/client/render/r_shader.cpp b/client/render/r_shader.cpp
 --- a/client/render/r_shader.cpp
 +++ b/client/render/r_shader.cpp
+@@ -279,12 +279,12 @@ static bool GL_ProcessShader( const char *filename, CVirtualFS *out, bool compat
+ 		out->Printf( "#extension GL_EXT_gpu_shader4 : require\n" ); // support bitwise ops
+ 		out->Printf( "#define GLSL_gpu_shader4\n" );
+ 		if( GL_Support( R_TEXTURE_ARRAY_EXT ))
+-			out->Printf( "#define GLSL_ALLOW_TEXTURE_ARRAY\n" );
++			out->Printf( "#define GLSL_ALLOW_TEXTURE_ARRAY 1\n" );
+ 	}
+ 	else if( GL_Support( R_TEXTURE_ARRAY_EXT ))
+ 	{
+ 	//	out->Printf( "#extension GL_EXT_texture_array : require\n" ); // support texture arrays
+-		out->Printf( "#define GLSL_ALLOW_TEXTURE_ARRAY\n" );
++		out->Printf( "#define GLSL_ALLOW_TEXTURE_ARRAY 1\n" );
+ 	}
+ 	if( defines )
+ 	{
 @@ -291,6 +291,7 @@ static bool GL_ProcessShader( const char *filename, CVirtualFS *out, bool compat
  	#if XASH_IOS
  		char mobileDefines[MAX_OPTIONS_LENGTH];

@@ -115,7 +115,7 @@ def jobs(source_root: Path):
         result.add(("fragment", path.name, ""))
 
     result.update(
-        (stage, filename, "#define GLSL_ALLOW_TEXTURE_ARRAY\n" + defines)
+        (stage, filename, "#define GLSL_ALLOW_TEXTURE_ARRAY 1\n" + defines)
         for stage, filename, defines in TEXTURE_ARRAY_JOBS
     )
 
