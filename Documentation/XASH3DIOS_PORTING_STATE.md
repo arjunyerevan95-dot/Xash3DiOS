@@ -2212,3 +2212,82 @@ Remaining risks: Diffusion landscapes remain unavailable; the complete GL4ES arr
 Durable ledger path: `Documentation/XASH3DIOS_PORTING_STATE.md`. Repository and Google Docs readbacks are required before handoff.
 
 Stop state: **Work Order 55 Phase A is complete at Outcome B and the orchestrator-review gate.** Do not implement a partial array path, build, run CI, create or upload any IPA, advertise arrays to Diffusion, contact Arjun, request evidence/testing, begin Phase B, invent Work Order 56, or start any later phase. Await a new explicit orchestrator-authored work order.
+
+## Work Order 56 Phase A - Outcome A: first-party GL4ES texture-array foundation build-qualified
+
+Selected work order and outcome: **WORK ORDER 56 PHASE A — FIRST-PARTY GL4ES TEXTURE-ARRAY FOUNDATION AND ON-DEVICE CONFORMANCE GATE. Outcome A.** The complete first-party array route and deterministic `-gl4es_texture_array_selftest` harness satisfy the source, rejection-fixture, full arm64 build, mobile-shader, IPA-contract, and publication gates. Bundle version 105 is a build-qualified self-test-only candidate. It is **not device-accepted**, Diffusion terrain admission remains disabled, and no device test is requested by this report.
+
+### Starting state, commits, and preserved scope
+
+- Starting ledger/baseline commit: `faf345eebf6d9b15e0d786ce9e1823506db16d33`.
+- Primary implementation commit: `239dfc204fe0e47e326371b0d68cdfd9fe38ca3a`.
+- Compile/link corrections: `efbe47bb09cb28221df538f2cb1edee29231cf0c`, `c64845938ac6401f3c56fc242e885ecf5b181b8c`, and `ee8a515844f9ea3c2793140e5d367b0a7a8d73e0`.
+- Final shader-route correction and candidate commit: `9f7e799763045cd88621fe89c2a4a0202cb510ff`.
+- The exact GL4ES pin remains `81547d986798e876de8b434193920b606a72363f`; Diffusion remains `14d156bf3a6993c172697fac83a937836c3b5561`. Bundle 96's direct-drawable, uint-index, topology, transform, texture-unit, material, and inactive-sampler repairs remain in the production patch order. No gameplay, menu, presentation, timing, or `ch1map1` transition code changed.
+- `GL_EXT_texture_array` is not advertised and Diffusion terrain is not admitted. The only published launch route is the pre-game self-test mode.
+
+### Architecture-closure matrix
+
+| Required route | Implemented closure | Proof |
+| --- | --- | --- |
+| Distinct object identity and per-unit state | Adds `ENABLED_TEXTURE_ARRAY`, `TU_ARRAY`, a separate array object slot and `actual_texarray` cache, target-specific bind/delete/rebind/query handling, and no 2-D/cache alias | Positive validator plus target-alias and wrong-unit rejection fixtures |
+| Live-context native GLES3 capability | Resolves `glTexImage3D`, `glTexSubImage3D`, and `glTexStorage3D` only from the live current context; requires native ES3 and records `GL_MAX_ARRAY_TEXTURE_LAYERS` | Exact-pin source replay, capability checks, and arm64 build |
+| Mutable/immutable upload | Preserves width, height, depth, z offset, mip, unpack/PBO offset, immutable levels, and array metadata through native 3-D calls | Lost-depth and lost-z mutation fixtures; harness image/storage/subimage cases |
+| Compressed upload | DXT array image and subimage paths decompress every requested layer into RGBA8 while retaining depth, layer offset, mip, and update extent; no layer-zero fallback | Compressed-route source checks, layer-zero rejection, and harness DXT image/subimage case |
+| Stage-correct ESSL 300 | Selects the array route from an explicit terrain/self-test program or active post-preprocessor array use; emits stage-correct `in`/`out`, fragment output, array permission, sampler precision, modern texture/projection mappings, and omits legacy numeric-overload helpers that collide with ESSL 300 | All four unsanitized pinned solid/dlight terrain jobs and all 354 CI shader variants compile; ESSL-100 fallback and raw-inactive-token mutations are rejected |
+| Reflection and unit routing | Classifies `GL_SAMPLER_2D_ARRAY` as `TU_ARRAY`, retains active-uniform metadata, and realizes the sampler against the selected texture unit without 2-D/cube collision | Sampler-misclassification and wrong-unit rejection fixtures; harness active-uniform inspection |
+| Context/lifecycle ownership | Resets array state and hardware-extension discovery on GL4ES close/reinitialize, preserves external-current-context ordering, and exercises delete/recreate/current-generation ownership | Lifecycle-removal rejection fixture, source replay, IPA markers, and harness lifecycle phase |
+| Native self-test harness | Runs before game/Diffusion initialization, covers mutable/immutable/compressed paths, units/bindings/aliasing, delete/recreate, GL4ES shader conversion/reflection, four layer quadrants, readback/checksum, and explicit terminal PASS/FAIL | Self-test-bypass and layer-zero mutations are rejected; harness and all seven markers are present in the verified arm64 IPA |
+
+### Failed-run evidence and verified correction boundary
+
+The inherited implementation had four sequential macOS build boundaries, each preserved in Actions history. Run [32412260088](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32412260088) first failed because the harness used undeclared `GL_TEXTURE0` through `GL_TEXTURE3`. Run [32413452984](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32413452984) advanced to arm64 link and exposed that direct ARB shader entry points were not linked through the GL4ES core export route. Run [32414573392](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32414573392) then exposed the existing GL4ES `glGetProgramiv` ABI's unsigned output pointer. Those boundaries were corrected by the three narrow harness commits above.
+
+The final inherited failure, [32416455836](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32416455836), passed the Work Order 56 source/rejection validator and built the engine, then failed the Diffusion mobile-shader gate: 158 of 354 variants failed, beginning with ordinary `bmodeldlight_fp.glsl`, at `float requires declaration of default precision qualifier` and `clamp redefinition`. The verified structural cause was pre-preprocessor substring routing: inactive `sampler2DArray`/`BMODEL_MULTI_LAYERS` text selected ESSL 300 for ordinary shaders, and the ESSL-300 branch still injected legacy ESSL-100 numeric overload helpers before precision declarations. The final correction selects generic array use from post-preprocessor source, keeps explicit paired vertex/fragment terrain/self-test routing, omits the legacy overload helpers only for ESSL 300, supplies opaque-sampler precision and `texture2DProj` mapping, and activates the guarded terrain helper definitions without advertising the extension. This is the first incomplete inherited step and the only runtime correction made by the replacement worker.
+
+### Validation and qualification
+
+- Inspected clean/local/remote branch heads, the inherited two-file diff, all implementation commits, and every active/recent failed workflow before editing. No qualifying workflow was already running.
+- Read the repository ledger completely through Work Order 55 and the authoritative Google Doc completely through the full Work Order 56 authorization.
+- Replayed the entire accepted GL4ES patch stack plus the Work Order 56 patch on a fresh exact-pin clone; `git apply --check`, positive validation, applied-source `git diff --check`, and all ten mutation/rejection fixtures passed. The added fixture rejects selection from raw inactive array tokens.
+- Compiled the real patched GL4ES converter locally and validated the four required unsanitized pinned terrain jobs: `bmodelsolid_vp`, `bmodelsolid_fp`, `bmodeldlight_vp`, and `bmodeldlight_fp`.
+- Passed the retained drawable, uint-element, index-trace, WO49 topology, WO49 transform, WO49 texture-unit, WO51 material-state, WO52 material-trace, inactive-sampler, and Diffusion shared-animated/rigid-one-bone positive/rejection suites.
+- Qualification workflow [32450973853](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32450973853) completed `success` on candidate `9f7e7997`. It replayed exact pins, passed every validator, compiled all 354 translated GL4ES mobile shader variants, built the arm64 engine plus Half-Life and Diffusion client/server/menu, verified all required thin-arm64 Mach-O files and embedded markers, packaged Bundle 105, passed the IPA contract, and uploaded exactly one retained artifact. The automatic pull-request copy is not the qualifying candidate and no manual duplicate was launched.
+
+### Artifact and IPA
+
+- GitHub artifact: [`Xash3DiOS-arm64-unsigned`](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32450973853/artifacts/9435734500), ID `9435734500`, 8,614,116-byte artifact ZIP, SHA-256 `7cffe7db01389b27e0361f9c2018da6487f070b0fb7c3109a584dccf37bd52b8`, retained for 14 days by the workflow.
+- IPA: `Xash3DiOS-WO56-9f7e7997-arm64-selftest-unsigned.ipa`, 8,711,204 bytes, SHA-256 `cee7394d25064341cf2fed8dcff6aa69f955217cd3eede50240f6bda5158b3b2`.
+- Tempfile page: https://tempfile.org/BHHRZLnPmHp/ ; direct download: https://tempfile.org/BHHRZLnPmHp/download . Tempfile independently reports the same byte size and SHA-256 with risk level `safe`; the object has a 48-hour retention window.
+
+### Exact repository files changed
+
+- `engine/client/cl_main.c`
+- `engine/platform/ios/launchdialog.m`
+- `ref/gl/gl_local.h`
+- `ref/gl/gl_opengl.c`
+- `ref/gl/gl_texture_array_selftest.c`
+- `scripts/gha/build_ios.sh`
+- `scripts/ios/gl4es-wo56-texture-array-ios.patch`
+- `scripts/ios/validate-diffusion-mobile-shaders.py`
+- `scripts/ios/validate-ios-texture-array.py`
+- `scripts/ios/verify_ipa.sh`
+- `Documentation/XASH3DIOS_PORTING_STATE.md` (this outcome report only)
+
+### Expected runtime markers
+
+- `iOS texture array selftest policy:`
+- `iOS texture array selftest object:`
+- `iOS texture array selftest upload:`
+- `iOS texture array selftest shader:`
+- `iOS texture array selftest sample:`
+- `iOS texture array selftest lifecycle:`
+- `iOS texture array selftest terminal:`
+
+The terminal success form is `iOS texture array selftest terminal: PASS failures=0 diffusion_started=0`. Any `FAIL`, nonzero failure count, missing stage marker, mismatched checksum/result, or evidence that Diffusion started rejects the candidate.
+
+Remaining risks: build and packaging qualification do not prove on-device array sampling, native DXT decompression results, drawable readback checksums, or lifecycle behavior on a real EAGL context. The self-test IPA therefore remains not device-accepted. Terrain capability remains deliberately unadvertised and Diffusion landscapes remain unavailable until a later orchestrator-authorized admission phase. The independently quarantined `ch1map1` termination is unchanged.
+
+Durable ledger path: `Documentation/XASH3DIOS_PORTING_STATE.md`. This report is published in one documentation-only `[skip ci]` commit; its exact hash is mirrored into the authoritative Google Docs ledger and final handoff because a Git commit cannot contain its own hash. Repository and Google Docs readbacks are required before handoff.
+
+Stop state: **Work Order 56 Phase A is complete at Outcome A and the orchestrator-review gate.** Do not request or run a device test, advertise texture arrays to Diffusion, admit terrain, begin Work Order 56 Phase B, start another workflow, create another candidate, contact Arjun, or begin any later work order. Await explicit orchestrator review.
