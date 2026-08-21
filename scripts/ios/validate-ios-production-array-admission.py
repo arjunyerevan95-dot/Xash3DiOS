@@ -132,6 +132,8 @@ def validate(files: dict[str, str]) -> list[str]:
     shader_sources = files["shader_sources"]
     for token in (
         'GL_CheckExtension( "GL_EXT_texture_array"',
+        "#ifndef GL_MAX_ARRAY_TEXTURE_LAYERS_EXT",
+        "#define GL_MAX_ARRAY_TEXTURE_LAYERS_EXT 0x88FF",
         "gRenderfuncs.GL_LoadTextureArray != NULL",
         "gRenderfuncs.GL_CreateTextureArray != NULL",
         "GL_MAX_ARRAY_TEXTURE_LAYERS_EXT", "MAX_LANDSCAPE_LAYERS",

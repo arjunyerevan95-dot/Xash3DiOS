@@ -53,6 +53,17 @@ diff --git a/client/render/r_misc.cpp b/client/render/r_misc.cpp
 diff --git a/client/render/r_opengl.cpp b/client/render/r_opengl.cpp
 --- a/client/render/r_opengl.cpp
 +++ b/client/render/r_opengl.cpp
+@@ -21,6 +21,10 @@ Copyright (C) 2010 Uncle Mike
+ #include "r_weather.h"
+ #include "mathlib.h"
+ 
++#ifndef GL_MAX_ARRAY_TEXTURE_LAYERS_EXT
++#define GL_MAX_ARRAY_TEXTURE_LAYERS_EXT 0x88FF
++#endif
++
+ #define MAX_RESERVED_UNIFORMS		22	// dynamic lighting estimates 42 uniforms... 
+ 
+ glState_t		glState;
 @@ -670,6 +670,21 @@ static void GL_InitExtensions( void )
  
  	// 2d texture array support
