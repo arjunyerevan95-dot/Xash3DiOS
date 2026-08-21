@@ -2713,3 +2713,27 @@ ControlPlane authority and complete stopping conditions are in `WorkOrders/WO-05
 Stop state: **Work Order 56 Phase L is active.** The first incomplete action is the preserved worker's exact evidence request and validation of the sole authorized normal-bootstrap device run. No engineering implementation work is authorized.
 
 The authoritative Google Docs ledger was appended under revision guard and its Phase L stop-state paragraph was verified by readback at revision `AIroW36cJUxGI7JGaMrb1e_-ZnY-2hz35dp3f9oR5_8XOk5WxxvOGFH_ylpE2YQB81wyRM8whgNLXFbiu6v0RmievJgG1VBId2Arbg8P0Cg`.
+
+## 2026-08-22 — Work Order 56 Phase L Outcome C worker report
+
+Selected outcome: **WORK ORDER 56 PHASE L — Outcome C before device launch.** The exact Bundle 124 IPA identity is valid, but the candidate cannot execute the order's required ordinary Diffusion arguments. This is an argument/candidate mismatch, not a renderer rejection. No physical-device launch, gameplay action, build, CI run, artifact, upload, or runtime change occurred.
+
+### Pre-launch evidence and exact boundary
+
+- Verified IPA: `xash3d-fwgs-ios-arm64.ipa`, Bundle 124, `8,717,677` bytes, SHA-256 `FB62C2903E21152DCB74C709656F8FEF841ACE2A22C281F27B90AC02F0E1D04F`, matching candidate `976c38f3d99d7ef6eaf348188fabf4fe4e722be9`, workflow `32510363562`, artifact `9456949434`.
+- Required Phase L arguments: `-dev 2 -log -game diffusion -ref gl4es`, with `-gl4es_texture_array_selftest` absent.
+- Actual candidate contract: `engine/platform/ios/launchdialog.m` assigns `-dev 2 -log -game diffusion -ref gl4es -gl4es_texture_array_selftest` to `textureArraySelftestArgs`, writes that value into the only launch field, calls `setEnabled:NO`, and constructs `argv` from the disabled field's text.
+- Independent packaged readback: the exact extracted Bundle 124 `xash` executable contains the full self-test argument string and the self-test token; its `Info.plist` reports version `124`.
+- The mismatch is therefore deterministic before installation. Launching the candidate would execute the bounded self-test route already qualified by Bundle 116, not the ordinary production-admission route Phase L is meant to discriminate.
+
+### Outcome, evidence status, and stop gate
+
+Outcome C applies because the arguments cannot be made correct for the exact immutable candidate. The worker stopped at Phase L procedure step 3. No app installation or launch was performed; no external Diffusion data changed; no stable-menu screenshot, engine log, or `.ips` exists; and the sole authorized device launch remains unconsumed. The absence of runtime markers is not treated as a renderer failure.
+
+Bundle 116 remains physically qualified for the bounded native texture-array conformance harness. Bundle 124 remains build-qualified for the conditional production route. The first unqualified boundary remains live provider/engine/Diffusion production-admission agreement during an ordinary, self-test-free bootstrap. Terrain discovery/loading, array object creation in production, terrain shader execution, drawing, presentation, map transitions, gameplay, and `ch1map1` remain unqualified and untouched.
+
+Exact files changed for Phase L reporting: `Documentation/CURRENT_STATE.md`, `WorkOrders/WO-056.md`, `Evidence/WO-056/manifest.md`, and `Documentation/XASH3DIOS_PORTING_STATE.md`. No source, patch, validator, workflow, IPA, artifact, game data, menu, input, terrain, map, transition, or gameplay file changed. No CI workflow was launched.
+
+First incomplete step: orchestrator review of the contradictory immutable candidate/argument tuple and a decision whether a separately authorized ordinary-argument candidate is justified. The worker does not propose or begin that change automatically.
+
+Stop state: **Work Order 56 Phase L is complete at Outcome C and the orchestrator-review gate.** Do not launch or retest Bundle 124, alter arguments or data, patch, build, run CI, create/upload an artifact, enter terrain/gameplay, modify `ch1map1`, or begin another phase without a new explicit orchestrator-authored order.

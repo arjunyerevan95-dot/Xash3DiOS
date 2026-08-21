@@ -1,6 +1,6 @@
 # Xash3DiOS Current State
 
-Last updated: `2026-08-22T01:32:42+05:30`
+Last updated: `2026-08-22T01:53:53+05:30`
 
 ## Repository
 
@@ -15,20 +15,20 @@ Last updated: `2026-08-22T01:32:42+05:30`
 ## Current control state
 
 - Current issued work order: [WO-056](../WorkOrders/WO-056.md), Phase L
-- Status: active; one evidence-only normal-bootstrap device launch of exact Bundle 124 is authorized
-- Current phase: WO-056 Phase L — Bundle 124 normal-bootstrap production texture-array admission device acceptance
-- First incomplete step: the preserved worker must request and validate the exact one-run Phase L device evidence package
-- Current blocker: no physical-device evidence yet proves that Bundle 124's provider, engine, and Diffusion production-admission gates all enable and agree during ordinary startup
+- Status: Phase L complete at Outcome C; stopped before device launch and awaiting orchestrator review
+- Current phase: WO-056 Phase L — inconclusive because exact Bundle 124 enforces the prohibited self-test flag
+- First incomplete step: orchestrator decides whether a separately authorized ordinary-argument candidate is justified; the worker must not patch or rebuild automatically
+- Current blocker: exact Bundle 124 cannot run the required ordinary arguments because its disabled launch field hardcodes `-gl4es_texture_array_selftest`
 - Current unresolved boundary: live physical-device production texture-array admission before any terrain, map, transition, or gameplay execution
 
 ## Qualification state
 
 - Highest physical-device-qualified gate: WO-056 Phase J / Bundle 116 bounded native texture-array conformance
 - Highest build-qualified production gate: WO-056 Phase K / Bundle 124 conditional production texture-array admission
-- First unqualified gate: physical-device normal-bootstrap agreement of the three Bundle 124 production-admission markers
+- First unqualified gate: physical-device ordinary-bootstrap agreement of the three production-admission markers using a candidate that actually omits the self-test flag
 - Latest candidate: Bundle 124, candidate `976c38f3d99d7ef6eaf348188fabf4fe4e722be9`, workflow `32510363562`
 - Latest IPA: `xash3d-fwgs-ios-arm64.ipa`, `8,717,677` bytes, SHA-256 `FB62C2903E21152DCB74C709656F8FEF841ACE2A22C281F27B90AC02F0E1D04F`
-- Phase K Outcome A is accepted as build-qualified only. Phase L authorizes one menu-only device launch of exact Bundle 124; terrain, map, transition, and gameplay testing remain prohibited.
+- Phase K Outcome A remains accepted as build-qualified only. Phase L closed at Outcome C without a launch because Bundle 124 cannot satisfy its ordinary-argument precondition; terrain, map, transition, and gameplay testing remain prohibited.
 
 ## Accepted Phase K result
 
@@ -39,13 +39,12 @@ Last updated: `2026-08-22T01:32:42+05:30`
 - The iOS shader route preserves `GLSL_ALLOW_TEXTURE_ARRAY 1`, `TERRAIN_NUM_LAYERS`, `BMODEL_MULTI_LAYERS`, and the real terrain material features instead of advertising arrays while stripping their consumer.
 - Machine-readable contract: `scripts/ios/wo56k-production-array-admission-contract.json`.
 
-## Active Phase L boundary
+## Phase L Outcome C stop boundary
 
-- Reuse Bundle 124 exactly; do not build, patch, launch CI, alter data, or create another artifact.
-- Locked ordinary arguments: `-dev 2 -log -game diffusion -ref gl4es` with no self-test flag.
-- Install over the existing app/data, launch once, reach the stable Diffusion menu, wait about 10 seconds, take one screenshot, export the complete log, and stop.
-- Do not click Start/New Game/difficulty, load a map, enter terrain/gameplay, or exercise the quarantined `ch1map1` path.
-- Device acceptance requires the provider, engine, and Diffusion admission markers to agree on enabled native ES3 texture arrays with at least 16 layers, with no `GL_EXT_texture_array - failed`, landscape-unavailable warning, relevant GL/shader failure, or crash.
+- Exact IPA identity passed: Bundle 124, `8,717,677` bytes, SHA-256 `FB62C2903E21152DCB74C709656F8FEF841ACE2A22C281F27B90AC02F0E1D04F`.
+- Argument identity failed before launch: source and packaged executable enforce `-dev 2 -log -game diffusion -ref gl4es -gl4es_texture_array_selftest` through a disabled launch field, while Phase L requires the same string without the self-test flag.
+- No install, launch, screenshot, log, `.ips`, terrain, map, transition, gameplay, or `ch1map1` action occurred. The one-run authorization was not consumed.
+- Outcome C does not reject the renderer or production-admission implementation. It leaves live ordinary-bootstrap agreement unqualified.
 
 ## Surviving hypotheses and boundaries
 
@@ -69,7 +68,7 @@ Last updated: `2026-08-22T01:32:42+05:30`
 
 - Completed and accepted prerequisite: WO-056 Phase J / Bundle 116 physical-device native array conformance
 - Accepted build-qualified result: WO-056 Phase K / Bundle 124 conditional production admission, Outcome A
-- Active experiment: WO-056 Phase L / Bundle 124 one-run normal-bootstrap admission-marker device acceptance
+- Latest experiment: WO-056 Phase L / Bundle 124 ordinary-bootstrap admission-marker acceptance — Outcome C before launch
 - Phase I contract: `scripts/ios/wo56i-sampling-readback-contract.json`
 - Phase K contract: `scripts/ios/wo56k-production-array-admission-contract.json`
 - Canonical Phase K tuple: candidate `976c38f3` / workflow `32510363562` / Bundle 124 / IPA hash above
@@ -91,7 +90,7 @@ Every worker activation must also include a completion callback directive. After
 ## Future orchestrator/worker bootstrap
 
 1. Read `Documentation/CURRENT_STATE.md`.
-2. Read `WorkOrders/WO-056.md` (Phase L authorizes exactly one normal-bootstrap, menu-only Bundle 124 device run; it does not authorize terrain or gameplay).
+2. Read `WorkOrders/WO-056.md` (Phase L is complete at Outcome C; Bundle 124 must not be launched or rebuilt without a new explicit orchestrator decision).
 3. Read only the `Decisions/` and `Evidence/` records referenced there.
 4. Verify current Git/remote/CI state before acting.
 5. Use the historical Google Docs ledger only when deeper context is required.

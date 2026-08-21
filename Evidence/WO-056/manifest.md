@@ -117,14 +117,17 @@ This manifest references the evidence used to close WO-056 Phases I and J at Out
 - Durable reports: repository ledger Phase K Outcome A entry near line 2627 and the authoritative Google Docs ledger, both reported read-back verified by the worker.
 - Qualification boundary: production capability admission is build-qualified only. Real Diffusion terrain loading, shader execution, rendering, transition behavior, gameplay, and `ch1map1` remain outside this evidence.
 
-## Phase L pending device-admission evidence
+## Phase L Outcome C pre-launch evidence
 
-- Status: active; one exact Bundle 124 normal-bootstrap, menu-only device run is authorized. No Phase L evidence exists yet.
+- Status: complete at Outcome C; stopped before installation/launch because the exact Bundle 124 argument identity cannot satisfy the order.
 - Exact candidate/workflow/artifact: `976c38f3d99d7ef6eaf348188fabf4fe4e722be9` / `32510363562` / `9456949434`.
 - Exact IPA: `xash3d-fwgs-ios-arm64.ipa`, Bundle 124, `8,717,677` bytes, SHA-256 `FB62C2903E21152DCB74C709656F8FEF841ACE2A22C281F27B90AC02F0E1D04F`.
 - Locked arguments: `-dev 2 -log -game diffusion -ref gl4es`; no self-test or force-enable flag.
 - Target device: established iPhone 16 Pro Max / iOS 26.6.
-- Pending evidence: one stable-menu screenshot; one complete single-run engine log with filename, byte count, and SHA-256; verified provider/engine/Diffusion admission markers; matching `.ips` only if unexpected termination occurs.
-- Acceptance boundary: live production texture-array admission during ordinary bootstrap only. Terrain loading, terrain shader execution, drawing, maps, gameplay, transitions, and `ch1map1` remain prohibited and unqualified.
+- Local IPA readback matched the authorized filename, Bundle 124 version, `8,717,677` bytes, and SHA-256 `FB62C2903E21152DCB74C709656F8FEF841ACE2A22C281F27B90AC02F0E1D04F`.
+- `engine/platform/ios/launchdialog.m` hardcodes `-dev 2 -log -game diffusion -ref gl4es -gl4es_texture_array_selftest`, writes it into the launch field, disables that field, and derives `argv` from it.
+- The exact extracted Bundle 124 `xash` executable contains the full hardcoded self-test argument string; `Info.plist` reports version `124`.
+- Required Phase L arguments omit `-gl4es_texture_array_selftest`; therefore the exact candidate cannot pass the pre-launch argument guard. No device launch, screenshot, log, `.ips`, or marker evidence was produced, and the one-run authorization remains unconsumed.
+- Qualification boundary: Phase K production admission remains build-qualified; live ordinary-bootstrap production admission remains unqualified. Terrain loading, terrain shader execution, drawing, maps, gameplay, transitions, and `ch1map1` remain prohibited and unqualified.
 - Related decision: [`DEC-007`](../../Decisions/DEC-007.md).
-- Authoritative Google ledger: Phase L order appended under revision guard and stop-state paragraph read-back verified at revision `AIroW36cJUxGI7JGaMrb1e_-ZnY-2hz35dp3f9oR5_8XOk5WxxvOGFH_ylpE2YQB81wyRM8whgNLXFbiu6v0RmievJgG1VBId2Arbg8P0Cg`.
+- First incomplete step: orchestrator review and decision whether a separately authorized ordinary-argument candidate is justified. No automatic patch/build/retry is authorized.
