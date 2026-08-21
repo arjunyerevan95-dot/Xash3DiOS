@@ -2623,3 +2623,63 @@ Complete authority, rejection fixtures, reporting fields, and stop conditions ar
 The authoritative Google Docs ledger was appended under revision guard and verified by readback at revision `AIroW37mgJWSAdh9os0FJ0VzXL-r36Dj5xAz9EfzGMg_oXINPkRe-WWO3uZKluW6OOn4DguV3EyefcmwR0ZwOd7v-shLklDwN20hf5dbH84`.
 
 Stop state: **Work Order 56 Phase K is active.** The preserved worker may read and implement the published order, create at most one qualifying build candidate, update both ledgers, and report at orchestrator review. No Phase K device test or later phase is authorized.
+
+## 2026-08-21 — Work Order 56 Phase K Outcome A worker report (Bundle 124)
+
+Selected order and outcome: **WORK ORDER 56 PHASE K — CONDITIONAL PRODUCTION TEXTURE-ARRAY ADMISSION, Outcome A.** The audit established one complete conditional native-ES3/GL4ES-to-Diffusion production route. Bundle 124 is build-qualified only; production terrain has not been device- or gameplay-accepted. No device test or user evidence is requested, and no later phase is begun.
+
+### Baseline, verified boundary, and structural cause
+
+- Control-plane baseline: `b3531a8dbed396aed22aca109b9cab64939305f6`; qualified implementation baseline: `bc4b2b7181b3111053f14ff86e8ff634718acf30`; accepted prerequisite: Bundle 116's physical-device native array conformance PASS.
+- Verified first unqualified boundary: after the complete Bundle 116 native array harness passed, production startup still logged `GL_EXT_texture_array - failed`; therefore the real engine/Diffusion landscape route remained unavailable even though its native primitives were qualified.
+- Structural cause: the pinned GL4ES extension provider never conditionally exposed the qualified route; the engine gate lacked a complete production proc/limit agreement; Diffusion lacked an independent callback/limit agreement and loader failure closure; and the iOS shader policy stripped `MULTI_LAYERS` plus related terrain directives, so merely exposing the token would have created a false-positive capability whose consumer stayed disabled or whose source/cache key diverged.
+- The machine-readable invariant is `scripts/ios/wo56k-production-array-admission-contract.json` (schema 1, seven provenance stages, nine GL4ES operation routes, minimum 16 layers, explicit negative cases and forbidden fallbacks).
+
+### Complete production capability/provenance contract
+
+| Stage | Owner and input | Qualified output | False/failure behavior |
+| --- | --- | --- | --- |
+| Native provider | GL4ES `GetHardwareExtensions`: live ES major >= 3, live `glTexImage3D`/`glTexSubImage3D`/`glTexStorage3D`, `GL_MAX_ARRAY_TEXTURE_LAYERS >= 16`, live ESSL-300 compile | `hardext.texture_array`, `hardext.maxarraylayers`, `hardext.glsl300es` | Unsupported context/provider, missing proc, insufficient limit, or missing ESSL-300 leaves the route false |
+| GL4ES exposure | `BuildExtensionsList`: native predicate plus compiled `gl4es_texture_array_available()` | Exactly one conditional `GL_EXT_texture_array` token | Token omitted; no spoof, cvar, argument, or environment override |
+| Engine gate | `GL_InitExtensions`/`GL_CheckExtension`: token, mutable and compressed 3-D upload procs, live layer limit | `GL_TEXTURE_ARRAY_EXT`, `max_2d_texture_layers`, stable engine marker | On disagreement or fewer than 16 layers, extension bit cleared and maximum zeroed |
+| Engine loader/export | `R_FillRenderAPI`, `GL_SetTextureTarget`, `GL_CreateTextureArray`, `GL_LoadTextureArray` | `IMAGE_MULTILAYER` maps to `GL_TEXTURE_2D_ARRAY_EXT`; both callbacks exported | Creation/load returns zero; no 2-D, atlas, CPU, or layer-zero fallback |
+| Diffusion gate | Its `GL_InitExtensions`: token, at least 16 layers, both array callbacks | `R_TEXTURE_ARRAY_EXT`, agreed maximum, stable admission marker | Gate cleared; `R_LoadLandscapes` performs no array work |
+| Landscape loader | `R_LoadLandscapes`, `LoadHeightMap`, `LoadTerrainLayers`: weight, diffuse, and complete optional normal layer sets | Valid weight/diffuse/normal array objects, at most `MAX_LANDSCAPE_LAYERS` | Terrain remains invalid and every partially created array is released |
+| Terrain shader/material | Solid/dlight bmodel builders and processor: `GLSL_ALLOW_TEXTURE_ARRAY 1`, `TERRAIN_NUM_LAYERS`, `BMODEL_MULTI_LAYERS`, bump/specular/emboss directives | Real `sampler2DArray`/`texture2DArray` variants; solid units diffuse/normal/weights = 0/4/5, dlight = 0/6/5 | Terrain variants are not admitted without the complete gate and objects; unrelated mobile filtering remains unchanged |
+
+The exact all-required predicate is: live native ES3+ context; all three provider procedures; at least 16 array layers; working ESSL 300; compiled GL4ES object/upload/sampler/translation/realization/lifecycle routes; engine mutable plus compressed 3-D upload procedures and retained engine bit; Diffusion token/limit/two-callback agreement; and terrain cache keys plus emitted source retaining the complete multi-layer feature family. Any false term keeps the provider unadvertised or clears a downstream gate. The native operations are wrapper-owned lifecycle and per-unit array identity/cache; native-forwarded mutable, subimage and immutable upload; per-layer DXT decode followed by native array upload for compressed layers; `TU_ARRAY` reflection/uniform and realization; existing qualified draw routes; live limit query; and stage-correct ESSL-300 translation.
+
+### Implementation, commits, and files
+
+- Coherent implementation commit: `c063202dc0c0111304e2d0a82a2506f1457f1454` (`ios: admit qualified production texture arrays`).
+- Bounded qualification corrections: `12a80912c8c18870cad71e6116fbfeda2e26e2c3` normalizes the terrain macro to `#define GLSL_ALLOW_TEXTURE_ARRAY 1`; `38d429b189efc9a46e1a47f8463bf04797641fd6` supplies the GLES token `GL_MAX_ARRAY_TEXTURE_LAYERS_EXT` when the pinned Diffusion headers omit it; `976c38f3d99d7ef6eaf348188fabf4fe4e722be9` verifies the engine gate marker in its actual `libref_gl4es.dylib` owner and adds a wrong-binary rejection fixture. None changes the admission predicate or broadens runtime scope.
+- Runtime/build files: `ref/gl/gl_opengl.c`, `scripts/gha/build_ios.sh`, `scripts/ios/builddiffusion.sh`, new `scripts/ios/gl4es-wo56-production-array-admission-ios.patch`, and new `scripts/ios/diffusion-wo56-production-array-admission-ios.patch`.
+- Contract/qualification files: new `scripts/ios/wo56k-production-array-admission-contract.json`, new `scripts/ios/validate-ios-production-array-admission.py`, `scripts/ios/validate-diffusion-mobile-shaders.py`, `scripts/ios/validate-ios-renderer-contract.py`, `scripts/ios/validate-ios-selftest-boot.py`, `scripts/ios/validate-ios-texture-array.py`, and `scripts/ios/verify_ipa.sh`.
+- Durable-report file: `Documentation/XASH3DIOS_PORTING_STATE.md` only in the final documentation commit.
+
+### Validation, rejection proof, and CI
+
+- Exact pins replayed cleanly: GL4ES `81547d986798e876de8b434193920b606a72363f`, Diffusion `14d156bf3a6993c172697fac83a937836c3b5561`, MainUI `8c68de2f...`, executable `9505a1c...`, and SDL `5d249570393f7a37e037abf22cd6012a4cc56a71`. The complete accepted patch stacks and both Phase K patches apply to clean pinned trees.
+- The new positive suite and mutation fixtures reject unconditional exposure, ES2/unknown provider, every missing provider proc, zero/insufficient limits, engine/Diffusion disagreement, absent callbacks, wrong target, lost GLSL allow, stripped multi-layers, bypassed loader, missing diffuse/normal array paths, sampler-unit mismatch, atlas/CPU/2-D fallback, wrong marker owner, and ordinary-startup changes.
+- Retained texture-array, normal-bootstrap, 57-item renderer-contract, direct-drawable, uint-element, index-trace, WO49 topology/transform/per-unit-target, WO52 material, lifecycle, shader, package and proprietary-data gates passed. Python compilation, JSON parsing and `git diff --check` passed.
+- Pre-qualification workflow `32508365615` failed at shader translation before build/artifact because of the macro-value mismatch; `32509025360` failed before artifact at Diffusion compile because the pinned header lacked the limit token; `32509723819` completed all builds but failed before artifact at the wrong-owner verifier assertion. These bounded failures produced no retained candidate/artifact.
+- Sole retained qualifying workflow: [32510363562](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32510363562), push event, **success**, job [`96859751554`](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32510363562/job/96859751554), exact head `976c38f3d99d7ef6eaf348188fabf4fe4e722be9`. It passed the complete source/rejection gates, built engine plus Half-Life and Diffusion client/server/menu for iPhoneOS arm64, passed the IPA contract, and uploaded the artifact. An automatic successful PR duplicate (`32510367825`) completed before cancellation; its artifact and run were deleted after exact identity verification, leaving exactly one qualifying workflow/artifact retained. Automatic Build & Deploy runs skipped.
+
+### Artifact and IPA publication
+
+- Retained GitHub artifact: [`Xash3DiOS-arm64-unsigned`](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32510363562/artifacts/9456949434), ID `9456949434`, archive size `8,618,551` bytes, archive digest `sha256:5ed24f8a6ad27dfaea62ed315329d8bdf79e95c5a0053a4ba36187236f42b744`, expiry `2026-09-04T17:57:43Z`.
+- Exact unsigned IPA: `xash3d-fwgs-ios-arm64.ipa`, Bundle 124, `8,717,677` bytes, SHA-256 `FB62C2903E21152DCB74C709656F8FEF841ACE2A22C281F27B90AC02F0E1D04F`.
+- Independent extraction verified the required app executable, `libref_gl4es.dylib`, Diffusion client/server/menu dylibs, all three production markers in their packaged owners, 13 Mach-O objects all thin arm64 (`CPU 0x0100000C`), and zero proprietary game assets.
+- Exactly one tempfile.org object: [information page](https://tempfile.org/qyUGaEfR9Jp/); [direct IPA download](https://tempfile.org/qyUGaEfR9Jp/download); expiry `2026-08-23T18:53:49.725Z`. Metadata/security readback reports the exact filename, byte count and SHA-256, risk `safe`, no warning and no suspicious patterns. A fresh direct-download round trip reproduced the exact byte count and SHA-256.
+
+### Expected markers, retained behavior, risks, and stop state
+
+Expected production markers are `iOS production texture array provider:`, `iOS production texture array engine:`, and `iOS production texture array admission:`. The provider marker must report the live ES/proc/limit/ESSL/implementation terms; the engine and Diffusion markers must agree on enabled state and at least 16 layers. Bundle 116's locked normal-bootstrap arguments, 57-item contract, `a915906d` checksum, `terminal: PASS failures=0 diffusion_started=0`, direct-drawable ownership, uint-index, per-unit target, material/inactive-sampler, array uniform/VBO, lifecycle, menu, Half-Life, and quarantined `ch1map1` contracts remain unchanged.
+
+Why the correction addresses the boundary: capability now flows only from a live qualified native provider through GL4ES's conditional token, an independently checked engine gate and exported array callbacks, Diffusion's independent agreement, complete landscape object creation/cleanup, and the real terrain shader/material consumer. The old iOS suppression no longer strips terrain-only multi-layer semantics, while ordinary mobile shader filtering still applies outside terrain. There is no false advertisement or fallback path.
+
+Remaining risks: Phase K proves source structure, rejection behavior, exact-pin replay, full arm64 build/package, and packaged identity only. It does not prove that ordinary Diffusion terrain loads, renders, or transitions correctly on a device. Bundle 124 is therefore not terrain/device-accepted; no gameplay/device test is requested here. GitHub and tempfile retention are finite. The independent `ch1map1` track remains quarantined and untouched.
+
+Durable ledger path: `Documentation/XASH3DIOS_PORTING_STATE.md`. The repository ledger commit is a documentation-only `[skip ci]` commit whose immutable hash is copied into the authoritative Google Docs report and final handoff. Both ledgers are read back after publication.
+
+Stop state: **Work Order 56 Phase K Outcome A is complete at the orchestrator-review gate.** Do not contact Arjun, request evidence or device/gameplay testing, launch or retest Bundle 124, start another workflow/candidate/upload, change terrain/gameplay/`ch1map1`, or begin a later phase without a new explicit orchestrator-authored work order.
