@@ -2466,3 +2466,63 @@ Remaining risks: build and static inspection cannot prove real external Diffusio
 Durable ledger path: `Documentation/XASH3DIOS_PORTING_STATE.md`. Repository and Google Docs reports are read back after publication.
 
 Stop state: **Revised Work Order 56 Phase G Outcome A is complete at the orchestrator-review gate.** Do not contact Arjun, request device evidence or testing, retest Bundle 112, start another workflow/candidate/upload, launch Diffusion gameplay, enable terrain, advertise arrays to Diffusion, alter `ch1map1`, begin a later phase, or perform additional implementation without a new explicit orchestrator-authored work order.
+
+## 2026-08-21 — Work Order 56 Phase I Outcome A worker report (Bundle 116)
+
+Selected order and outcome: **WORK ORDER 56 PHASE I — COMPLETE THE NATIVE ARRAY SAMPLING/READBACK CORRECTION, Outcome A.** The complete call-level audit established one immediate, source-proven GL4ES error origin and one additional native-ES3-invalid vertex-input route that the first error could mask. Both are corrected coherently at their owners. Bundle 116 is a build-qualified diagnostics candidate, **not device-accepted**. No device test or evidence is requested by this report, and no later phase is begun.
+
+### Adopted Phase H evidence and exact boundary
+
+The authoritative raw Bundle 114 log is `1-engine.log`, SHA-256 `2A0A70CC3005795626ADF1597E656FBE30FEBEFBF0EACE0D9342BD09399FB32B`. It proves one bounded launch on candidate prefix `281eb237`: normal Diffusion game-information bootstrap; all 57 renderer-contract items; `renderer-ready` and one dispatch; mutable, immutable and compressed uploads PASS; array-object identity PASS; shader translation/reflection PASS; lifecycle PASS; then sampling/readback `GL_INVALID_OPERATION` (`0x0502`), checksum `a915906d`, and `terminal: FAIL failures=1 diffusion_started=0`, followed by clean intentional shutdown. This was not a hard crash. Bundle 114 is rejected and is not retested.
+
+The checksum is FNV-1a-32 over the exact 16 expected readback bytes, in quadrant order: red RGBA, green RGBA, magenta RGBA, yellow RGBA. Recomputing that stream yields `0xA915906D`, exactly matching the device log. The native array object, both draw calls, layer selection, drawable readback, quadrant order, and pixel contents therefore succeeded. The failure was an API-state error recorded during the sampling stage, not failed sampling or presentation.
+
+### Complete provenance audit and structural cause
+
+| Sequence | Owner/call | State/invariant | Phase H attribution | Phase I proof/correction |
+| --- | --- | --- | --- | --- |
+| 0 | Stage entry | Drain prior errors after the last successful shader/reflection operation | Object-routing drain was clean, so the later error is bounded to sampling | Explicit `stage-entry` immediate attribution rejects stale errors |
+| 1 | SDL drawable FBO query/check | External default framebuffer, native draw/read FBO identity, complete drawable, audited size | Correct pixels prove drawable route worked but did not identify its state | Explicit owner/object/registered FBO/status/size marker before sampling |
+| 2 | Viewport/scissor | Full 4×4 viewport; scissor cannot clip quadrants | Readback contained all four exact quadrants | Disable and restore scissor; set and restore viewport |
+| 3 | Program and sampler uniform | Reflected `GL_SAMPLER_2D_ARRAY`, sampler unit 0 | First uninstrumented operation able to emit the observed wrapper error | Immediate per-call error marker; GL4ES uniform classification repaired |
+| 4 | Texture unit/array bind | Unit 0, native array object, no 2-D alias | Object identity and exact layers passed | Immediate active-unit/bind attribution and state restoration |
+| 5 | Vertex/index/attribute state | ES3-valid buffer-backed attributes | CPU client pointer existed in the old harness and is invalid in Apple GLES3 | Quad is uploaded to a native VBO; attribute pointer is a buffer offset |
+| 6 | Draw/synchronization | Two triangle-strip draws, layer uniform 0 then 1, finish before read | Exact four-color result proves both draws and layer selection worked | Immediate attribution after each uniform/draw/finish call |
+| 7 | Read-buffer/pack/readback | External default read FBO; supported RGBA/UNSIGNED_BYTE; pack alignment 1 | Exact 16-byte checksum proves read succeeded | Explicit read-FBO, pack, `glReadPixels`, buffer-size and checksum contract |
+| 8 | Restoration/continuation | Restore program, buffers, attributes, texture bindings/unit, viewport, scissor, pack, clear state; continue lifecycle | Lifecycle PASS and clean terminal shutdown | Immediate cleanup attribution plus retained one-dispatch/lifecycle guards |
+
+The exact observed `0x0502` origin is `gl4es_glUniform1i(u_Array, 0)`. GL4ES already reflected `GL_SAMPLER_2D_ARRAY` and routed it through `TU_ARRAY`, but `src/gl/uniform.c` omitted that type from all three uniform classification helpers: `uniformsize`, `is_uniform_int`, and `n_uniform`. `GoUniformiv` consequently saw an incompatible size/class and deterministically called `errorShim(GL_INVALID_OPERATION)`. The native sampler default is already zero, which explains why the rejected uniform update left the program able to draw the exact expected pixels. The prior clean error drain and new stage-entry drain exclude a stale earlier error.
+
+The full route audit also proved that the old harness passed a CPU address to `glVertexAttribPointer`. Client-side vertex arrays are invalid in native OpenGL ES 3 on iOS, so that call could generate a second native `0x0502` hidden by the first shim error. This was not claimed as the origin of the logged checksum result; it is the second invalid operation on the same audited route and is removed by the required complete correction. No production terrain or gameplay path is enabled.
+
+### Implementation, commits, and exact files
+
+- Implementation/candidate commit: `bc4b2b7181b3111053f14ff86e8ff634718acf30` (`ios: complete native array sampling contract`).
+- Repository-ledger commit: this documentation-only `[skip ci]` commit. Its immutable hash is mirrored into the authoritative Google Docs ledger and final handoff because a Git commit cannot contain its own hash.
+- Exact GL4ES pin remains `81547d986798e876de8b434193920b606a72363f`.
+- Runtime/contract files changed: `ref/gl/gl_texture_array_selftest.c`, `scripts/ios/gl4es-wo56-texture-array-ios.patch`, `scripts/ios/validate-ios-renderer-contract.py`, `scripts/ios/validate-ios-selftest-boot.py`, `scripts/ios/validate-ios-texture-array.py`, `scripts/ios/verify_ipa.sh`, and new `scripts/ios/wo56i-sampling-readback-contract.json`.
+- Durable-report file: `Documentation/XASH3DIOS_PORTING_STATE.md` only in the reporting commit.
+
+The GL4ES patch adds `GL_SAMPLER_2D_ARRAY` to all three uniform helpers. The harness adds direct-drawable FBO proof, a stale-error boundary, immediate sequence/call/owner/object/framebuffer/error/result attribution, a VBO-backed quad, explicit scissor/viewport/pack ownership and restoration, exact checksum constant `0xA915906D`, and complete cleanup. The JSON contract records every sampling/readback call, valid state, expected error and restoration obligation. Bundle 114's normal Diffusion bootstrap, 57-item contract, single dispatch, direct-drawable architecture, every preceding PASS stage, locked arguments, bounded terminal shutdown, unadvertised/disabled terrain, and quarantined `ch1map1` track are preserved.
+
+### Validation, workflow, artifact, and IPA
+
+- Python compilation and JSON parsing passed; repository and applied-source `git diff --check` passed.
+- The complete accepted patch stack, ending in the Phase I patch, replayed cleanly against a fresh exact-pin GL4ES clone. `validate-ios-texture-array.py --self-test`, `validate-ios-selftest-boot.py --self-test`, and `validate-ios-renderer-contract.py --self-test` passed.
+- Retained drawable, uint-element, index-trace, WO49 topology, WO49 transform, texture-unit, and WO52 material-trace suites passed.
+- Mutation fixtures rejected stale attribution; missing/incomplete/wrong framebuffer; target, level, read/draw-buffer and sample defects; wrong sampler unit/type; missing array bind; wrong layer; client vertex storage; wrong viewport; unsupported read format/type; bad pack/buffer size; missing finish; checksum weakening; skipped read; 2-D/atlas/layer-zero/CPU fallbacks; state leakage; and missing continuation.
+- The local SDL checkout is intentionally CI-owned and was absent locally; the qualifying workflow replayed its retained checks. No local clang was available, so the single qualifying macOS/iPhoneOS workflow supplied compilation and link proof.
+- Sole retained qualifying workflow: [32489923843](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32489923843), job `96794910555`, push event, attempt 1, **success** in 4m56s on exact candidate commit `bc4b2b7181b3111053f14ff86e8ff634718acf30`. It replayed exact pins, passed all validators, built the engine plus Half-Life and Diffusion client/server/menu targets for iPhoneOS arm64, passed the IPA contract, and uploaded one artifact. Automatic PR duplicate `32489927380` was cancelled. Automatic Build & Deploy Engine runs `32489924024` and `32489927404` skipped and did not qualify.
+- GitHub artifact: [`Xash3DiOS-arm64-unsigned`](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32489923843/artifacts/9449473335), ID `9449473335`, ZIP size `8,616,958` bytes, SHA-256 `dacfb9d82bce5c3f777b2c77b38fa038d24655260c0438d199a6b596479355d2`.
+- Exact unsigned IPA: `xash3d-fwgs-ios-arm64.ipa`, Bundle 116, `8,716,506` bytes, SHA-256 `4FD8D67DDAEBF1986AC795164B7CD20BA782319B9F29200C9EA76F1A4BA73806`. Independent extraction verified all required contents, 13 thin-arm64 Mach-O files, the new attribution/contract markers in `libref_gl4es.dylib`, and no proprietary game assets.
+- Exactly one tempfile.org object: [information page](https://tempfile.org/FQBk1nBoC51/); [direct IPA download](https://tempfile.org/FQBk1nBoC51/download); 48-hour expiry. Metadata/security readback reports the exact filename, byte count and SHA-256, risk `safe`, no warning and no suspicious patterns. A fresh direct-download round trip reproduced the exact byte count and SHA-256.
+
+### Expected markers, remaining risks, and stop state
+
+New stable markers include `iOS texture array selftest sampling-fbo: owner=sdl-view ... result=PASS`, immediate `iOS texture array selftest sampling-call: seq=<n> call=<name> owner=<owner> object=<id> framebuffer=<id> error=0x0000 result=PASS`, and `iOS texture array selftest sampling-contract: schema=1 expected_checksum=a915906d error_origin=gl4es-uniform-type-cache vertex_source=vbo framebuffer=external-default attribution=immediate`. The existing sample checksum must remain `a915906d`; every immediate call must report `0x0000`; the terminal success form remains `iOS texture array selftest terminal: PASS failures=0 diffusion_started=0`.
+
+Remaining risks: source, mutation, full-build and packaged-marker proof cannot establish physical-device error-free execution. Bundle 116 is therefore not device-accepted. Texture-array terrain remains deliberately unadvertised and disabled; no gameplay launch occurred; Bundle 114 remains rejected without retest; and the independent `ch1map1` issue remains quarantined. GitHub and tempfile retention are finite.
+
+Durable ledger path: `Documentation/XASH3DIOS_PORTING_STATE.md`. Both repository and authoritative Google Docs reports are read back after publication.
+
+Stop state: **Work Order 56 Phase I is complete at Outcome A and the orchestrator-review gate.** Do not contact Arjun, request evidence or device testing, retest Bundle 114, start another workflow/candidate/upload, launch gameplay, enable or advertise Diffusion terrain, alter `ch1map1`, begin a later phase, or perform additional implementation without a new explicit orchestrator-authored work order.
