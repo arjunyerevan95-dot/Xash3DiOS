@@ -187,16 +187,24 @@ diff --git a/src/gl/shaderconv.c b/src/gl/shaderconv.c
 index 3d0f46bd..e43fa399 100644
 --- a/src/gl/shaderconv.c
 +++ b/src/gl/shaderconv.c
-@@ -448,6 +448,9 @@ char* ConvertShader(const char* pEntry, int isVertex, shaderconv_need_t *need)
+@@ -448,6 +448,7 @@ char* ConvertShader(const char* pEntry, int isVertex, shaderconv_need_t *need)
      }
    }
    int fpeShader = (strstr(pEntry, fpeshader_signature)!=NULL)?1:0;
-+  int texture_array_shader = strstr(pEntry, "sampler2DArray") ||
-+      strstr(pEntry, "texture2DArray") || strstr(pEntry, "BMODEL_MULTI_LAYERS") ||
-+      strstr(pEntry, "GL4ES_TEXTURE_ARRAY_PROGRAM");
++  int texture_array_program = strstr(pEntry, "GL4ES_TEXTURE_ARRAY_PROGRAM") || strstr(pEntry, "#define BMODEL_MULTI_LAYERS");
    int maskbefore = 4|(isVertex?1:2);
    int maskafter = 8|(isVertex?1:2);
    if((globals4es.dbgshaderconv&maskbefore)==maskbefore) {
+@@ -478,7 +479,9 @@ char* ConvertShader(const char* pEntry, int isVertex, shaderconv_need_t *need)
+     if(exts.ext)
+       free(exts.ext);
+   }
++  int texture_array_shader = texture_array_program ||
++      strstr(pBuffer, "sampler2DArray") || strstr(pBuffer, "texture2DArray");
+ 
+   static shaderconv_need_t dummy_need = {0};
+   if(!need) {
+     need = &dummy_need;
 @@ -507,7 +510,16 @@ char* ConvertShader(const char* pEntry, int isVertex, shaderconv_need_t *need)
    }
    #endif
@@ -207,7 +215,7 @@ index 3d0f46bd..e43fa399 100644
 +      ? "#define attribute in\n#define varying out\n"
 +      : "#define varying in\nout mediump vec4 gl4es_FragColor;\n#define gl_FragColor gl4es_FragColor\n";
 +    snprintf(GLESFullHeader, sizeof(GLESFullHeader),
-+      "#version 300 es\n%s#define texture2DArray texture\n#define texture2D texture\n#define textureCube texture\nprecision %s float;\nprecision %s int;\n",
++      "#version 300 es\n%s#define GLSL_ALLOW_TEXTURE_ARRAY 1\n#define texture2DArray texture\n#define texture2DProj textureProj\n#define texture2D texture\n#define textureCube texture\nprecision %s float;\nprecision %s int;\nprecision mediump sampler2D;\nprecision mediump samplerCube;\nprecision mediump sampler2DArray;\n",
 +      stage, (wanthighp)?"highp":"mediump", (wanthighp)?"highp":"mediump");
 +  } else {
 +    sprintf(GLESFullHeader, GLESHeader[versionHeader], "", (wanthighp)?"highp":"mediump", (wanthighp)?"highp":"mediump");
@@ -250,6 +258,15 @@ index 3d0f46bd..e43fa399 100644
        Tmp = gl4es_inplace_insert(gl4es_getline(Tmp, 1), GLESUseDerivative, Tmp, &tmpsize);
      else
        Tmp = gl4es_inplace_insert(gl4es_getline(Tmp, headline-1), GLESFakeDerivative, Tmp, &tmpsize);
+@@ -580,7 +598,7 @@ char* ConvertShader(const char* pEntry, int isVertex, shaderconv_need_t *need)
+     Tmp = gl4es_inplace_insert(gl4es_getline(Tmp, 1), useEXTDrawBuffers, Tmp, &tmpsize);
+   }
+   // if some functions are used, add some int/float alternative
+-  if(!fpeShader && !globals4es.nointovlhack) {
++  if(!texture_array_shader && !fpeShader && !globals4es.nointovlhack) {
+     if(strstr(Tmp, "pow(") || strstr(Tmp, "pow (")) {
+         Tmp = gl4es_inplace_insert(gl4es_getline(Tmp, headline), HackAltPow, Tmp, &tmpsize);
+     }
 diff --git a/src/gl/texture.h b/src/gl/texture.h
 index 33e140a3..e48bb95e 100644
 --- a/src/gl/texture.h
@@ -772,4 +789,3 @@ index 05738fb6..1ed51f6f 100644
 +EXPORT void ResetHardwareExtensions(void);
  
  #endif
-

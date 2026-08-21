@@ -119,10 +119,12 @@ def validate(files: dict[str, str]) -> list[str]:
     ):
         require(program + fpe, token, "sampler reflection/routing", failures)
     for token in (
-        'strstr(pEntry, "sampler2DArray")', "BMODEL_MULTI_LAYERS",
-        "GL4ES_TEXTURE_ARRAY_PROGRAM", "#version 300 es",
+        'strstr(pBuffer, "sampler2DArray")', 'strstr(pEntry, "#define BMODEL_MULTI_LAYERS")',
+        "GL4ES_TEXTURE_ARRAY_PROGRAM", "#version 300 es", "#define GLSL_ALLOW_TEXTURE_ARRAY 1",
         "#define varying out", "#define varying in",
-        "#define texture2DArray texture", "gl4es_FragColor",
+        "#define texture2DArray texture", "#define texture2DProj textureProj", "gl4es_FragColor",
+        "precision mediump sampler2DArray",
+        "if(!texture_array_shader && !fpeShader",
         "derivatives are core in ESSL 300", "gl_FragDepth is core in ESSL 300",
     ):
         require(shader, token, "stage-correct ESSL300", failures)
@@ -166,6 +168,7 @@ def fixtures(files: dict[str, str]) -> list[str]:
         ("lost zoffset", "array", "xoffset, yoffset, zoffset", "xoffset, yoffset, 0"),
         ("sampler misclassification", "program", "type=TU_ARRAY", "type=TU_TEX2D"),
         ("ESSL100 fallback", "shader", "#version 300 es", "#version 100"),
+        ("raw inactive array token", "shader", 'strstr(pBuffer, "sampler2DArray")', 'strstr(pEntry, "sampler2DArray")'),
         ("wrong unit", "fpe", "glprogram->texunits[tu_idx].type - 1", "ENABLED_TEX2D"),
         ("missing lifecycle", "init", "gl4es_texture_array_reset", "array_reset_removed"),
         ("layer-zero-only", "harness", "layers=0,1,2,3", "layers=0"),
