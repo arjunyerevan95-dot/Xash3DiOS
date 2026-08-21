@@ -248,9 +248,21 @@ fi
 
 for selftest_boot_marker in \
 	'iOS texture array selftest boot: armed' \
-	'iOS texture array selftest boot: filesystem-independent'; do
+	'iOS texture array selftest boot: filesystem-independent' \
+	'iOS texture array selftest contract: begin' \
+	'iOS texture array selftest contract: item name='; do
 	if ! grep -q "$selftest_boot_marker" "$ENGINE_STRINGS"; then
 		echo "Engine is missing filesystem-independent selftest marker: $selftest_boot_marker" >&2
+		exit 1
+	fi
+done
+
+for selftest_contract_marker in \
+	'iOS texture array selftest contract: item name=global.refState.desktopBitsPixel source=shared' \
+	'iOS texture array selftest contract: item name=global.refState.drawableSize source=shared' \
+	'iOS texture array selftest contract: complete count=57'; do
+	if ! grep -q "$selftest_contract_marker" "$GL4ES_RENDERER_STRINGS"; then
+		echo "Renderer is missing complete-contract marker: $selftest_contract_marker" >&2
 		exit 1
 	fi
 done

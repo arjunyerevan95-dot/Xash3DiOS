@@ -87,6 +87,47 @@ CVAR_DEFINE( con_gamemaps, "con_mapfilter", "1", FCVAR_ARCHIVE, "when true show 
 CVAR_DEFINE_AUTO( cl_background, "0", FCVAR_READ_ONLY, "if set to 1, client running a background map" );
 CVAR_DEFINE_AUTO( sv_background, "0", FCVAR_READ_ONLY, "if set to 1, server running a background map" );
 
+static qboolean Host_RegisterRendererContractCvar( convar_t *var )
+{
+	convar_t *registered = Cvar_FindVar( var->name );
+
+	if( !registered )
+	{
+		Cvar_RegisterVariable( var );
+		registered = Cvar_FindVar( var->name );
+	}
+
+	if( registered == var )
+		return true;
+
+#if XASH_IOS
+	if( host_ios_texture_array_selftest )
+	{
+		Con_Printf( "iOS texture array selftest contract: missing name=%s reason=ownership\n", var->name );
+		return false;
+	}
+#endif
+
+	Host_Error( "renderer contract cvar %s has invalid ownership\n", var->name );
+	return false;
+}
+
+/* Shared by normal startup and the filesystem-independent iOS self-test. */
+static qboolean Host_InitRendererContract( void )
+{
+#if XASH_IOS
+	if( host_ios_texture_array_selftest )
+		Con_Printf( "iOS texture array selftest contract: begin\n" );
+#endif
+
+	if( !Host_RegisterRendererContractCvar( &host_allow_materials ))
+		return false;
+	if( !Host_RegisterRendererContractCvar( &r_showhull ))
+		return false;
+
+	return true;
+}
+
 typedef struct feature_message_s
 {
 	uint32_t mask;
@@ -1196,6 +1237,12 @@ int EXPORT Host_Main( int argc, char **argv, const char *progname, int bChangeGa
 #if XASH_IOS
 	if( host_ios_texture_array_selftest )
 	{
+		if( !Host_InitRendererContract( ))
+		{
+			Con_Printf( "iOS texture array selftest terminal: FAIL failures=1 diffusion_started=0\n" );
+			Sys_Quit( "iOS texture array selftest renderer contract failed" );
+			return EXIT_FAILURE;
+		}
 		CL_Init();
 		Con_Printf( "iOS texture array selftest terminal: FAIL failures=1 diffusion_started=0\n" );
 		Sys_Quit( "iOS texture array selftest dispatch returned" );
@@ -1211,7 +1258,7 @@ int EXPORT Host_Main( int argc, char **argv, const char *progname, int bChangeGa
 		Cmd_AddRestrictedCommand ( "crash", Host_Crash_f, "a way to force a bus error for development reasons");
 	}
 
-	Cvar_RegisterVariable( &host_allow_materials );
+	Host_InitRendererContract();
 	Cvar_RegisterVariable( &host_serverstate );
 	Cvar_RegisterVariable( &host_maxfps );
 	Cvar_RegisterVariable( &fps_override );

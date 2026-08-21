@@ -60,6 +60,8 @@ python3 "$GITHUB_WORKSPACE/scripts/ios/validate-ios-texture-array.py" \
 	--self-test || die
 python3 "$GITHUB_WORKSPACE/scripts/ios/validate-ios-selftest-boot.py" \
 	"$GITHUB_WORKSPACE" --self-test || die
+python3 "$GITHUB_WORKSPACE/scripts/ios/validate-ios-renderer-contract.py" \
+	"$GITHUB_WORKSPACE" --self-test || die
 mkdir -p build || die
 cc -std=gnu11 -DNANOGL_MANGLE_PREPEND=1 -DREF_DLL=1 \
 	-I3rdparty/nanogl -I3rdparty/nanogl/GL \

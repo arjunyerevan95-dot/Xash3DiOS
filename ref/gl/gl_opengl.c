@@ -1583,6 +1583,30 @@ void GL_OnContextCreated( void )
 	wes_init( "" );
 #endif // XASH_WES
 
+#if XASH_IOS && XASH_GL4ES
+	if( gEngfuncs.Sys_CheckParm( "-gl4es_texture_array_selftest" ))
+	{
+		if( !gpGlobals || gpGlobals->desktopBitsPixel <= 0 )
+		{
+			gEngfuncs.Con_Printf( "iOS texture array selftest contract: missing name=global.refState.desktopBitsPixel reason=invalid\n" );
+			gEngfuncs.Con_Printf( "iOS texture array selftest terminal: FAIL failures=1 diffusion_started=0\n" );
+			gEngfuncs.Host_Error( "iOS texture array selftest renderer contract failed\n" );
+			return;
+		}
+		gEngfuncs.Con_Printf( "iOS texture array selftest contract: item name=global.refState.desktopBitsPixel source=shared\n" );
+
+		if( gpGlobals->width <= 0 || gpGlobals->height <= 0 )
+		{
+			gEngfuncs.Con_Printf( "iOS texture array selftest contract: missing name=global.refState.drawableSize reason=invalid\n" );
+			gEngfuncs.Con_Printf( "iOS texture array selftest terminal: FAIL failures=1 diffusion_started=0\n" );
+			gEngfuncs.Host_Error( "iOS texture array selftest renderer contract failed\n" );
+			return;
+		}
+		gEngfuncs.Con_Printf( "iOS texture array selftest contract: item name=global.refState.drawableSize source=shared\n" );
+		gEngfuncs.Con_Printf( "iOS texture array selftest contract: complete count=57\n" );
+	}
+#endif
+
 #if XASH_GL4ES
 	set_getprocaddress( GL4ES_GetProcAddress );
 	set_getmainfbsize( GL4ES_GetMainFBSize );

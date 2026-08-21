@@ -9,6 +9,7 @@ import subprocess
 import sys
 
 BASELINE = "9cf4cf1fea8e1aa8e83b9f110452582302b3877f"
+CANDIDATE = "a96c03c79f49ae71ae50011da3b9360d0e88fbac"
 ALLOWED_PATHS = {
     ".github/workflows/ios-proof-of-life.yml",
     "engine/common/host.c",
@@ -88,9 +89,10 @@ def validate(files: dict[str, str]) -> list[str]:
     elif "FS_LoadGameInfo" in host[filesystem_branch:filesystem_end]:
         failures.append("filesystem-independent branch calls FS_LoadGameInfo")
 
+    host_main = host[host.find("int EXPORT Host_Main") :]
     host_selftest = block(
-        host,
-        "if( host_ios_texture_array_selftest )\n\t{\n\t\tCL_Init();",
+        host_main,
+        "if( host_ios_texture_array_selftest )\n\t{",
         "// init commands and vars",
         "Host_Main selftest route",
         failures,
@@ -107,10 +109,17 @@ def validate(files: dict[str, str]) -> list[str]:
         "R_IOSTextureArraySelftestMode",
         "if( R_IOSTextureArraySelftestMode() && !success )",
         "iOS texture array selftest boot: renderer-failed",
-        TERMINAL_FAIL,
         "iOS texture array selftest renderer initialization failed",
     ):
         require(renderer_loader, token, "bounded renderer failure", failures)
+    renderer_failure = block(
+        renderer_loader,
+        "if( R_IOSTextureArraySelftestMode() && !success )",
+        "if( !success && !COM_StringEmptyOrNULL( r_refdll.string )",
+        "selftest renderer failure",
+        failures,
+    )
+    require(renderer_failure, TERMINAL_FAIL, "bounded renderer failure", failures)
     ordered(renderer_loader, (
         'Sys_GetParmFromCmdLine( "-ref", requested_cmdline )',
         "R_LoadRenderer( requested_cmdline, false )",
@@ -171,9 +180,14 @@ def fixtures(files: dict[str, str]) -> list[str]:
         ("filesystem bypass removed", "host", "iOS texture array selftest boot: filesystem-independent", "selftest filesystem bypass removed"),
         ("config write restored", "host", "&& !host_ios_texture_array_selftest", "&& true"),
         ("game-info leak", "host", 'Con_Printf( "iOS texture array selftest boot: filesystem-independent\\n" );', 'FS_LoadGameInfo(); Con_Printf( "iOS texture array selftest boot: filesystem-independent\\n" );'),
-        ("normal launch hijack", "host", "if( host_ios_texture_array_selftest )\n\t{\n\t\tCL_Init();", "if( true )\n\t{\n\t\tCL_Init();"),
+        ("normal launch hijack", "host", "if( host_ios_texture_array_selftest )\n\t{\n\t\tif( !Host_InitRendererContract( ))", "if( true )\n\t{\n\t\tif( !Host_InitRendererContract( ))"),
         ("renderer fallback", "renderer_loader", "if( R_IOSTextureArraySelftestMode() && !success )", "if( false && R_IOSTextureArraySelftestMode() && !success )"),
-        ("missing failure terminal", "renderer_loader", TERMINAL_FAIL, "selftest renderer failure"),
+        (
+            "missing failure terminal",
+            "renderer_loader",
+            'Con_Printf( "iOS texture array selftest boot: renderer-failed\\n" );\n\t\tCon_Printf( "' + TERMINAL_FAIL + '\\n" );',
+            'Con_Printf( "iOS texture array selftest boot: renderer-failed\\n" );\n\t\tCon_Printf( "selftest renderer failure\\n" );',
+        ),
         ("dispatch removed", "context", "R_IOSTextureArraySelftest();", "/* selftest dispatch removed */"),
         ("run-once removed", "harness", "if( dispatched )", "if( false && dispatched )"),
         ("launcher changed", "launch", LOCKED_ARGS, "-dev 2 -log -ref gl4es -game diffusion"),
@@ -192,7 +206,7 @@ def fixtures(files: dict[str, str]) -> list[str]:
 
 def changed_paths(root: pathlib.Path) -> set[str]:
     tracked = subprocess.run(
-        ["git", "-C", str(root), "diff", "--name-only", BASELINE, "HEAD", "--"],
+        ["git", "-C", str(root), "diff", "--name-only", BASELINE, CANDIDATE, "--"],
         check=True, capture_output=True, text=True,
     ).stdout.splitlines()
     return {path.replace("\\", "/") for path in tracked if path}
