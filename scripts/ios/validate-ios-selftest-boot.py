@@ -11,6 +11,7 @@ import sys
 
 BASELINE = "42be8465ec8752182f65005e8419a0cf634faf69"
 ALLOWED_PATHS = {
+    "Documentation/XASH3DIOS_PORTING_STATE.md",
     "engine/common/host.c",
     "engine/platform/ios/launchdialog.m",
     "scripts/ios/validate-ios-renderer-contract.py",
