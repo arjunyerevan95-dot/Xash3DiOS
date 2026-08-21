@@ -2526,3 +2526,31 @@ Remaining risks: source, mutation, full-build and packaged-marker proof cannot e
 Durable ledger path: `Documentation/XASH3DIOS_PORTING_STATE.md`. Both repository and authoritative Google Docs reports are read back after publication.
 
 Stop state: **Work Order 56 Phase I is complete at Outcome A and the orchestrator-review gate.** Do not contact Arjun, request evidence or device testing, retest Bundle 114, start another workflow/candidate/upload, launch gameplay, enable or advertise Diffusion terrain, alter `ch1map1`, begin a later phase, or perform additional implementation without a new explicit orchestrator-authored work order.
+
+## 2026-08-21 — Work Order 56 Phase I acceptance and Phase J device-evidence order
+
+Orchestrator decision: **Work Order 56 Phase I Outcome A is accepted.** The source-proven `GL_SAMPLER_2D_ARRAY` uniform-classification defect, VBO correction, exact `a915906d` checksum derivation, complete validator/rejection suite, exact-pin replay, successful arm64 build, artifact identity, and durable two-ledger worker report are accepted as build-qualified diagnostics evidence. This acceptance does not device-accept Bundle 116, admit terrain, or qualify gameplay.
+
+Selected next boundary: **WORK ORDER 56 PHASE J — BUNDLE 116 NORMAL-BOOTSTRAP DEVICE ACCEPTANCE.** This is a device-evidence-only continuation of WO-056, not a new implementation phase. The existing worker may request exactly one physical-device evidence package from Arjun, validate it, update both durable ledgers, and report. No new candidate, workflow, artifact, upload, patch, instrumentation, source edit, or game-data change is authorized.
+
+### Exact candidate and objective
+
+- Candidate commit: `bc4b2b7181b3111053f14ff86e8ff634718acf30`.
+- Workflow: `32489923843`, success; artifact `Xash3DiOS-arm64-unsigned`, ID `9449473335`.
+- Exact IPA: `xash3d-fwgs-ios-arm64.ipa`, `8,716,506` bytes, SHA-256 `4FD8D67DDAEBF1986AC795164B7CD20BA782319B9F29200C9EA76F1A4BA73806`.
+- Locked arguments remain `-dev 2 -log -game diffusion -ref gl4es -gl4es_texture_array_selftest`.
+- Objective: determine whether the corrected normal-bootstrap native array sampling/readback contract passes once on Apple GLES3 while retaining the exact prior checksum and bounded pre-gameplay shutdown.
+
+### Authorized procedure and required evidence
+
+Verify the exact IPA identity before installation. Preserve the device's existing authorized external Diffusion data; do not delete, replace, add, or package game data. Install Bundle 116 over the existing test installation, launch the diagnostic route exactly once, do not click Start or enter gameplay, and export the complete new engine log. Record device model, iOS version, whether the app visibly closed after the terminal marker, and the log filename, byte count, and SHA-256. If the process terminates without a complete terminal marker, include the matching iOS `.ips` report if one exists. Do not infer a hard crash merely because the bounded harness intentionally closes the app.
+
+Outcome A requires one complete log proving normal Diffusion game information, all 57 contract items, one renderer dispatch, every retained policy/object/upload/shader/lifecycle PASS stage, `sampling-fbo ... result=PASS`, every immediate sampling call with `error=0x0000 result=PASS`, the exact sampling contract, checksum `a915906d`, terminal `PASS failures=0 diffusion_started=0`, and bounded intentional shutdown. Outcome A device-accepts only the native texture-array conformance harness. Terrain remains disabled and unadvertised; gameplay and `ch1map1` remain outside the result.
+
+Outcome B applies when a complete run reaches the harness but records a nonzero immediate error, framebuffer failure, different checksum, missing retained PASS stage, terminal FAIL, nonzero failure count, nonzero `diffusion_started`, module/map/terrain/gameplay admission, or a matching iOS crash report. Preserve the exact first failing call and all later bounded evidence; do not patch, rebuild, or rerun.
+
+Outcome C is inconclusive: wrong IPA identity, unavailable external Diffusion game information, installation/log-export failure, a truncated log before the decisive boundary without a matching `.ips`, or evidence not attributable to one Bundle 116 launch. Do not reinterpret it as renderer failure and do not rerun without review.
+
+The authoritative Google Docs ledger was updated under revision guard and verified by readback at revision `AIroW37HusfW5RcASaQXlFaFbLG6Gn6MQSQKue4vM5AcoplbZxyRyXtBUv4dHDYxPXkic431rdzCcxaXlSDz3IUyB9P73Jr-36zbyq1Cbi8`.
+
+Stop state: **Work Order 56 Phase J is active and awaiting exactly one Bundle 116 physical-device evidence package.** No source, patch, validator, CI, workflow, artifact, IPA, game-data, renderer, terrain, menu, input, gameplay, or `ch1map1` change is authorized. Do not test Bundle 114 or begin another phase.

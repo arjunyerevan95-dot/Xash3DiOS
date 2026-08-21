@@ -1,6 +1,6 @@
 # WO-056 Evidence Manifest
 
-This manifest references the evidence used to close WO-056 Phase I at Outcome A. Large artifacts are referenced rather than copied into the repository.
+This manifest references the evidence used to close WO-056 Phase I at Outcome A and the evidence required by active Phase J. Large artifacts are referenced rather than copied into the repository.
 
 ## Repository provenance
 
@@ -48,7 +48,18 @@ This manifest references the evidence used to close WO-056 Phase I at Outcome A.
 - Exact successful readback checksum: `a915906d`.
 - Phase H device observation: the normal-bootstrap native-array route reached sampling/readback; `glUniform1i(u_Array, 0)` reported `GL_INVALID_OPERATION`, while the exact checksum proved the expected array layer sample was drawn, read back, and presented.
 - Phase I established the source cause and supplied a build-qualified corrected bundle.
-- No Bundle 116 device test was requested or performed. Bundle 116 is not device-accepted.
+- No Bundle 116 device test had been requested or performed before Phase J authorization. Phase J is now authorized, but no Phase J device evidence has yet been received and Bundle 116 is not device-accepted.
+
+## Phase J pending evidence
+
+- Status: authorized; no Phase J device evidence has yet been received.
+- Exact candidate under test: Bundle 116 IPA and SHA-256 listed above.
+- Required device identity: model and iOS version.
+- Required primary artifact: complete engine log from the sole authorized launch, including filename, byte count, and SHA-256.
+- Required success boundary: all retained PASS stages; each immediate sampling call `error=0x0000 result=PASS`; checksum `a915906d`; terminal `PASS failures=0 diffusion_started=0`; bounded intentional shutdown.
+- Conditional artifact: matching iOS `.ips` only when the process terminates unexpectedly without the complete terminal marker and the report exists.
+- No rebuild, second launch, gameplay run, or terrain admission is authorized.
+- Authoritative Google ledger authorization/readback revision: `AIroW37HusfW5RcASaQXlFaFbLG6Gn6MQSQKue4vM5AcoplbZxyRyXtBUv4dHDYxPXkic431rdzCcxaXlSDz3IUyB9P73Jr-36zbyq1Cbi8`.
 
 ## PortingOS references
 
@@ -64,3 +75,4 @@ This manifest references the evidence used to close WO-056 Phase I at Outcome A.
 - [`DEC-001`](../../Decisions/DEC-001.md)
 - [`DEC-002`](../../Decisions/DEC-002.md)
 - [`DEC-003`](../../Decisions/DEC-003.md)
+- [`DEC-004`](../../Decisions/DEC-004.md)
