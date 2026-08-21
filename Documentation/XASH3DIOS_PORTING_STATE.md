@@ -2683,3 +2683,33 @@ Remaining risks: Phase K proves source structure, rejection behavior, exact-pin 
 Durable ledger path: `Documentation/XASH3DIOS_PORTING_STATE.md`. The repository ledger commit is a documentation-only `[skip ci]` commit whose immutable hash is copied into the authoritative Google Docs report and final handoff. Both ledgers are read back after publication.
 
 Stop state: **Work Order 56 Phase K Outcome A is complete at the orchestrator-review gate.** Do not contact Arjun, request evidence or device/gameplay testing, launch or retest Bundle 124, start another workflow/candidate/upload, change terrain/gameplay/`ch1map1`, or begin a later phase without a new explicit orchestrator-authored work order.
+
+## 2026-08-22 — Work Order 56 Phase K acceptance and Phase L admission-device order
+
+Orchestrator decision: **Work Order 56 Phase K Outcome A is accepted as build-qualified evidence.** Candidate `976c38f3d99d7ef6eaf348188fabf4fe4e722be9`, workflow `32510363562`, artifact `9456949434`, and Bundle 124 establish one coherent conditional GL4ES/engine/Diffusion production texture-array admission route. The Phase K source, mutation, exact-pin replay, full arm64 build, packaged-owner, architecture, and proprietary-data gates are accepted. Bundle 124 is not yet device-accepted and the result does not establish landscape loading, terrain shader execution, rendering, transitions, gameplay, or `ch1map1`.
+
+Selected next boundary: **WORK ORDER 56 PHASE L — BUNDLE 124 NORMAL-BOOTSTRAP PRODUCTION TEXTURE-ARRAY ADMISSION DEVICE ACCEPTANCE.** This remains a continuation of WO-056. It reuses the exact build-qualified IPA for one ordinary, menu-only launch on the established iPhone 16 Pro Max / iOS 26.6. It does not authorize a build, patch, CI run, new artifact, gameplay, terrain, map, transition, or `ch1map1` test.
+
+### Exact candidate and locked procedure
+
+- Candidate: `976c38f3d99d7ef6eaf348188fabf4fe4e722be9`; workflow `32510363562`; retained artifact `Xash3DiOS-arm64-unsigned`, ID `9456949434`.
+- IPA: `xash3d-fwgs-ios-arm64.ipa`, Bundle 124, `8,717,677` bytes, SHA-256 `FB62C2903E21152DCB74C709656F8FEF841ACE2A22C281F27B90AC02F0E1D04F`.
+- Locked arguments: `-dev 2 -log -game diffusion -ref gl4es`; the self-test flag and any force-enable flag must be absent.
+- Verify the exact IPA identity, preserve external Diffusion data, install over the existing app without deleting data, launch exactly once, reach a stable Diffusion menu, wait about 10 seconds, capture one screenshot, export the complete engine log, and stop.
+- Do not click Start, New Game, difficulty, or any route that admits a map or gameplay. Do not exercise terrain or `ch1map1`. Do not rerun without orchestrator review.
+
+### Required evidence and outcome gates
+
+The log must show three agreeing enabled markers: `iOS production texture array provider:` with native ES3+, required procedures, at least 16 layers, ESSL 300, `advertised=1`, and `reason=complete`; `iOS production texture array engine:` with four procedures, at least 16 layers, `minimum=16`, and `enabled=1`; and `iOS production texture array admission:` with extension/callback agreement, at least 16 layers, `minimum=16`, `terrain_shaders=full`, and `enabled=1`. It must not contain `GL_EXT_texture_array - failed`, `Landscapes will be unavailable`, a relevant GL/shader failure, or unexpected termination. The menu must remain stable for the bounded observation.
+
+- **Outcome A:** exact identity, complete one-run evidence, all three markers enabled and agreeing, stable menu, no prohibited warnings/failures/crash. Qualifies production admission during ordinary bootstrap only; terrain and gameplay remain unqualified.
+- **Outcome B:** exact candidate reaches renderer initialization but a marker is false/mismatched/missing, a prohibited warning appears, a relevant GL/shader failure occurs, or the app crashes. Preserve the first divergence; do not patch, rebuild, or rerun.
+- **Outcome C:** wrong/unverifiable IPA, arguments, data, installation, screenshot, or log; truncated evidence; or evidence not attributable to exactly one launch. Stop inconclusive; do not rerun.
+
+Required package: verified IPA filename/bytes/hash; device/OS; one stable-menu screenshot; complete single-run log with filename/bytes/SHA-256 and the three markers; first divergence for Outcome B; matching `.ips` only for unexpected termination; explicit outcome and stop state.
+
+ControlPlane authority and complete stopping conditions are in `WorkOrders/WO-056.md`, `Decisions/DEC-007.md`, and `Evidence/WO-056/manifest.md`. The preserved worker may request exactly this evidence package, validate it, update and read-back verify both ledgers and ControlPlane, push documentation-only reporting, message the delegating orchestrator with the result, and stop at orchestrator review.
+
+Stop state: **Work Order 56 Phase L is active.** The first incomplete action is the preserved worker's exact evidence request and validation of the sole authorized normal-bootstrap device run. No engineering implementation work is authorized.
+
+The authoritative Google Docs ledger was appended under revision guard and its Phase L stop-state paragraph was verified by readback at revision `AIroW36cJUxGI7JGaMrb1e_-ZnY-2hz35dp3f9oR5_8XOk5WxxvOGFH_ylpE2YQB81wyRM8whgNLXFbiu6v0RmievJgG1VBId2Arbg8P0Cg`.
