@@ -1,6 +1,6 @@
 # WO-056 Evidence Manifest
 
-This manifest references the evidence used to close WO-056 Phase I at Outcome A and the evidence required by active Phase J. Large artifacts are referenced rather than copied into the repository.
+This manifest references the evidence used to close WO-056 Phases I and J at Outcome A. Large artifacts are referenced rather than copied into the repository.
 
 ## Repository provenance
 
@@ -48,23 +48,29 @@ This manifest references the evidence used to close WO-056 Phase I at Outcome A 
 - Exact successful readback checksum: `a915906d`.
 - Phase H device observation: the normal-bootstrap native-array route reached sampling/readback; `glUniform1i(u_Array, 0)` reported `GL_INVALID_OPERATION`, while the exact checksum proved the expected array layer sample was drawn, read back, and presented.
 - Phase I established the source cause and supplied a build-qualified corrected bundle.
-- No Bundle 116 device test had been requested or performed before Phase J authorization. Phase J is now authorized, but no Phase J device evidence has yet been received and Bundle 116 is not device-accepted.
+- Phase J supplied one complete Bundle 116 device run and closed at Outcome A.
 
-## Phase J pending evidence
+## Phase J device evidence
 
-- Status: authorized; no Phase J device evidence has yet been received.
-- Exact candidate under test: Bundle 116 IPA and SHA-256 listed above.
-- Required device identity: model and iOS version.
-- Required primary artifact: complete engine log from the sole authorized launch, including filename, byte count, and SHA-256.
-- Required success boundary: all retained PASS stages; each immediate sampling call `error=0x0000 result=PASS`; checksum `a915906d`; terminal `PASS failures=0 diffusion_started=0`; bounded intentional shutdown.
-- Conditional artifact: matching iOS `.ips` only when the process terminates unexpectedly without the complete terminal marker and the report exists.
-- No rebuild, second launch, gameplay run, or terrain admission is authorized.
-- Authoritative Google ledger authorization/readback revision: `AIroW37HusfW5RcASaQXlFaFbLG6Gn6MQSQKue4vM5AcoplbZxyRyXtBUv4dHDYxPXkic431rdzCcxaXlSDz3IUyB9P73Jr-36zbyq1Cbi8`.
+- Status: Phase J Outcome A; Bundle 116 device-accepted for the bounded native texture-array conformance harness.
+- Device: iPhone 16 Pro Max, iOS 26.6; Apple A18 Pro GPU; drawable `2868x1320`.
+- Log: `1-engine.log`, `23,255` bytes, `254` lines, SHA-256 `139B15982FEC0B4D34146B3F99A39D4758B36D77925394403B214BE9F5544FF5`.
+- Log candidate identity: `bc4b2b71-dirty`, branch `agent/ios-proof-of-life`, `apple-arm64`; exact locked diagnostic arguments.
+- Normal Diffusion game information and all 57 contract items completed; one renderer dispatch; no `CL_LoadProgs`, module, map, terrain, cutscene, or gameplay admission.
+- Mutable/immutable/compressed upload, object identity, shader translation/reflection, and lifecycle stages: PASS.
+- Direct-drawable framebuffer: complete; sampling/cleanup calls `seq=1..51`: all `error=0x0000 result=PASS`.
+- Sample: four quadrants, layers `0,1,2,3`, checksum `a915906d`, PASS.
+- Terminal: `PASS failures=0 diffusion_started=0`; explicit intentional shutdown reason and clean context-destroy lifecycle.
+- User observation: app closed about one second after the interaction described as clicking Start. The complete log proves this was the self-test's bounded intentional exit, not a hard crash; no `.ips` was required.
+- `GL_EXT_texture_array - failed` after the terminal is expected because production capability advertisement remains disabled.
+- No rebuild, second launch, gameplay run, terrain admission, or `ch1map1` change was performed or authorized.
+- Authoritative Google ledger Outcome A/readback revision: `AIroW35eAHEQsIjng7koSVYL26SxH_LPplNTY2_pP2hkjH5sDD-v7Sa_DztjVI28T3Rh0oHuQNk1fdRkpHFvUX0cTfPZNGDFprZXSl-CK-o`.
 
 ## PortingOS references
 
 - Phase H / Bundle 114: predecessor normal-bootstrap device experiment.
 - Phase I / Bundle 116: completed build-qualified diagnostic/correction experiment.
+- Phase J / Bundle 116: completed physical-device conformance experiment at Outcome A.
 - Contract identifier: `scripts/ios/wo56i-sampling-readback-contract.json`.
 - No separate PortingOS snapshot ID was recorded for Phase I.
 
@@ -76,3 +82,4 @@ This manifest references the evidence used to close WO-056 Phase I at Outcome A 
 - [`DEC-002`](../../Decisions/DEC-002.md)
 - [`DEC-003`](../../Decisions/DEC-003.md)
 - [`DEC-004`](../../Decisions/DEC-004.md)
+- [`DEC-005`](../../Decisions/DEC-005.md)

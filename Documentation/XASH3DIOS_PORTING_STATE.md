@@ -2554,3 +2554,35 @@ Outcome C is inconclusive: wrong IPA identity, unavailable external Diffusion ga
 The authoritative Google Docs ledger was updated under revision guard and verified by readback at revision `AIroW37HusfW5RcASaQXlFaFbLG6Gn6MQSQKue4vM5AcoplbZxyRyXtBUv4dHDYxPXkic431rdzCcxaXlSDz3IUyB9P73Jr-36zbyq1Cbi8`.
 
 Stop state: **Work Order 56 Phase J is active and awaiting exactly one Bundle 116 physical-device evidence package.** No source, patch, validator, CI, workflow, artifact, IPA, game-data, renderer, terrain, menu, input, gameplay, or `ch1map1` change is authorized. Do not test Bundle 114 or begin another phase.
+
+## 2026-08-21 — Work Order 56 Phase J Outcome A device report (Bundle 116)
+
+Selected outcome: **WORK ORDER 56 PHASE J — BUNDLE 116 NORMAL-BOOTSTRAP DEVICE ACCEPTANCE, Outcome A.** The sole authorized Bundle 116 run passes the complete bounded native texture-array conformance contract on an iPhone 16 Pro Max running iOS 26.6. Bundle 116 is device-accepted for this harness only. Production Diffusion terrain remains disabled and `GL_EXT_texture_array` remains unadvertised; gameplay and the quarantined `ch1map1` transition remain outside the result.
+
+### Evidence identity and observed close
+
+- Exact candidate: implementation `bc4b2b7181b3111053f14ff86e8ff634718acf30`; the log identifies `bc4b2b71-dirty`, `agent/ios-proof-of-life`, `apple-arm64`, and the locked arguments `-dev 2 -log -game diffusion -ref gl4es -gl4es_texture_array_selftest`.
+- Device: iPhone 16 Pro Max, iOS 26.6; log-reported `Apple A18 Pro GPU`; drawable `2868x1320`.
+- Complete evidence log: `1-engine.log`, `23,255` bytes, `254` lines, SHA-256 `139B15982FEC0B4D34146B3F99A39D4758B36D77925394403B214BE9F5544FF5`.
+- The engine started at `20:55:04` and stopped at `20:55:05`. The user described the app as hard-crashing about one second after clicking Start. The complete log disproves a crash: the bounded diagnostic had already armed, completed, emitted its successful terminal, deliberately invoked host shutdown with reason `iOS texture array selftest complete`, ran `CL_Shutdown()`, cleared the direct-drawable context lifecycle, unlinked engine state, and emitted `Stopped with reason "iOS texture array selftest complete"`. No `.ips` is required.
+
+### Qualified runtime contract
+
+- Real Diffusion game information loaded. All 57 shared renderer-contract items completed, followed by `renderer-ready` and one `dispatched` marker.
+- Mutable, immutable and compressed array uploads reported PASS. Array object identity, four distinct units/layers, alias rejection and delete/recreate reported PASS. GLSL-130 to ESSL-300 translation and `sampler2DArray` reflection reported PASS.
+- The direct-drawable framebuffer was registered and complete at native draw/read framebuffer `1/1`, status `0x8cd5`, size `2868x1320`, samples `0`.
+- Every immediate sampling and cleanup attribution from `seq=1` through `seq=51` reported `error=0x0000 result=PASS`. This includes the corrected `glUniform1i(u_Array)` at sequence 12 and the VBO-backed `glVertexAttribPointer(0,VBO)` at sequence 20.
+- Four quadrant readbacks from layers `0,1,2,3` produced exact checksum `a915906d` and PASS. Lifecycle delete/recreate and context ownership reported PASS.
+- Exact terminal: `iOS texture array selftest terminal: PASS failures=0 diffusion_started=0`.
+- No `CL_LoadProgs`, client/server/menu module, map, terrain, cutscene, or gameplay admission occurred. The log's early `FS_LoadProgs: filesystem_stdio successfully loaded` is the filesystem plugin and is not client-game admission.
+- The later `GL_EXT_texture_array - failed` capability check is expected and preserved: production Diffusion advertisement remains deliberately disabled. It does not contradict the native array harness PASS.
+
+### Conclusion, qualification boundary, and stop state
+
+Bundle 116 now qualifies native iOS/Apple-GLES3 texture-array object identity, mutable/immutable/compressed upload, ESSL-300 translation/reflection, sampler update, VBO-backed submission, four-layer sampling, direct-drawable readback, exact pixels, cleanup/restoration, lifecycle, and bounded normal-bootstrap shutdown. The Phase H `GL_INVALID_OPERATION` boundary is closed on device.
+
+This result does not qualify or authorize production `GL_EXT_texture_array` advertisement, the real Diffusion terrain shader/material path, ordinary gameplay, or `ch1map1`. The first unqualified boundary is production terrain admission using the now-qualified native array capability.
+
+The authoritative Google Docs ledger was updated under revision guard and verified by readback at revision `AIroW35eAHEQsIjng7koSVYL26SxH_LPplNTY2_pP2hkjH5sDD-v7Sa_DztjVI28T3Rh0oHuQNk1fdRkpHFvUX0cTfPZNGDFprZXSl-CK-o`.
+
+Stop state: **Work Order 56 Phase J is complete at Outcome A and the orchestrator-review gate.** The one-run authorization is consumed. Do not rerun, rebuild, patch, enable or advertise terrain, launch a gameplay experiment, modify `ch1map1`, or begin another phase without a new explicit orchestrator order.
