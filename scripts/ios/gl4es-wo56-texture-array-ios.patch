@@ -31,6 +31,33 @@ index 903f55d3..ea289e2b 100644
                  case GL_SAMPLER_CUBE:
                  case GL_INT:
                  case GL_INT_VEC2:
+diff --git a/src/gl/uniform.c b/src/gl/uniform.c
+--- a/src/gl/uniform.c
++++ b/src/gl/uniform.c
+@@ -32,6 +32,7 @@ int uniformsize(GLenum type) {
+         GOV(GL_BOOL, /*GLboolean*/GLint); //GLboolean is an unsigned char and is not suitable here
+         GOM(GL_FLOAT, GLfloat);
+         GO(GL_SAMPLER_2D, GLint, 1);
++        GO(GL_SAMPLER_2D_ARRAY, GLint, 1);
+         GO(GL_SAMPLER_CUBE , GLint, 1);
+     // Need other types?
+     }
+@@ -65,6 +66,7 @@ int is_uniform_int(GLenum type) {
+         case GL_BOOL_VEC3:
+         case GL_BOOL_VEC4:
+         case GL_SAMPLER_2D:
++        case GL_SAMPLER_2D_ARRAY:
+         case GL_SAMPLER_CUBE:
+             return 1;
+     }
+@@ -87,6 +89,7 @@ int n_uniform(GLenum type) {
+         case GL_INT:
+         case GL_BOOL:
+         case GL_SAMPLER_2D:
++        case GL_SAMPLER_2D_ARRAY:
+         case GL_SAMPLER_CUBE:
+             return 1;
+         case GL_FLOAT_VEC2:
 diff --git a/src/gl/getter.c b/src/gl/getter.c
 index 3a9acc55..f216d3d1 100644
 --- a/src/gl/getter.c

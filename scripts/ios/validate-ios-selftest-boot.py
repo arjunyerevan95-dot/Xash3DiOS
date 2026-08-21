@@ -14,9 +14,13 @@ ALLOWED_PATHS = {
     "Documentation/XASH3DIOS_PORTING_STATE.md",
     "engine/common/host.c",
     "engine/platform/ios/launchdialog.m",
+    "ref/gl/gl_texture_array_selftest.c",
+    "scripts/ios/gl4es-wo56-texture-array-ios.patch",
     "scripts/ios/validate-ios-renderer-contract.py",
     "scripts/ios/validate-ios-selftest-boot.py",
+    "scripts/ios/validate-ios-texture-array.py",
     "scripts/ios/verify_ipa.sh",
+    "scripts/ios/wo56i-sampling-readback-contract.json",
 }
 LOCKED_ARGS = "-dev 2 -log -game diffusion -ref gl4es -gl4es_texture_array_selftest"
 TERMINAL_FAIL = "iOS texture array selftest terminal: FAIL failures=1 diffusion_started=0"

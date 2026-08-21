@@ -246,6 +246,9 @@ for texture_array_marker in \
 	'iOS texture array selftest object:' \
 	'iOS texture array selftest upload:' \
 	'iOS texture array selftest shader:' \
+	'iOS texture array selftest sampling-call:' \
+	'iOS texture array selftest sampling-fbo:' \
+	'iOS texture array selftest sampling-contract:' \
 	'iOS texture array selftest sample:' \
 	'iOS texture array selftest lifecycle:' \
 	'iOS texture array selftest terminal:'; do

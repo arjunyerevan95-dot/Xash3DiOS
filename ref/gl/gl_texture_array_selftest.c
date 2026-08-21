@@ -1,10 +1,16 @@
 #include "gl_local.h"
 
 #if XASH_IOS && XASH_GL4ES
+#include "gl4es/include/gl4esinit.h"
+
 #define GL_TEXTURE_2D_ARRAY 0x8C1A
 #define GL_TEXTURE_BINDING_2D_ARRAY 0x8C1D
 #define GL_MAX_ARRAY_TEXTURE_LAYERS 0x88FF
 #define GL_SAMPLER_2D_ARRAY 0x8DC1
+#define IOS_ARRAY_VIEWPORT 0x0BA2
+#define IOS_ARRAY_COLOR_CLEAR_VALUE 0x0C22
+#define IOS_ARRAY_FRAMEBUFFER_COMPLETE 0x8CD5u
+#define IOS_ARRAY_EXPECTED_CHECKSUM 0xA915906Du
 #ifndef GL_TEXTURE0
 #define GL_TEXTURE0 0x84C0
 #define GL_TEXTURE1 0x84C1
@@ -35,6 +41,21 @@ extern void gl4es_glDisableVertexAttribArray( GLuint index );
 extern void gl4es_glVertexAttribPointer( GLuint index, GLint size, GLenum type,
 	GLboolean normalized, GLsizei stride, const GLvoid *pointer );
 extern void gl4es_glDeleteProgram( GLuint program );
+
+static int R_IOSArrayCallResult( unsigned *sequence, const char *call,
+	const char *owner, GLuint object, GLuint framebuffer )
+{
+	GLenum error = pglGetError();
+	const unsigned current = ++( *sequence );
+	gEngfuncs.Con_Printf( "iOS texture array selftest sampling-call: seq=%u call=%s owner=%s object=%u framebuffer=%u error=0x%04x result=%s\n",
+		current, call, owner, object, framebuffer, error,
+		error == GL_NO_ERROR ? "PASS" : "FAIL" );
+	while( pglGetError() != GL_NO_ERROR ) { }
+	return error == GL_NO_ERROR;
+}
+
+#define IOS_ARRAY_GL_CALL( call, owner, object, framebuffer, expression ) \
+	do { expression; if( !R_IOSArrayCallResult( &samplingSequence, call, owner, object, framebuffer )) failures++; } while( 0 )
 
 static int R_IOSArrayDrainError( const char *step )
 {
@@ -91,6 +112,7 @@ void R_IOSTextureArraySelftest( void )
 	byte dxt[16] = { 0x00,0xf8,0x00,0x00,0,0,0,0, 0x00,0xf8,0x00,0x00,0,0,0,0 };
 	byte dxtSub[8] = { 0xe0,0x07,0x00,0x00,0,0,0,0 };
 	GLuint textures[4] = { 0 };
+	GLuint vertexBuffer = 0;
 	GLuint vertexShader = 0, fragmentShader = 0, program = 0;
 	GLint maxLayers = 0, binding2D = 0, bindingArray = 0;
 	GLint layerLocation, samplerLocation;
@@ -98,6 +120,7 @@ void R_IOSTextureArraySelftest( void )
 	GLint width = gpGlobals->width, height = gpGlobals->height;
 	int failures = 0, samplerFound = 0;
 	unsigned checksum = 2166136261u;
+	unsigned samplingSequence = 0;
 
 	if( !gEngfuncs.Sys_CheckParm( "-gl4es_texture_array_selftest" ))
 		return;
@@ -193,39 +216,131 @@ void R_IOSTextureArraySelftest( void )
 
 	if( !failures )
 	{
+		gl4es_external_default_state_t framebufferProof;
+		GLint savedViewport[4] = { 0 };
+		GLint savedScissor[4] = { 0 };
+		GLfloat savedClearColor[4] = { 0 };
+		GLint savedPackAlignment = 4;
+		GLint savedArrayBuffer = 0;
+		GLboolean savedScissorEnabled;
 		const GLint viewports[4][4] = {
 			{ 0, 0, width/2, height/2 }, { width/2, 0, width-width/2, height/2 },
 			{ 0, height/2, width/2, height-height/2 }, { width/2, height/2, width-width/2, height-height/2 }
 		};
-		gl4es_glUseProgram( program );
+		const GLuint framebuffer = gl4es_external_default_framebuffer_state( width,
+			height, 0, &framebufferProof ) ? framebufferProof.registered_framebuffer : 0;
+
+		if( !R_IOSArrayCallResult( &samplingSequence, "stage-entry", "selftest-boundary", program, framebuffer ))
+			failures++;
+		if( !framebuffer || framebufferProof.logical_current ||
+			framebufferProof.logical_read || framebufferProof.logical_draw ||
+			framebufferProof.native_draw != framebuffer ||
+			framebufferProof.native_read != framebuffer ||
+			framebufferProof.framebuffer_status != IOS_ARRAY_FRAMEBUFFER_COMPLETE )
+			failures++;
+		gEngfuncs.Con_Printf( "iOS texture array selftest sampling-fbo: owner=sdl-view logical=0/0/0 native=%u/%u registered=%u status=0x%04x size=%dx%d samples=0 result=%s\n",
+			framebufferProof.native_draw, framebufferProof.native_read,
+			framebufferProof.registered_framebuffer, framebufferProof.framebuffer_status,
+			width, height, failures ? "FAIL" : "PASS" );
+		if( !R_IOSArrayCallResult( &samplingSequence, "gl4es_external_default_framebuffer_state",
+			"direct-drawable", framebufferProof.registered_framebuffer, framebuffer ))
+			failures++;
+
+		IOS_ARRAY_GL_CALL( "glGetIntegerv(GL_VIEWPORT)", "GL4ES", 0, framebuffer,
+			pglGetIntegerv( IOS_ARRAY_VIEWPORT, savedViewport ));
+		IOS_ARRAY_GL_CALL( "glGetIntegerv(GL_SCISSOR_BOX)", "GL4ES", 0, framebuffer,
+			pglGetIntegerv( GL_SCISSOR_BOX, savedScissor ));
+		savedScissorEnabled = pglIsEnabled( GL_SCISSOR_TEST );
+		if( !R_IOSArrayCallResult( &samplingSequence, "glIsEnabled(GL_SCISSOR_TEST)",
+			"GL4ES", 0, framebuffer )) failures++;
+		IOS_ARRAY_GL_CALL( "glGetIntegerv(GL_PACK_ALIGNMENT)", "GL4ES", 0, framebuffer,
+			pglGetIntegerv( GL_PACK_ALIGNMENT, &savedPackAlignment ));
+		IOS_ARRAY_GL_CALL( "glGetFloatv(GL_COLOR_CLEAR_VALUE)", "GL4ES", 0, framebuffer,
+			pglGetFloatv( IOS_ARRAY_COLOR_CLEAR_VALUE, savedClearColor ));
+		IOS_ARRAY_GL_CALL( "glGetIntegerv(GL_ARRAY_BUFFER_BINDING)", "GL4ES", 0, framebuffer,
+			pglGetIntegerv( GL_ARRAY_BUFFER_BINDING_ARB, &savedArrayBuffer ));
+
+		IOS_ARRAY_GL_CALL( "glUseProgram", "GL4ES-program-cache", program, framebuffer,
+			gl4es_glUseProgram( program ));
 		samplerLocation = gl4es_glGetUniformLocation( program, "u_Array" );
+		if( !R_IOSArrayCallResult( &samplingSequence, "glGetUniformLocation(u_Array)",
+			"GL4ES-program-cache", program, framebuffer )) failures++;
 		layerLocation = gl4es_glGetUniformLocation( program, "u_Layer" );
-		gl4es_glUniform1i( samplerLocation, 0 );
-		pglActiveTexture( GL_TEXTURE0 );
-		pglEnable( GL_TEXTURE_2D_ARRAY );
-		pglBindTexture( GL_TEXTURE_2D_ARRAY, textures[0] );
-		gl4es_glEnableVertexAttribArray( 0 );
-		gl4es_glVertexAttribPointer( 0, 2, GL_FLOAT, GL_FALSE, 0, quad );
-		pglClearColor( 0.1f, 0.1f, 0.1f, 1.0f );
-		pglClear( GL_COLOR_BUFFER_BIT );
+		if( !R_IOSArrayCallResult( &samplingSequence, "glGetUniformLocation(u_Layer)",
+			"GL4ES-program-cache", program, framebuffer )) failures++;
+		if( samplerLocation < 0 || layerLocation < 0 ) failures++;
+		IOS_ARRAY_GL_CALL( "glUniform1i(u_Array)", "GL4ES-uniform-type-cache", program, framebuffer,
+			gl4es_glUniform1i( samplerLocation, 0 ));
+		IOS_ARRAY_GL_CALL( "glActiveTexture(GL_TEXTURE0)", "GL4ES-texture-state", textures[0], framebuffer,
+			pglActiveTexture( GL_TEXTURE0 ));
+		IOS_ARRAY_GL_CALL( "glEnable(GL_TEXTURE_2D_ARRAY)", "GL4ES-texture-state", textures[0], framebuffer,
+			pglEnable( GL_TEXTURE_2D_ARRAY ));
+		IOS_ARRAY_GL_CALL( "glBindTexture(GL_TEXTURE_2D_ARRAY)", "GL4ES-native-array-binding", textures[0], framebuffer,
+			pglBindTexture( GL_TEXTURE_2D_ARRAY, textures[0] ));
+		IOS_ARRAY_GL_CALL( "glGenBuffers", "GL4ES-buffer-owner", 0, framebuffer,
+			pglGenBuffersARB( 1, &vertexBuffer ));
+		IOS_ARRAY_GL_CALL( "glBindBuffer(GL_ARRAY_BUFFER)", "GL4ES-buffer-owner", vertexBuffer, framebuffer,
+			pglBindBufferARB( GL_ARRAY_BUFFER_ARB, vertexBuffer ));
+		IOS_ARRAY_GL_CALL( "glBufferData(GL_ARRAY_BUFFER)", "GL4ES-native-vbo", vertexBuffer, framebuffer,
+			pglBufferDataARB( GL_ARRAY_BUFFER_ARB, sizeof( quad ), quad, GL_STATIC_DRAW_ARB ));
+		IOS_ARRAY_GL_CALL( "glEnableVertexAttribArray(0)", "GL4ES-vertex-state", vertexBuffer, framebuffer,
+			gl4es_glEnableVertexAttribArray( 0 ));
+		IOS_ARRAY_GL_CALL( "glVertexAttribPointer(0,VBO)", "GL4ES-native-vbo", vertexBuffer, framebuffer,
+			gl4es_glVertexAttribPointer( 0, 2, GL_FLOAT, GL_FALSE, 0, (const GLvoid *)0 ));
+		IOS_ARRAY_GL_CALL( "glDisable(GL_SCISSOR_TEST)", "GL4ES-raster-state", 0, framebuffer,
+			pglDisable( GL_SCISSOR_TEST ));
+		IOS_ARRAY_GL_CALL( "glPixelStorei(GL_PACK_ALIGNMENT,1)", "GL4ES-pack-state", 0, framebuffer,
+			pglPixelStorei( GL_PACK_ALIGNMENT, 1 ));
+		IOS_ARRAY_GL_CALL( "glClearColor", "GL4ES-raster-state", 0, framebuffer,
+			pglClearColor( 0.1f, 0.1f, 0.1f, 1.0f ));
+		IOS_ARRAY_GL_CALL( "glClear(GL_COLOR_BUFFER_BIT)", "GL4ES-direct-drawable", 0, framebuffer,
+			pglClear( GL_COLOR_BUFFER_BIT ));
 		for( int layer = 0; layer < 4; ++layer )
 		{
-			pglViewport( viewports[layer][0], viewports[layer][1], viewports[layer][2], viewports[layer][3] );
-			gl4es_glUniform1f( layerLocation, (GLfloat)layer );
-			pglDrawArrays( GL_TRIANGLE_STRIP, 0, 4 );
+			IOS_ARRAY_GL_CALL( "glViewport(quadrant)", "GL4ES-raster-state", layer, framebuffer,
+				pglViewport( viewports[layer][0], viewports[layer][1], viewports[layer][2], viewports[layer][3] ));
+			IOS_ARRAY_GL_CALL( "glUniform1f(u_Layer)", "GL4ES-uniform-type-cache", layer, framebuffer,
+				gl4es_glUniform1f( layerLocation, (GLfloat)layer ));
+			IOS_ARRAY_GL_CALL( "glDrawArrays(GL_TRIANGLE_STRIP)", "GL4ES-native-es3", layer, framebuffer,
+				pglDrawArrays( GL_TRIANGLE_STRIP, 0, 4 ));
 		}
-		pglFinish();
+		IOS_ARRAY_GL_CALL( "glFinish", "GL4ES-native-es3", 0, framebuffer, pglFinish() );
 		for( int layer = 0; layer < 4; ++layer )
 		{
 			GLint x = viewports[layer][0] + viewports[layer][2]/2;
 			GLint y = viewports[layer][1] + viewports[layer][3]/2;
-			pglReadPixels( x, y, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixel );
+			IOS_ARRAY_GL_CALL( "glReadPixels(GL_RGBA,GL_UNSIGNED_BYTE)", "GL4ES-direct-readback", layer, framebuffer,
+				pglReadPixels( x, y, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixel ));
 			for( int c = 0; c < 4; ++c ) checksum = ( checksum ^ pixel[c] ) * 16777619u;
 			if( !R_IOSArrayNear( pixel, expected[layer] )) failures++;
 		}
-		gl4es_glDisableVertexAttribArray( 0 );
-		if( !R_IOSArrayDrainError( "sampling-readback" )) failures++;
+		if( checksum != IOS_ARRAY_EXPECTED_CHECKSUM ) failures++;
+		IOS_ARRAY_GL_CALL( "glDisableVertexAttribArray(0)", "GL4ES-vertex-state", vertexBuffer, framebuffer,
+			gl4es_glDisableVertexAttribArray( 0 ));
+		IOS_ARRAY_GL_CALL( "glBindBuffer(GL_ARRAY_BUFFER,restore)", "GL4ES-buffer-owner", savedArrayBuffer, framebuffer,
+			pglBindBufferARB( GL_ARRAY_BUFFER_ARB, savedArrayBuffer ));
+		IOS_ARRAY_GL_CALL( "glDeleteBuffers", "GL4ES-buffer-owner", vertexBuffer, framebuffer,
+			pglDeleteBuffersARB( 1, &vertexBuffer ));
+		IOS_ARRAY_GL_CALL( "glDisable(GL_TEXTURE_2D_ARRAY,restore)", "GL4ES-texture-state", textures[0], framebuffer,
+			pglDisable( GL_TEXTURE_2D_ARRAY ));
+		IOS_ARRAY_GL_CALL( "glBindTexture(GL_TEXTURE_2D_ARRAY,restore)", "GL4ES-native-array-binding", 0, framebuffer,
+			pglBindTexture( GL_TEXTURE_2D_ARRAY, 0 ));
+		IOS_ARRAY_GL_CALL( "glUseProgram(restore)", "GL4ES-program-cache", 0, framebuffer,
+			gl4es_glUseProgram( 0 ));
+		if( savedScissorEnabled )
+			IOS_ARRAY_GL_CALL( "glEnable(GL_SCISSOR_TEST,restore)", "GL4ES-raster-state", 0, framebuffer,
+				pglEnable( GL_SCISSOR_TEST ));
+		IOS_ARRAY_GL_CALL( "glScissor(restore)", "GL4ES-raster-state", 0, framebuffer,
+			pglScissor( savedScissor[0], savedScissor[1], savedScissor[2], savedScissor[3] ));
+		IOS_ARRAY_GL_CALL( "glPixelStorei(GL_PACK_ALIGNMENT,restore)", "GL4ES-pack-state", 0, framebuffer,
+			pglPixelStorei( GL_PACK_ALIGNMENT, savedPackAlignment ));
+		IOS_ARRAY_GL_CALL( "glClearColor(restore)", "GL4ES-raster-state", 0, framebuffer,
+			pglClearColor( savedClearColor[0], savedClearColor[1], savedClearColor[2], savedClearColor[3] ));
+		IOS_ARRAY_GL_CALL( "glViewport(restore)", "GL4ES-raster-state", 0, framebuffer,
+			pglViewport( savedViewport[0], savedViewport[1], savedViewport[2], savedViewport[3] ));
 	}
+	gEngfuncs.Con_Printf( "iOS texture array selftest sampling-contract: schema=1 expected_checksum=%08x error_origin=gl4es-uniform-type-cache vertex_source=vbo framebuffer=external-default attribution=immediate\n",
+		IOS_ARRAY_EXPECTED_CHECKSUM );
 	gEngfuncs.Con_Printf( "iOS texture array selftest sample: quadrants=4 layers=0,1,2,3 checksum=%08x result=%s\n", checksum, failures ? "FAIL" : "PASS" );
 
 	gl4es_glUseProgram( 0 );
@@ -244,3 +359,5 @@ void R_IOSTextureArraySelftest( void )
 #else
 void R_IOSTextureArraySelftest( void ) { }
 #endif
+
+#undef IOS_ARRAY_GL_CALL

@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import argparse
+import copy
+import json
 import pathlib
 import re
 import subprocess
@@ -17,6 +19,7 @@ PATCH_FILES = {
     "src/gl/program.c", "src/gl/program.h", "src/gl/shaderconv.c",
     "src/gl/texture.h", "src/gl/texture_3d.c", "src/gl/texture_array.c",
     "src/gl/texture_compressed.c", "src/gl/texture_params.c",
+    "src/gl/uniform.c",
     "src/glx/hardext.c", "src/glx/hardext.h",
 }
 MARKERS = (
@@ -24,6 +27,9 @@ MARKERS = (
     "iOS texture array selftest object:",
     "iOS texture array selftest upload:",
     "iOS texture array selftest shader:",
+    "iOS texture array selftest sampling-call:",
+    "iOS texture array selftest sampling-fbo:",
+    "iOS texture array selftest sampling-contract:",
     "iOS texture array selftest sample:",
     "iOS texture array selftest lifecycle:",
     "iOS texture array selftest terminal:",
@@ -48,6 +54,15 @@ def require(text: str, token: str, label: str, failures: list[str]) -> None:
         failures.append(f"{label}: missing {token!r}")
 
 
+def ordered(text: str, tokens: tuple[str, ...], label: str, failures: list[str]) -> None:
+    cursor = -1
+    for token in tokens:
+        cursor = text.find(token, cursor + 1)
+        if cursor < 0:
+            failures.append(f"{label}: missing or out of order {token!r}")
+            return
+
+
 def validate(files: dict[str, str]) -> list[str]:
     failures: list[str] = []
     texture_h = files["texture_h"]
@@ -58,6 +73,7 @@ def validate(files: dict[str, str]) -> list[str]:
     compressed = files["compressed"]
     program = files["program"]
     program_h = files["program_h"]
+    uniform = files["uniform"]
     fpe = files["fpe"]
     shader = files["shader"]
     hardext = files["hardext"]
@@ -72,6 +88,11 @@ def validate(files: dict[str, str]) -> list[str]:
     verify = files["verify"]
     shader_gate = files["shader_gate"]
     patch = files["patch"]
+    try:
+        contract = json.loads(files["contract"])
+    except (TypeError, json.JSONDecodeError) as exc:
+        failures.append(f"sampling/readback contract is not valid JSON: {exc}")
+        contract = {}
 
     for token in (
         "ENABLED_TEXTURE_ARRAY", "GL_TEXTURE_2D_ARRAY",
@@ -119,6 +140,13 @@ def validate(files: dict[str, str]) -> list[str]:
     ):
         require(program + fpe, token, "sampler reflection/routing", failures)
     for token in (
+        "GO(GL_SAMPLER_2D_ARRAY, GLint, 1)",
+        "case GL_SAMPLER_2D_ARRAY:",
+    ):
+        require(uniform, token, "complete sampler uniform type", failures)
+    if uniform.count("GL_SAMPLER_2D_ARRAY") != 3:
+        failures.append("sampler2DArray must be present in uniformsize, is_uniform_int, and n_uniform exactly")
+    for token in (
         'strstr(pBuffer, "sampler2DArray")', 'strstr(pEntry, "#define BMODEL_MULTI_LAYERS")',
         "GL4ES_TEXTURE_ARRAY_PROGRAM", "#version 300 es", "#define GLSL_ALLOW_TEXTURE_ARRAY 1",
         "#define varying out", "#define varying in",
@@ -149,6 +177,98 @@ def validate(files: dict[str, str]) -> list[str]:
         "pglReadPixels", "checksum", "diffusion_started=0",
     ):
         require(harness + context + client + launch, token, "selftest gate", failures)
+
+    for token in (
+        "IOS_ARRAY_EXPECTED_CHECKSUM 0xA915906Du",
+        '"stage-entry"', "gl4es_external_default_framebuffer_state",
+        "IOS_ARRAY_FRAMEBUFFER_COMPLETE", "logical_current",
+        '"glUniform1i(u_Array)"', "gl4es_glUniform1i( samplerLocation, 0 )",
+        '"glBindTexture(GL_TEXTURE_2D_ARRAY)"',
+        "pglBindTexture( GL_TEXTURE_2D_ARRAY, textures[0] )",
+        "pglGenBuffersARB", "pglBufferDataARB", "GL_STATIC_DRAW_ARB",
+        "gl4es_glVertexAttribPointer( 0, 2, GL_FLOAT, GL_FALSE, 0, (const GLvoid *)0 )",
+        "pglDisable( GL_SCISSOR_TEST )", "pglPixelStorei( GL_PACK_ALIGNMENT, 1 )",
+        "{ 0, 0, width/2, height/2 }", "(GLfloat)layer ));",
+        "pglFinish()", "checksum != IOS_ARRAY_EXPECTED_CHECKSUM",
+        "byte pixel[4];", "pglReadPixels( x, y, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixel )",
+        "pglDeleteBuffersARB", "glDisable(GL_TEXTURE_2D_ARRAY,restore)",
+        "glBindTexture(GL_TEXTURE_2D_ARRAY,restore)", "glUseProgram(restore)",
+        "glPixelStorei(GL_PACK_ALIGNMENT,restore)", "glViewport(restore)",
+    ):
+        require(harness, token, "sampling/readback source contract", failures)
+    require(harness, "diffusion_started=0", "bounded selftest terminal", failures)
+    if "gl4es_glVertexAttribPointer( 0, 2, GL_FLOAT, GL_FALSE, 0, quad )" in harness:
+        failures.append("Apple GLES3 sampling route still uses forbidden client-side vertex storage")
+    ordered(harness, (
+        "iOS texture array selftest shader:",
+        '"stage-entry"',
+        '"glUniform1i(u_Array)"',
+        '"glDrawArrays(GL_TRIANGLE_STRIP)"',
+        '"glFinish"',
+        '"glReadPixels(GL_RGBA,GL_UNSIGNED_BYTE)"',
+        "checksum != IOS_ARRAY_EXPECTED_CHECKSUM",
+        "iOS texture array selftest sampling-contract:",
+        "iOS texture array selftest sample:",
+        "iOS texture array selftest lifecycle:",
+    ), "sampling/readback order", failures)
+
+    if contract.get("schema") != 1 or contract.get("workOrder") != "56I":
+        failures.append("sampling/readback contract identity changed")
+    evidence = contract.get("phaseHEvidence", {})
+    if evidence.get("bundle") != 114 or evidence.get("boundedExit") is not True or evidence.get("hardCrash") is not False:
+        failures.append("Phase H bounded-exit evidence contract changed")
+    if evidence.get("logSha256") != "2A0A70CC3005795626ADF1597E656FBE30FEBEFBF0EACE0D9342BD09399FB32B":
+        failures.append("Phase H evidence hash changed")
+    origin = contract.get("sourceProvenOrigin", {})
+    for key, value in (
+        ("wrapperEntry", "gl4es_glUniform1i"),
+        ("failingHelper", "GoUniformiv"),
+        ("uniformType", "GL_SAMPLER_2D_ARRAY"),
+        ("errorResult", "errorShim(GL_INVALID_OPERATION)"),
+    ):
+        if origin.get(key) != value:
+            failures.append(f"source-proven error origin changed: {key}")
+    framebuffer = contract.get("framebuffer", {})
+    for key, value in (
+        ("target", "GL_FRAMEBUFFER"), ("logicalRead", 0), ("logicalDraw", 0),
+        ("requiredStatus", "GL_FRAMEBUFFER_COMPLETE"),
+        ("drawBuffer", "GL_COLOR_ATTACHMENT0 implicit for the registered nonzero FBO"),
+        ("readBuffer", "GL_COLOR_ATTACHMENT0 implicit for the registered nonzero FBO"),
+        ("level", 0), ("samples", 0),
+    ):
+        if framebuffer.get(key) != value:
+            failures.append(f"framebuffer contract changed: {key}")
+    checksum_contract = contract.get("checksum", {})
+    colors = [q.get("rgba") for q in checksum_contract.get("quadrants", [])]
+    expected_colors = [[255, 0, 0, 255], [0, 255, 0, 255], [255, 0, 255, 255], [255, 255, 0, 255]]
+    if colors != expected_colors:
+        failures.append("source layer colors or quadrant ordering changed")
+    hash_value = 2166136261
+    for color in expected_colors:
+        for channel in color:
+            hash_value = ((hash_value ^ channel) * 16777619) & 0xFFFFFFFF
+    if f"{hash_value:08x}" != "a915906d" or checksum_contract.get("expected") != "a915906d":
+        failures.append("source-derived FNV-1a checksum changed")
+    if checksum_contract.get("format") != "GL_RGBA" or checksum_contract.get("type") != "GL_UNSIGNED_BYTE":
+        failures.append("readback pixel format/type contract changed")
+    if checksum_contract.get("comparison") != "both per-pixel tolerance and exact source-derived checksum":
+        failures.append("checksum comparison was weakened")
+    required_calls = [
+        "stage-entry", "gl4es_external_default_framebuffer_state", "glGetIntegerv state capture",
+        "glUseProgram", "glGetUniformLocation", "glUniform1i(u_Array)",
+        "glActiveTexture/glEnable/glBindTexture", "glGenBuffers/glBindBuffer/glBufferData",
+        "glEnableVertexAttribArray/glVertexAttribPointer", "glDisable(GL_SCISSOR_TEST)",
+        "glPixelStorei(GL_PACK_ALIGNMENT,1)", "glClearColor/glClear",
+        "glViewport(quadrant)", "glUniform1f(u_Layer)",
+        "glDrawArrays(GL_TRIANGLE_STRIP)", "glFinish",
+        "glReadPixels(GL_RGBA,GL_UNSIGNED_BYTE)", "checksum", "state restoration",
+        "lifecycle continuation",
+    ]
+    calls = contract.get("calls", [])
+    if [call.get("call") for call in calls] != required_calls:
+        failures.append("call-level sampling/readback provenance table changed")
+    if any(not call.get("legal") or not call.get("owner") or not call.get("preconditions") for call in calls):
+        failures.append("call-level provenance is missing legality, owner, or preconditions")
     require(build, "gl4es-wo56-texture-array-ios.patch", "build patch replay", failures)
     require(build, "validate-ios-texture-array.py", "build validator", failures)
     for token in ("TEXTURE_ARRAY_JOBS", "BMODEL_MULTI_LAYERS", "bmodelsolid_fp.glsl", "bmodeldlight_fp.glsl"):
@@ -170,16 +290,55 @@ def fixtures(files: dict[str, str]) -> list[str]:
         ("ESSL100 fallback", "shader", "#version 300 es", "#version 100"),
         ("raw inactive array token", "shader", 'strstr(pBuffer, "sampler2DArray")', 'strstr(pEntry, "sampler2DArray")'),
         ("wrong unit", "fpe", "glprogram->texunits[tu_idx].type - 1", "ENABLED_TEX2D"),
+        ("missing uniform size", "uniform", "GO(GL_SAMPLER_2D_ARRAY, GLint, 1)", "GO(GL_SAMPLER_2D, GLint, 1)"),
+        ("wrong uniform type", "uniform", "case GL_SAMPLER_2D_ARRAY:", "case GL_SAMPLER_2D:"),
         ("missing lifecycle", "init", "gl4es_texture_array_reset", "array_reset_removed"),
         ("layer-zero-only", "harness", "layers=0,1,2,3", "layers=0"),
+        ("stale error attribution", "harness", '"stage-entry"', '"stage-entry-removed"'),
+        ("missing framebuffer proof", "harness", "gl4es_external_default_framebuffer_state", "framebuffer_state_removed"),
+        ("wrong sampler unit", "harness", "gl4es_glUniform1i( samplerLocation, 0 )", "gl4es_glUniform1i( samplerLocation, 1 )"),
+        ("missing array binding", "harness", "pglBindTexture( GL_TEXTURE_2D_ARRAY, textures[0] )", "missingArrayBind()"),
+        ("wrong layer coordinate", "harness", "(GLfloat)layer ));", "0.0f ));"),
+        ("client vertex state", "harness", "(const GLvoid *)0 ));", "quad ));"),
+        ("wrong viewport", "harness", "width/2, height/2", "0, height/2"),
+        ("unsupported read type", "harness", "GL_RGBA, GL_UNSIGNED_BYTE, pixel", "GL_RGBA, GL_FLOAT, pixel"),
+        ("bad pack alignment", "harness", "GL_PACK_ALIGNMENT, 1 )", "GL_PACK_ALIGNMENT, 3 )"),
+        ("small destination", "harness", "byte pixel[4];", "byte pixel[3];"),
+        ("missing synchronization", "harness", "pglFinish()", "missingFinish()"),
+        ("checksum weakening", "harness", "checksum != IOS_ARRAY_EXPECTED_CHECKSUM", "checksum == 0xffffffffu"),
+        ("skipped readback", "harness", "pglReadPixels( x, y, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixel )", "skipReadback()"),
+        ("ordinary 2D fallback", "harness", '"glBindTexture(GL_TEXTURE_2D_ARRAY)"', '"glBindTexture(GL_TEXTURE_2D)"'),
+        ("atlas fallback", "harness", "texture2DArray(u_Array", "texture2D(u_Array"),
+        ("state leakage", "harness", "pglDeleteBuffersARB( 1, &vertexBuffer )", "leakVertexBuffer()"),
+        ("continuation after failure", "harness", "diffusion_started=0", "diffusion_started=1"),
         ("selftest bypass", "client", "Sys_Quit( \"iOS texture array selftest complete\" )", "/* bypass */"),
     )
     for label, key, old, new in mutations:
-        candidate = dict(files)
+        candidate = copy.deepcopy(files)
         if old not in candidate[key]:
             failures.append(f"fixture {label}: source token absent")
             continue
         candidate[key] = candidate[key].replace(old, new)
+        if not validate(candidate):
+            failures.append(f"fixture {label}: validator accepted mutation")
+
+    contract_mutations = (
+        ("incomplete framebuffer", '"requiredStatus": "GL_FRAMEBUFFER_COMPLETE"', '"requiredStatus": "GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT"'),
+        ("wrong attachment target", '"target": "GL_FRAMEBUFFER"', '"target": "GL_RENDERBUFFER"'),
+        ("wrong attachment level", '"level": 0', '"level": 1'),
+        ("wrong read framebuffer", '"logicalRead": 0', '"logicalRead": 7'),
+        ("wrong draw framebuffer", '"logicalDraw": 0', '"logicalDraw": 7'),
+        ("illegal read buffer", '"readBuffer": "GL_COLOR_ATTACHMENT0 implicit for the registered nonzero FBO"', '"readBuffer": "GL_BACK"'),
+        ("wrong sample count", '"samples": 0', '"samples": 4'),
+        ("wrong pixel format", '"format": "GL_RGBA"', '"format": "GL_RGB"'),
+        ("checksum contract weakening", '"comparison": "both per-pixel tolerance and exact source-derived checksum"', '"comparison": "observed checksum accepted"'),
+    )
+    for label, old, new in contract_mutations:
+        candidate = copy.deepcopy(files)
+        if old not in candidate["contract"]:
+            failures.append(f"fixture {label}: contract token absent")
+            continue
+        candidate["contract"] = candidate["contract"].replace(old, new, 1)
         if not validate(candidate):
             failures.append(f"fixture {label}: validator accepted mutation")
     return failures
@@ -204,6 +363,7 @@ def main() -> int:
         "compressed": read(gl4es / "src/gl/texture_compressed.c"),
         "program": read(gl4es / "src/gl/program.c"),
         "program_h": read(gl4es / "src/gl/program.h"),
+        "uniform": read(gl4es / "src/gl/uniform.c"),
         "fpe": read(gl4es / "src/gl/fpe.c"),
         "shader": read(gl4es / "src/gl/shaderconv.c"),
         "hardext": read(gl4es / "src/glx/hardext.c"),
@@ -218,6 +378,7 @@ def main() -> int:
         "verify": read(root / "scripts/ios/verify_ipa.sh"),
         "shader_gate": read(root / "scripts/ios/validate-diffusion-mobile-shaders.py"),
         "patch": read(root / PATCH),
+        "contract": read(root / "scripts/ios/wo56i-sampling-readback-contract.json"),
     }
     failures = validate(files)
     if args.self_test:

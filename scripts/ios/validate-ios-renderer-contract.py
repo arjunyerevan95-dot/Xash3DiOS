@@ -19,11 +19,15 @@ ALLOWED_PATHS = {
     "engine/common/model.c",
     "engine/platform/ios/launchdialog.m",
     "ref/gl/gl_opengl.c",
+    "ref/gl/gl_texture_array_selftest.c",
     "scripts/gha/build_ios.sh",
+    "scripts/ios/gl4es-wo56-texture-array-ios.patch",
     "scripts/ios/validate-ios-renderer-contract.py",
     "scripts/ios/validate-ios-selftest-boot.py",
+    "scripts/ios/validate-ios-texture-array.py",
     "scripts/ios/verify_ipa.sh",
     "scripts/ios/wo56e-renderer-contract.json",
+    "scripts/ios/wo56i-sampling-readback-contract.json",
 }
 TERMINAL_FAIL = "iOS texture array selftest terminal: FAIL failures=1 diffusion_started=0"
 EXPECTED_COUNTS = {"cvars": 27, "callbacks": 22, "parameters": 5, "globals": 3}
