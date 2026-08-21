@@ -83,3 +83,18 @@ This manifest references the evidence used to close WO-056 Phases I and J at Out
 - [`DEC-003`](../../Decisions/DEC-003.md)
 - [`DEC-004`](../../Decisions/DEC-004.md)
 - [`DEC-005`](../../Decisions/DEC-005.md)
+- [`DEC-006`](../../Decisions/DEC-006.md)
+
+## Phase K admission evidence and pending proof
+
+- Status: Phase K active; no implementation candidate, workflow, artifact, IPA, or device evidence exists yet.
+- Authoritative Google ledger Phase K order was appended under revision guard and verified by readback at revision `AIroW37mgJWSAdh9os0FJ0VzXL-r36Dj5xAz9EfzGMg_oXINPkRe-WWO3uZKluW6OOn4DguV3EyefcmwR0ZwOd7v-shLklDwN20hf5dbH84`.
+- Admission baseline: Phase J Outcome A record `cc02ebaa192abb3a11ce5ea520649a096a68ed44`; qualified implementation `bc4b2b7181b3111053f14ff86e8ff634718acf30`.
+- Established runtime boundary: the Phase J log reports `GL_EXT_texture_array - failed` after the successful bounded harness because production capability advertisement remains deliberately disabled.
+- Engine source boundary: `ref/gl/gl_opengl.c` gates `GL_TEXTURE_ARRAY_EXT` through `GL_CheckExtension("GL_EXT_texture_array", ..., "gl_texture_2d_array", ..., 0)` and queries `GL_MAX_ARRAY_TEXTURE_LAYERS_EXT` only after success.
+- Engine loader boundary: `ref/gl/gl_image.c` rejects array targets when `GL_TEXTURE_ARRAY_EXT` is false and contains the production texture-array create/load path.
+- Diffusion source boundary: its renderer separately gates `R_TEXTURE_ARRAY_EXT`; `GLSL_ALLOW_TEXTURE_ARRAY`, landscape `LOAD_TEXTURE_ARRAY`, and terrain shader use depend on that state.
+- Shader boundary: terrain GLSL uses `sampler2DArray` under `GLSL_ALLOW_TEXTURE_ARRAY && BMODEL_MULTI_LAYERS`; `scripts/ios/diffusion-ios.patch` currently filters `MULTI_LAYERS` on iOS.
+- Required Phase K artifact: `scripts/ios/wo56k-production-array-admission-contract.json` or the semantically equivalent machine-readable path named in the worker report.
+- Required CI evidence if Outcome A: exactly one qualifying workflow and artifact tied to one immutable candidate; all identifiers and IPA hash remain pending.
+- Phase K does not authorize device evidence. A build-qualified candidate, if produced, must stop at orchestrator review and must not be described as terrain/device-accepted.

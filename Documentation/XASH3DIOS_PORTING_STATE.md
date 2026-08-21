@@ -2586,3 +2586,40 @@ This result does not qualify or authorize production `GL_EXT_texture_array` adve
 The authoritative Google Docs ledger was updated under revision guard and verified by readback at revision `AIroW35eAHEQsIjng7koSVYL26SxH_LPplNTY2_pP2hkjH5sDD-v7Sa_DztjVI28T3Rh0oHuQNk1fdRkpHFvUX0cTfPZNGDFprZXSl-CK-o`.
 
 Stop state: **Work Order 56 Phase J is complete at Outcome A and the orchestrator-review gate.** The one-run authorization is consumed. Do not rerun, rebuild, patch, enable or advertise terrain, launch a gameplay experiment, modify `ch1map1`, or begin another phase without a new explicit orchestrator order.
+
+## 2026-08-21 — Work Order 56 Phase J acceptance and Phase K production-admission order
+
+Orchestrator decision: **Work Order 56 Phase J Outcome A is accepted.** Bundle 116, candidate `bc4b2b7181b3111053f14ff86e8ff634718acf30`, passed the complete bounded native texture-array conformance contract on iPhone 16 Pro Max / iOS 26.6. The native Apple GLES3/GL4ES object, upload, shader translation/reflection, sampler, VBO draw, four-layer sample, direct-drawable readback, exact `a915906d` checksum, cleanup, lifecycle, and intentional shutdown contracts are qualified. This does not qualify production terrain, gameplay, or `ch1map1`.
+
+Selected next boundary: **WORK ORDER 56 PHASE K — CONDITIONAL PRODUCTION TEXTURE-ARRAY ADMISSION.** This remains a continuation of WO-056. It authorizes the preserved worker to audit and implement one complete guarded production route, validate it, build at most one qualifying candidate, update both ledgers, and stop before any device test.
+
+### Baseline, objective, and first incomplete action
+
+- Branch/control baseline: `agent/ios-proof-of-life` at Phase J record `cc02ebaa192abb3a11ce5ea520649a096a68ed44`; qualified implementation baseline `bc4b2b7181b3111053f14ff86e8ff634718acf30`.
+- Latest qualified CI remains workflow `32489923843`, artifact `9449473335`, Bundle 116 IPA SHA-256 `4FD8D67DDAEBF1986AC795164B7CD20BA782319B9F29200C9EA76F1A4BA73806`. No relevant workflow was active when Phase K was issued.
+- Objective: admit the proven capability into the real engine and Diffusion production route only when the complete GL4ES/native ES3 provider, entry-point, limit, engine, Diffusion, loader, sampler, target, and terrain-shader contract is true.
+- First incomplete action: audit the exact end-to-end production admission path and produce the source-proven capability/provenance table required by the Phase K order before or with one coherent implementation.
+
+### Required complete route
+
+The audit must cover the GL4ES extension-string/capability provider and negative cases; required native ES3 array procedures and limits; engine `GL_CheckExtension`, `GL_TEXTURE_ARRAY_EXT`, callback exports, `GL_MAX_ARRAY_TEXTURE_LAYERS_EXT`, target/create/load paths; Diffusion `R_TEXTURE_ARRAY_EXT`, `GLSL_ALLOW_TEXTURE_ARRAY`, `LOAD_TEXTURE_ARRAY`, `LoadTerrainLayers`, diffuse and normal layer arrays, targets, units, samplers, cleanup; and terrain GLSL `sampler2DArray`, `texture2DArray`, `TERRAIN_NUM_LAYERS`, and `BMODEL_MULTI_LAYERS` behavior.
+
+The current iOS Diffusion shader patch filters `MULTI_LAYERS`. Phase K must prove and preserve the complete production shader/material contract; merely appending `GL_EXT_texture_array` while leaving the consumer disabled is rejected. Engine and Diffusion must agree on capability, and unsupported contexts/backends, missing procedures, or invalid/insufficient limits must remain unadvertised. Record this as `scripts/ios/wo56k-production-array-admission-contract.json` or a semantically equivalent machine-readable contract named in the report.
+
+### Scope, prohibitions, validation, and outcomes
+
+After the audit establishes one bounded route, implement only the minimum coherent production admission at the responsible owners. Retain exact GL4ES/SDL pins and all accepted drawable, uint-index, per-unit target, material/inactive-sampler, array uniform/VBO, normal-bootstrap, renderer-contract, lifecycle, and diagnostic-harness behavior.
+
+Do not spoof or unconditionally advertise the extension; add a cvar/argument/environment force-enable; use CPU, 2-D, atlas, multi-texture, or layer-zero fallback; strip terrain or `MULTI_LAYERS` semantics to compile; change gameplay, input, menus, data, maps, unrelated shaders, or `ch1map1`; create a probe-only IPA or serial partial candidates; or request/run device or gameplay testing.
+
+Positive and mutation coverage must reject unsupported providers, missing procedures, bad limits, engine/Diffusion disagreement, absent callbacks, wrong target/unit/sampler, missing array loader paths, lost shader defines, false-positive support, fallbacks, and normal-startup changes. Retain all prior validators, replay exact pins, run Python/JSON and `git diff --check`, build affected units, and perform full iPhoneOS arm64 engine/Half-Life/Diffusion plus IPA qualification.
+
+- **Outcome A:** one coherent conditional admission passes every source, mutation, pinned-replay, full-build, and IPA gate. Retain exactly one qualifying run/artifact and verify IPA identity/hash. This is build-qualified only, not terrain/device-accepted. Update/read back both ledgers and stop.
+- **Outcome B:** the audit finds a broader renderer/shader/material migration. Make no partial advertisement or runtime candidate/build. Record the exact boundary and stop.
+- **Outcome C:** the capability cannot be safely discriminated or engine/Diffusion agreement cannot be proven. Make no runtime change/build; record the missing evidence and stop.
+
+Complete authority, rejection fixtures, reporting fields, and stop conditions are materialized in `WorkOrders/WO-056.md`; `Documentation/CURRENT_STATE.md`, `Decisions/DEC-006.md`, and `Evidence/WO-056/manifest.md` form the current ControlPlane checkpoint.
+
+The authoritative Google Docs ledger was appended under revision guard and verified by readback at revision `AIroW37mgJWSAdh9os0FJ0VzXL-r36Dj5xAz9EfzGMg_oXINPkRe-WWO3uZKluW6OOn4DguV3EyefcmwR0ZwOd7v-shLklDwN20hf5dbH84`.
+
+Stop state: **Work Order 56 Phase K is active.** The preserved worker may read and implement the published order, create at most one qualifying build candidate, update both ledgers, and report at orchestrator review. No Phase K device test or later phase is authorized.
