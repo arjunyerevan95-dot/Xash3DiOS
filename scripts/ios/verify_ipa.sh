@@ -246,6 +246,24 @@ if ! grep -q -- '-gl4es_texture_array_selftest' "$ENGINE_STRINGS"; then
 	exit 1
 fi
 
+for selftest_boot_marker in \
+	'iOS texture array selftest boot: armed' \
+	'iOS texture array selftest boot: filesystem-independent'; do
+	if ! grep -q "$selftest_boot_marker" "$ENGINE_STRINGS"; then
+		echo "Engine is missing filesystem-independent selftest marker: $selftest_boot_marker" >&2
+		exit 1
+	fi
+done
+
+for selftest_renderer_marker in \
+	'iOS texture array selftest boot: renderer-ready' \
+	'iOS texture array selftest boot: dispatched'; do
+	if ! grep -q "$selftest_renderer_marker" "$GL4ES_RENDERER_STRINGS"; then
+		echo "Renderer is missing filesystem-independent selftest marker: $selftest_renderer_marker" >&2
+		exit 1
+	fi
+done
+
 if ! grep -q 'gl4es_iOSWO49TopologyProducer' "$DIFFUSION_CLIENT_STRINGS"; then
 	echo "Diffusion client is missing the WO49 pre-shader producer bridge" >&2
 	exit 1

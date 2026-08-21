@@ -58,6 +58,8 @@ python3 "$GITHUB_WORKSPACE/scripts/ios/validate-ios-wo52-material-trace.py" \
 python3 "$GITHUB_WORKSPACE/scripts/ios/validate-ios-texture-array.py" \
 	"$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/3rdparty/gl4es/gl4es" \
 	--self-test || die
+python3 "$GITHUB_WORKSPACE/scripts/ios/validate-ios-selftest-boot.py" \
+	"$GITHUB_WORKSPACE" --self-test || die
 mkdir -p build || die
 cc -std=gnu11 -DNANOGL_MANGLE_PREPEND=1 -DREF_DLL=1 \
 	-I3rdparty/nanogl -I3rdparty/nanogl/GL \

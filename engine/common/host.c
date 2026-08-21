@@ -41,6 +41,9 @@ GNU General Public License for more details.
 
 host_parm_t host;	// host parms
 static jmp_buf return_from_main_buf;
+#if XASH_IOS
+static qboolean host_ios_texture_array_selftest;
+#endif
 
 /*
 ===============
@@ -1003,6 +1006,9 @@ static void Host_InitCommon( int argc, char **argv, const char *progname, qboole
 	// e.g. xash.exe +game xash -game xash
 	// so we clear all cmd_args, but leave dbg states as well
 	Sys_ParseCommandLine( argc, (const char **)argv );
+#if XASH_IOS
+	host_ios_texture_array_selftest = Sys_CheckParm( "-gl4es_texture_array_selftest" );
+#endif
 	Host_DetermineExecutableName( exename, exename_size );
 
 	if( !Sys_CheckParm( "-disablehelp" ))
@@ -1082,6 +1088,10 @@ static void Host_InitCommon( int argc, char **argv, const char *progname, qboole
 
 	Sys_InitLog();
 	Con_Init(); // early console running to catch all the messages
+#if XASH_IOS
+	if( host_ios_texture_array_selftest )
+		Con_Printf( "iOS texture array selftest boot: armed\n" );
+#endif
 
 	XRcon_Init();
 
@@ -1124,6 +1134,14 @@ static void Host_InitCommon( int argc, char **argv, const char *progname, qboole
 #if XASH_ENGINE_TESTS
 	if( Sys_CheckParm( "-runtests" ))
 		Host_RunTests( 1 );
+#endif
+
+#if XASH_IOS
+	if( host_ios_texture_array_selftest )
+	{
+		Con_Printf( "iOS texture array selftest boot: filesystem-independent\n" );
+		return;
+	}
 #endif
 
 	FS_LoadGameInfo();
@@ -1174,6 +1192,16 @@ int EXPORT Host_Main( int argc, char **argv, const char *progname, int bChangeGa
 	host.starttime = Platform_DoubleTime();
 
 	Host_InitCommon( argc, argv, progname, bChangeGame, exename, sizeof( exename ));
+
+#if XASH_IOS
+	if( host_ios_texture_array_selftest )
+	{
+		CL_Init();
+		Con_Printf( "iOS texture array selftest terminal: FAIL failures=1 diffusion_started=0\n" );
+		Sys_Quit( "iOS texture array selftest dispatch returned" );
+		return EXIT_FAILURE;
+	}
+#endif
 
 	// init commands and vars
 	if( host_developer.value >= DEV_EXTENDED )
@@ -1361,7 +1389,11 @@ void Host_ShutdownWithReason( const char *reason )
 		host.status = HOST_SHUTDOWN; // prepare host to normal shutdown
 
 #if !XASH_DEDICATED
-	if( host.type == HOST_NORMAL && !error )
+	if( host.type == HOST_NORMAL && !error
+#if XASH_IOS
+		&& !host_ios_texture_array_selftest
+#endif
+	)
 		Host_WriteConfig();
 #endif
 

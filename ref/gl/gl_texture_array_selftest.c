@@ -72,6 +72,7 @@ static int R_IOSArrayNear( const byte *pixel, const byte *expected )
 
 void R_IOSTextureArraySelftest( void )
 {
+	static qboolean dispatched;
 	static const char *vertexSource =
 		"#version 130\n#define GL4ES_TEXTURE_ARRAY_PROGRAM 1\nattribute vec2 a_Position; varying vec2 v_TexCoord;\n"
 		"void main(){ v_TexCoord=a_Position*0.5+0.5; gl_Position=vec4(a_Position,0.0,1.0); }\n";
@@ -100,6 +101,9 @@ void R_IOSTextureArraySelftest( void )
 
 	if( !gEngfuncs.Sys_CheckParm( "-gl4es_texture_array_selftest" ))
 		return;
+	if( dispatched )
+		return;
+	dispatched = true;
 
 	gEngfuncs.Con_Printf( "iOS texture array selftest policy: mode=selftest-only terrain-admission=disabled backend=native-es3\n" );
 	pglGetIntegerv( GL_MAX_ARRAY_TEXTURE_LAYERS, &maxLayers );

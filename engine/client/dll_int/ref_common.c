@@ -43,6 +43,15 @@ static CVAR_DEFINE_AUTO( r_refdll, "", FCVAR_RENDERINFO, "choose renderer implem
 static CVAR_DEFINE_AUTO( r_refdll_loaded, "", FCVAR_READ_ONLY, "currently loaded renderer" );
 static CVAR_DEFINE_AUTO( r_pvs_radius, "0.1", FCVAR_ARCHIVE, "increase amount of potentially visible leaves by this radius" );
 
+static qboolean R_IOSTextureArraySelftestMode( void )
+{
+#if XASH_IOS
+	return Sys_CheckParm( "-gl4es_texture_array_selftest" );
+#else
+	return false;
+#endif
+}
+
 // there is no need to expose whole host and cl structs into the renderer
 // but we still need to update timings accurately as possible
 // this looks horrible but the only other option would be passing four
@@ -591,6 +600,8 @@ static qboolean R_LoadProgs( const char *name )
 
 	Cvar_FullSet( "host_refloaded", "1", FCVAR_READ_ONLY );
 	ref.initialized = true;
+	if( R_IOSTextureArraySelftestMode( ))
+		return true;
 
 	R_CreateBuiltinTextures();
 	CL_FillTriAPI( &gTriApi );
@@ -805,6 +816,14 @@ qboolean R_Init( void )
 	if( Sys_GetParmFromCmdLine( "-ref", requested_cmdline ))
 		success = R_LoadRenderer( requested_cmdline, false );
 
+	if( R_IOSTextureArraySelftestMode() && !success )
+	{
+		Con_Printf( "iOS texture array selftest boot: renderer-failed\n" );
+		Con_Printf( "iOS texture array selftest terminal: FAIL failures=1 diffusion_started=0\n" );
+		Sys_Quit( "iOS texture array selftest renderer initialization failed" );
+		return false;
+	}
+
 	if( !success && !COM_StringEmptyOrNULL( r_refdll.string ) && Q_stricmp( requested_cmdline, r_refdll.string ))
 	{
 		Q_strncpy( requested_cvar, r_refdll.string, sizeof( requested_cvar ));
@@ -849,6 +868,9 @@ qboolean R_Init( void )
 		Sys_Error( "Can't initialize any renderer. Check your video drivers!\n" );
 		return false;
 	}
+
+	if( R_IOSTextureArraySelftestMode( ))
+		return true;
 
 	SCR_Init();
 

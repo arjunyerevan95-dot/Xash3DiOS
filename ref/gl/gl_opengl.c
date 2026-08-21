@@ -1280,6 +1280,11 @@ qboolean R_Init( void )
 		return false;
 	}
 
+#if XASH_IOS && XASH_GL4ES
+	if( gEngfuncs.Sys_CheckParm( "-gl4es_texture_array_selftest" ))
+		return true;
+#endif
+
 	// see R_ProcessEntData for tr.entities initialization
 	tr.world = (struct world_static_s *)ENGINE_GET_PARM( PARM_GET_WORLD_PTR );
 	tr.palette = (color24 *)ENGINE_GET_PARM( PARM_GET_PALETTE_PTR );
@@ -1312,7 +1317,12 @@ void R_Shutdown( void )
 		return;
 
 	GL_RemoveCommands();
+#if XASH_IOS && XASH_GL4ES
+	if( !gEngfuncs.Sys_CheckParm( "-gl4es_texture_array_selftest" ))
+		R_ShutdownImages();
+#else
 	R_ShutdownImages();
+#endif
 #if !XASH_GLES && !XASH_GL_STATIC
 	GL2_ShimShutdown();
 #endif
@@ -1580,7 +1590,12 @@ void GL_OnContextCreated( void )
 #if XASH_IOS
 	R_IOSDirectDrawableContextCreated();
 	set_index_trace_logger( R_IOSIndexTraceLog );
-	R_IOSTextureArraySelftest();
+	if( gEngfuncs.Sys_CheckParm( "-gl4es_texture_array_selftest" ))
+	{
+		gEngfuncs.Con_Printf( "iOS texture array selftest boot: renderer-ready\n" );
+		gEngfuncs.Con_Printf( "iOS texture array selftest boot: dispatched\n" );
+		R_IOSTextureArraySelftest();
+	}
 #endif
 
 	// merge glBegin/glEnd in beams and console
