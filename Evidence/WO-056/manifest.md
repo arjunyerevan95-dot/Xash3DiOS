@@ -224,3 +224,11 @@ Phase O's worker-produced result was build-qualified only. The later user-perfor
 - Related decision: [DEC-010](../../Decisions/DEC-010.md).
 - Authoritative Google ledger: revision-guarded and verified by readback at `AIroW36mLoq7WrJrz_hQ7VNAZ8_Cp4ALusa3DW2ZE0kSZO_GS5x9v3CU-c9dwzB8xNVgb24EwecG-HOmPXZeJG3_1ndUT06S-r9l7deSS2o`.
 - Stop state: WO-056 Phase P active; no device test, crash investigation, or later phase authorized.
+
+## Phase P worker-continuity evidence
+
+- Active worker: `Continue Work Order 56`, thread `01a022ae-5ea9-7121-8512-2fe40f5e99a2`, host `slingshot:env_e_6a6f826a8f4483218b6956e12dea53cc`; its last completed durable work was earlier WO-056 ledger-based execution, so it must adopt the current repo-backed ControlPlane before acting.
+- Superseded worker: `Xash3DiOS Worker Bootstrap`, thread `019ff1ea-8387-7291-b391-f030d22db2ef`; current connector status `systemError`. Its session remains retained and is evidence only, subordinate to Git, CI, device evidence, and ControlPlane.
+- Latest useful prior-worker report: no Phase P commit, CI run, candidate, artifact, upload, or device test was consumed. It identified that fragment-only ESSL 300 promotion would pair with an ESSL 100 vertex shader and fail linking, requiring audit of GL4ES's existing cross-stage compatibility/reconversion owner.
+- Preserved exploratory workspace: ignored nested checkout `build/wo56m-gl4es-replay4`; notable unaccepted edits are in `src/gl/shaderconv.c` and `src/glx/hardext.c`. The replay checkout also contains the retained patch-stack modifications, so its aggregate dirty status is not itself a Phase P diff.
+- Qualification rule: the active worker must inspect and source-prove the cross-stage finding within the required BmodelSolid/StudioSolid/GrassDlight lineage before promoting, rewriting, or discarding the exploratory implementation. The finding does not authorize a candidate by itself.

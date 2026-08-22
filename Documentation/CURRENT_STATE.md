@@ -1,6 +1,6 @@
 # Xash3DiOS Current State
 
-Last updated: `2026-08-22T17:58:37+05:30`
+Last updated: `2026-08-22T19:21:13+05:30`
 
 ## Repository
 
@@ -21,6 +21,15 @@ Last updated: `2026-08-22T17:58:37+05:30`
 - Corrected boundary: GL4ES's generic ESSL probe formed malformed `#version 300 es#extension ...` source, leaving `hardext.glsl300es=0`; `BuildExtensionsList` therefore withheld `GL_EXT_texture_array` before the engine layer query
 - Active boundary: `GL_EXT_shader_texture_lod` is present in the native extension string, but GL4ES emits a rejected extension directive and undeclared `texture2DLodEXT` calls for affected Diffusion fragment shaders
 - Preserved unresolved boundary: the user-observed hard crash occurs after the last durable engine record and remains separate from Phase P
+
+## Active worker binding
+
+- Active implementation worker: `Continue Work Order 56`, thread `01a022ae-5ea9-7121-8512-2fe40f5e99a2`, host `slingshot:env_e_6a6f826a8f4483218b6956e12dea53cc`.
+- Superseded execution worker: `Xash3DiOS Worker Bootstrap`, thread `019ff1ea-8387-7291-b391-f030d22db2ef`; retained as implementation history but removed from active execution after repeated context/policy transport failures and current `systemError` status.
+- Handoff boundary: the superseded worker consumed no Phase P CI run or candidate and made no top-level source commit. It left exploratory, unaccepted edits in the ignored replay checkout `build/wo56m-gl4es-replay4`, principally `src/gl/shaderconv.c` and `src/glx/hardext.c`.
+- Preserved implementation finding, not yet an accepted project decision: fragment-only promotion to ESSL 300 would leave the paired vertex shader at ESSL 100 and fail program linking; GL4ES's existing cross-stage compatibility/reconversion path must therefore be included in the Phase P source-lineage proof before any candidate is promoted.
+- The active worker must read this file, [WO-056](../WorkOrders/WO-056.md), [DEC-010](../Decisions/DEC-010.md), and the referenced evidence; inspect the preserved replay diff; and continue from Phase P's first incomplete step without accepting or discarding the exploratory diff by assumption.
+- Completion callback target: orchestrator thread `01a02450-2442-7bd3-9232-46419e80d731` on host `slingshot:env_e_6a6f826a8f4483218b6956e12dea53cc`.
 
 ## Qualification state
 
