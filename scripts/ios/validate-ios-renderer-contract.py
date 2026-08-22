@@ -19,6 +19,8 @@ ALLOWED_PATHS = {
     "Decisions/DEC-004.md",
     "Decisions/DEC-005.md",
     "Decisions/DEC-006.md",
+    "Decisions/DEC-007.md",
+    "Decisions/DEC-008.md",
     "Documentation/CURRENT_STATE.md",
     "Documentation/XASH3DIOS_PORTING_STATE.md",
     "Evidence/WO-056/manifest.md",
@@ -38,11 +40,13 @@ ALLOWED_PATHS = {
     "scripts/ios/validate-ios-production-array-admission.py",
     "scripts/ios/validate-ios-renderer-contract.py",
     "scripts/ios/validate-ios-selftest-boot.py",
+    "scripts/ios/validate-ios-ordinary-bootstrap.py",
     "scripts/ios/validate-ios-texture-array.py",
     "scripts/ios/verify_ipa.sh",
     "scripts/ios/wo56e-renderer-contract.json",
     "scripts/ios/wo56i-sampling-readback-contract.json",
     "scripts/ios/wo56k-production-array-admission-contract.json",
+    "scripts/ios/wo56m-ordinary-bootstrap-contract.json",
 }
 TERMINAL_FAIL = "iOS texture array selftest terminal: FAIL failures=1 diffusion_started=0"
 EXPECTED_COUNTS = {"cvars": 27, "callbacks": 22, "parameters": 5, "globals": 3}

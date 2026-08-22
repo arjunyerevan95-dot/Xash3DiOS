@@ -123,8 +123,13 @@ if ! grep -q 'iOS production texture array admission:' "$DIFFUSION_CLIENT_STRING
 	exit 1
 fi
 
-if ! grep -Fq -- '-dev 2 -log -game diffusion -ref gl4es -gl4es_texture_array_selftest' "$ENGINE_STRINGS"; then
-	echo "Engine is missing the locked normal-Diffusion selftest launch arguments" >&2
+if ! grep -Fxq -- '-dev 2 -log -game diffusion -ref gl4es' "$ENGINE_STRINGS"; then
+	echo "Engine is missing the exact locked ordinary-Diffusion launch arguments" >&2
+	exit 1
+fi
+
+if grep -Fxq -- '-dev 2 -log -game diffusion -ref gl4es -gl4es_texture_array_selftest' "$ENGINE_STRINGS"; then
+	echo "Engine still contains the forbidden combined ordinary-plus-selftest default arguments" >&2
 	exit 1
 fi
 

@@ -196,8 +196,10 @@ def validate(files: dict[str, str]) -> list[str]:
         "Proprietary game asset is packaged in the IPA",
     ):
         require(files["build"] + files["verify"], token, "ordinary build/package contract", failures)
-    require(files["launch"], "-dev 2 -log -game diffusion -ref gl4es -gl4es_texture_array_selftest",
-            "retained bounded bootstrap", failures)
+    require(files["launch"], 'ordinaryBootstrapArgs = @"-dev 2 -log -game diffusion -ref gl4es"',
+            "locked ordinary bootstrap", failures)
+    if "-dev 2 -log -game diffusion -ref gl4es -gl4es_texture_array_selftest" in files["launch"]:
+        failures.append("ordinary bootstrap still automatically arms the selftest")
 
     phase_sources = files["provider_patch"] + files["diffusion_patch"] + engine
     reject(phase_sources, r"terrain[_ -]?(atlas|cpu)[_ -]?fallback", "fallback policy", failures)
@@ -228,7 +230,7 @@ def fixtures(files: dict[str, str]) -> list[str]:
         ("missing normal array", "terrain", "LOAD_TEXTURE_ARRAY( (const char **)normalmaps, TF_NORMALMAP )", "LOAD_TEXTURE( normalmaps[0], NULL, 0, TF_NORMALMAP )"),
         ("sampler unit mismatch", "shader", "u_LayerMap, GL_TEXTURE5", "u_LayerMap, GL_TEXTURE4"),
         ("engine marker wrong binary", "verify", "grep -q 'iOS production texture array engine:' \"$GL4ES_RENDERER_STRINGS\"", "grep -q 'iOS production texture array engine:' \"$ENGINE_STRINGS\""),
-        ("ordinary startup changed", "launch", "-dev 2 -log -game diffusion -ref gl4es -gl4es_texture_array_selftest", "-dev 2 -game diffusion -enable_terrain"),
+        ("ordinary startup changed", "launch", "-dev 2 -log -game diffusion -ref gl4es", "-dev 2 -game diffusion -enable_terrain"),
     )
     for label, key, old, new in mutations:
         candidate = copy.deepcopy(files)

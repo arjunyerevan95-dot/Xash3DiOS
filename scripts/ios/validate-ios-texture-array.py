@@ -176,7 +176,7 @@ def validate(files: dict[str, str]) -> list[str]:
     for token in (
         '"-gl4es_texture_array_selftest"', "R_IOSTextureArraySelftest();",
         "Sys_Quit( \"iOS texture array selftest complete\" )",
-        "-ref gl4es -gl4es_texture_array_selftest", "setEnabled:NO",
+        "-dev 2 -log -game diffusion -ref gl4es", "setEnabled:NO",
         "layers=0,1,2,3", "zoffset=2", "zoffset=3", "zoffset=1",
         "levels=3", "texture2DArray(u_Array", "GL_SAMPLER_2D_ARRAY",
         "pglReadPixels", "checksum", "diffusion_started=0",

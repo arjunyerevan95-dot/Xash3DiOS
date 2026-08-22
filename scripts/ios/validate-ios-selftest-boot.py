@@ -17,6 +17,8 @@ ALLOWED_PATHS = {
     "Decisions/DEC-004.md",
     "Decisions/DEC-005.md",
     "Decisions/DEC-006.md",
+    "Decisions/DEC-007.md",
+    "Decisions/DEC-008.md",
     "Documentation/CURRENT_STATE.md",
     "Documentation/XASH3DIOS_PORTING_STATE.md",
     "Evidence/WO-056/manifest.md",
@@ -34,12 +36,14 @@ ALLOWED_PATHS = {
     "scripts/ios/validate-ios-production-array-admission.py",
     "scripts/ios/validate-ios-renderer-contract.py",
     "scripts/ios/validate-ios-selftest-boot.py",
+    "scripts/ios/validate-ios-ordinary-bootstrap.py",
     "scripts/ios/validate-ios-texture-array.py",
     "scripts/ios/verify_ipa.sh",
     "scripts/ios/wo56i-sampling-readback-contract.json",
     "scripts/ios/wo56k-production-array-admission-contract.json",
+    "scripts/ios/wo56m-ordinary-bootstrap-contract.json",
 }
-LOCKED_ARGS = "-dev 2 -log -game diffusion -ref gl4es -gl4es_texture_array_selftest"
+LOCKED_ARGS = "-dev 2 -log -game diffusion -ref gl4es"
 TERMINAL_FAIL = "iOS texture array selftest terminal: FAIL failures=1 diffusion_started=0"
 
 
@@ -200,7 +204,8 @@ def validate(files: dict[str, str]) -> list[str]:
     require(system, "Host_ShutdownWithReason( reason );\n\tHost_ExitInMain();", "bounded terminal unwind", failures)
     require(host, "if( host.shutdown_issued )\n\t\treturn;", "idempotent host shutdown", failures)
 
-    require(launch, LOCKED_ARGS, "locked launcher arguments", failures)
+    require(launch, f'@"{LOCKED_ARGS}"', "locked ordinary launcher arguments", failures)
+    reject(launch, LOCKED_ARGS + " -gl4es_texture_array_selftest", "automatic selftest launch", failures)
     reject(launch, "-game valve", "Valve substitution", failures)
     require(launch, "setEnabled:NO", "locked launcher field", failures)
     require(build, "validate-ios-selftest-boot.py", "qualification validator", failures)
@@ -222,7 +227,7 @@ def validate(files: dict[str, str]) -> list[str]:
 def fixtures(files: dict[str, str]) -> list[str]:
     failures: list[str] = []
     mutations = (
-        ("missing -game diffusion", "launch", LOCKED_ARGS, "-dev 2 -log -ref gl4es -gl4es_texture_array_selftest"),
+        ("missing -game diffusion", "launch", LOCKED_ARGS, "-dev 2 -log -ref gl4es"),
         ("Valve substitution", "launch", "-game diffusion", "-game valve"),
         ("pre-gameinfo marker", "host", "FS_LoadGameInfo();", 'Con_Printf( "iOS texture array selftest boot: gameinfo-ready game=diffusion\\n" );\n\tFS_LoadGameInfo();'),
         ("pre-gameinfo return", "host", "FS_LoadGameInfo();", "if( host_ios_texture_array_selftest ) return;\n\tFS_LoadGameInfo();"),

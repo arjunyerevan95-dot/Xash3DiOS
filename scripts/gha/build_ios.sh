@@ -62,6 +62,8 @@ python3 "$GITHUB_WORKSPACE/scripts/ios/validate-ios-texture-array.py" \
 	--self-test || die
 python3 "$GITHUB_WORKSPACE/scripts/ios/validate-ios-selftest-boot.py" \
 	"$GITHUB_WORKSPACE" --self-test || die
+python3 "$GITHUB_WORKSPACE/scripts/ios/validate-ios-ordinary-bootstrap.py" \
+	"$GITHUB_WORKSPACE" --self-test || die
 python3 "$GITHUB_WORKSPACE/scripts/ios/validate-ios-renderer-contract.py" \
 	"$GITHUB_WORKSPACE" --self-test || die
 mkdir -p build || die
