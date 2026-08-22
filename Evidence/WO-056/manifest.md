@@ -271,3 +271,19 @@ Phase O's worker-produced result was build-qualified only. The later user-perfor
 - Explicitly absent: production-stack integration, Phase P machine contract/full validator matrix, CI run/job, candidate, artifact, IPA/tempfile, device test, crash work, and Phase P final outcome.
 - Authoritative Google ledger completion: target document `1IYL3pI07fWvoYniP_NxZ7yO3gz9vbnM6sBFK8BT2zLU`, tab `t.0`; verified readback revision `AIroW36Pdd17P_c07iiUWT1H5qZhSF4470eZUOzzRjpe2LF1HZpQtgCMZeEUVer8BH9LQupDTCYHSFdWZYkBpBeJNlUHYSU-AJzqnn8uHag`.
 - Stop gate: checkpoint complete at orchestrator review; first incomplete action is the explicit validator/integration decision.
+
+## Phase P production-integration and build-qualification checkpoint — evidence required
+
+- Issuance baseline: `6e5e464bca5d0b0cc3e6d76e5ca3cf362ccb232d`; local HEAD, tracking HEAD, and live remote HEAD agreed with a clean worktree.
+- Accepted implementation: `d37bf36a5b707273359728a5ae08f81e712bea5d`; patch `scripts/ios/gl4es-wo56-shader-lod-compatibility-ios.patch`; `10,564` bytes; SHA-256 `91AB64B6C392303BEA189BE2D66E409836489DFC6F46F2FC3DFB0BACCFA60FE4`.
+- Accepted upstream scope/pin: `src/gl/shader.c`, `src/gl/shader.h`, `src/gl/shaderconv.c`; GL4ES `81547d986798e876de8b434193920b606a72363f`.
+- CI at issuance: no active or newer relevant workflow; latest qualifying run remains `32570119378` on `f42f2c96b61624fe510fe32288bfbfa6873cc686`, artifact `9475150885`, Bundle 130.
+- Required integration evidence: canonical patch application after `gl4es-wo56-provider-lifecycle-ios.patch`; exact apply/reverse/pin state; contract/validator registration in all retained qualification owners; independently recorded patch and contract hashes.
+- Required positive evidence: BmodelSolid/StudioSolid core-LOD count `11`, GrassDlight count `9`, zero rejected directive/EXT intrinsic, paired ESSL 300 vertex reconversion, and unchanged legacy ESSL 100/ES2 control.
+- Required rejection evidence: omitted/reordered patch, missing family/cross-stage propagation, returned ESSL 300 EXT path, semantic weakening, fabricated capability, source-order corruption, uncompiled/unlinked acceptance, and error suppression must fail deterministically.
+- Required retained evidence: all Phase I/J/K/M/O local validators and mutations, exact dependency pins, full iPhoneOS arm64 engine/Half-Life/Diffusion build, ordinary arguments, thin-arm64 IPA, marker ownership, and proprietary-data exclusion.
+- Outcome A may identify exactly one candidate, workflow/job, artifact, IPA size/SHA-256, archive digest, tempfile object/direct link, independent round-trip hash, and qualification boundary. Outcome B/C must explicitly prove that none was published beyond any sole failed run.
+- Explicitly absent/forbidden: device test, user evidence request, scene/stability acceptance, crash investigation, later phase, duplicate workflow/candidate, and instrumentation-only IPA.
+- Active executor/callback: `01a02a6a-349a-75f1-88dc-c1ad920dd38e` must report to orchestrator `01a02450-2442-7bd3-9232-46419e80d731` after ControlPlane and both ledgers are updated/read back and local/live-remote equality is verified.
+- Authoritative Google ledger order record: document `1IYL3pI07fWvoYniP_NxZ7yO3gz9vbnM6sBFK8BT2zLU`, tab `t.0`, revision `AIroW37PnkPqMsbHyPFXDL72uZ-ytXchFloR1kcCa0KhAwyKdhfgD6WU1dcBQ6Z1_TKPzO-zGIuga59l_E6OQ9-wVTgoZCynTz9rwtNdkg4`; heading and stop-state readback verified.
+- Stop gate: execute this checkpoint only, select Outcome A/B/C, update all durable records, callback, and stop for orchestrator review.

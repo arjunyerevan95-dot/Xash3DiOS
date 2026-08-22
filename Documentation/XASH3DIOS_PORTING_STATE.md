@@ -3022,3 +3022,19 @@ No production patch-stack integration, complete Phase P validator matrix, CI, ca
 Stop state: **WO-056 Phase P downstream patch-materialization checkpoint is complete at orchestrator review.**
 
 The authoritative Google Docs ledger completion append was revision-guarded and verified by readback at revision `AIroW36Pdd17P_c07iiUWT1H5qZhSF4470eZUOzzRjpe2LF1HZpQtgCMZeEUVer8BH9LQupDTCYHSFdWZYkBpBeJNlUHYSU-AJzqnn8uHag`.
+
+## Work Order 56 Phase P production integration and build qualification checkpoint — active
+
+The orchestrator accepts the source-lineage and downstream patch-materialization checkpoints. Implementation commit `d37bf36a5b707273359728a5ae08f81e712bea5d` and reporting baseline `6e5e464bca5d0b0cc3e6d76e5ca3cf362ccb232d` are preserved. The accepted Xash-owned patch is `scripts/ios/gl4es-wo56-shader-lod-compatibility-ios.patch`, `10,564` bytes, SHA-256 `91AB64B6C392303BEA189BE2D66E409836489DFC6F46F2FC3DFB0BACCFA60FE4`, representing only GL4ES `src/gl/shader.c`, `src/gl/shader.h`, and `src/gl/shaderconv.c` at pin `81547d986798e876de8b434193920b606a72363f`.
+
+The next bounded continuation remains WO-056 Phase P. Integrate the accepted patch into the canonical production GL4ES stack after the Phase O provider-lifecycle patch; add the Phase P machine contract and dedicated validator; register them in the retained renderer, self-test, CI, and IPA qualification surfaces; run complete positive/mutation/rejection/pin/native/package qualification; and consume at most one qualifying ordinary workflow/candidate/artifact/IPA/tempfile.
+
+The gate must prove core ESSL 300 `textureLod` for BmodelSolid, StudioSolid, and GrassDlight, coherent paired-vertex reconversion, unchanged ESSL 100/ES2 explicit-LOD behavior, exact patch scope/order, and retained Phase I/J/K/M/O behavior. It must reject omitted/reordered or partial patches, ESSL 300 EXT regressions, semantic weakening, fabricated capability, source corruption, unlinked acceptance, and error suppression.
+
+No independent GL4ES redesign, Diffusion shader/material/model change, accepted array/provider/argument change, device test, user evidence request, crash investigation, later phase, duplicate CI run, or instrumentation-only IPA is authorized. A substantive contradiction in the accepted patch must stop with exact evidence rather than be silently redesigned.
+
+Active executor is preserved Xash Worker Gen 3 thread `01a02a6a-349a-75f1-88dc-c1ad920dd38e`. It must update/read-back verify ControlPlane and both ledgers, push, confirm clean local/live-remote equality, callback the orchestrator with the selected outcome and exact identities, and stop for review.
+
+Stop state: **WO-056 Phase P production integration and build qualification checkpoint is active.**
+
+The authoritative Google Docs ledger order append was revision-guarded and verified by heading/stop-state readback at revision `AIroW37PnkPqMsbHyPFXDL72uZ-ytXchFloR1kcCa0KhAwyKdhfgD6WU1dcBQ6Z1_TKPzO-zGIuga59l_E6OQ9-wVTgoZCynTz9rwtNdkg4`.

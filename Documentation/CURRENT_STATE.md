@@ -1,6 +1,6 @@
 # Xash3DiOS Current State
 
-Last updated: `2026-08-23T00:05:59+05:30`
+Last updated: `2026-08-23T00:56:18+05:30`
 
 ## Repository
 
@@ -9,28 +9,29 @@ Last updated: `2026-08-23T00:05:59+05:30`
 - Phase O starting ControlPlane commit: `4591b6753ca068185c7edb2be62348a5be99692e`
 - Phase O implementation/candidate commits: `15b831ae6a25d79a01cff0a2d14c53e13cd9f89a` and `f42f2c96b61624fe510fe32288bfbfa6873cc686`
 - Phase O reporting / Phase P ControlPlane baseline: `78ae00a86b2938943b8c0d2f7ba6846bee6b7538`
+- Phase P patch implementation: `d37bf36a5b707273359728a5ae08f81e712bea5d`; production-integration order baseline: `6e5e464bca5d0b0cc3e6d76e5ca3cf362ccb232d`
 - Latest build-qualified candidate: Bundle 130 at `f42f2c96b61624fe510fe32288bfbfa6873cc686`
 - Qualifying workflow `32570119378`, job `97024299913`, artifact `9475150885`; no relevant workflow remains active
 
 ## Current control state
 
 - Current issued work order: [WO-056](../WorkOrders/WO-056.md), Phase P active
-- Status: Phase O Outcome A is accepted; the Phase P source-lineage and downstream patch-materialization checkpoints are complete, with the latter stopped at orchestrator review
+- Status: Phase O Outcome A and the Phase P source-lineage/patch-materialization checkpoints are accepted; the Phase P production-integration and build-qualification checkpoint is active
 - Current phase: WO-056 Phase P - ordinary-runtime fragment explicit-LOD shader compatibility
-- First incomplete step: orchestrator review of the completed patch-materialization checkpoint and an explicit decision on whether to authorize the separate Phase P validator/integration checkpoint
+- First incomplete step: integrate the exact accepted shader-LOD patch into the canonical production GL4ES patch stack and make its machine contract/validator part of the retained qualification surfaces
 - Corrected boundary: GL4ES's generic ESSL probe formed malformed `#version 300 es#extension ...` source, leaving `hardext.glsl300es=0`; `BuildExtensionsList` therefore withheld `GL_EXT_texture_array` before the engine layer query
 - Verified Phase P boundary: texture-array use promotes the affected fragment shaders to ESSL 300, but baseline GL4ES still applies its ESSL 100 extension rewrite, emitting a rejected `GL_EXT_shader_texture_lod` directive and undeclared `texture2DLodEXT`; the paired vertex stage remains ESSL 100 unless GL4ES's existing program compatibility/reconversion state carries an ESSL 300 requirement across both stages
 - Preserved unresolved boundary: the user-observed hard crash occurs after the last durable engine record and remains separate from Phase P
 
 ## Active worker binding
 
-- Active implementation worker: none at this review gate. Repeated fresh-worker and orchestrator prompt transports failed at the exact generated-edit boundary; the orchestrator completed the already-authorized patch checkpoint by mechanical before/after derivation.
-- Most recent attempted worker: fresh Xash3DiOS ControlPlane worker, thread `01a02a6a-349a-75f1-88dc-c1ad920dd38e`, host `slingshot:env_e_6a6f826a8f4483218b6956e12dea53cc`; no failed transport wrote repository state.
+- Active implementation worker: preserved Xash Worker Gen 3 thread `01a02a6a-349a-75f1-88dc-c1ad920dd38e`, host `slingshot:env_e_6a6f826a8f4483218b6956e12dea53cc`, reactivated for the published production-integration/build-qualification checkpoint.
+- Prior patch-materialization transport failures wrote no repository state; the accepted implementation is the mechanically derived top-level patch at `d37bf36a5b707273359728a5ae08f81e712bea5d`.
 - Superseded continuation worker: `Continue Work Order 56`, thread `01a022ae-5ea9-7121-8512-2fe40f5e99a2`; retained as implementation history after repeated context/policy transport failures and no longer the active executor.
 - Superseded execution worker: `Xash3DiOS Worker Bootstrap`, thread `019ff1ea-8387-7291-b391-f030d22db2ef`; retained as implementation history but removed from active execution after repeated context/policy transport failures and current `systemError` status.
 - Handoff boundary: the superseded worker consumed no Phase P CI run or candidate and made no top-level source commit. It left exploratory, unaccepted edits in the ignored replay checkout `build/wo56m-gl4es-replay4`, principally `src/gl/shaderconv.c` and `src/glx/hardext.c`.
 - Verified lineage finding: fragment-only ESSL 300 promotion leaves the paired vertex shader at ESSL 100; adding `need_essl300` to GL4ES's existing `shaderconv_need_t` accumulation, compatibility, and `redoShader` reconversion owner makes both stages converge on ESSL 300. This is source-lineage qualification only, not production implementation or native compile/link qualification.
-- Any future executor must read this file, [WO-056](../WorkOrders/WO-056.md), [DEC-010](../Decisions/DEC-010.md), and the referenced evidence, preserve commit `d37bf36a5b707273359728a5ae08f81e712bea5d`, and wait for a separate explicit validator/integration order.
+- The active executor must read this file, the final active checkpoint in [WO-056](../WorkOrders/WO-056.md), [DEC-010](../Decisions/DEC-010.md), and the referenced evidence; preserve the accepted patch design; execute only production integration and build qualification; and stop before device or crash work.
 - Completion callback target: orchestrator thread `01a02450-2442-7bd3-9232-46419e80d731` on host `slingshot:env_e_6a6f826a8f4483218b6956e12dea53cc`.
 
 ## Qualification state
@@ -38,7 +39,7 @@ Last updated: `2026-08-23T00:05:59+05:30`
 - Highest physical-device-qualified gate: Bundle 130 ordinary provider/engine/Diffusion texture-array admission with `2,048` live layers
 - Highest build-qualified ordinary candidate: WO-056 Phase O / Bundle 130
 - Latest device result: unplanned but accepted Bundle 130 observation; array admission succeeds, the same incomplete sky/water/text scene appears, affected fragment shader families fail, and the user observes a hard crash after frame 56 or later
-- First unqualified gate: production patch-stack integration plus the complete Phase P positive/mutation/rejection and native/CI qualification matrix
+- First unqualified gate: successful production-stack integration plus the complete Phase P positive/mutation/rejection and native/CI qualification matrix
 - Latest candidate tuple: `f42f2c96b61624fe510fe32288bfbfa6873cc686`; workflow `32570119378`; job `97024299913`; artifact `9475150885`
 - Latest IPA: `xash3d-fwgs-ios-arm64.ipa`, Bundle 130, `8,718,358` bytes, SHA-256 `9FD6E3DD7E8FE19B4B3987479D2E69FFD99EF7FF4368FD1F9884286BB095BB5D`
 
@@ -82,7 +83,7 @@ Last updated: `2026-08-23T00:05:59+05:30`
 - Phase O contract: `scripts/ios/wo56o-provider-lifecycle-contract.json`
 - Phase P required contract: `scripts/ios/wo56p-shader-lod-compatibility-contract.json` or the semantic equivalent named in the worker report
 - Phase P patch: `scripts/ios/gl4es-wo56-shader-lod-compatibility-ios.patch`, `10,564` bytes, SHA-256 `91AB64B6C392303BEA189BE2D66E409836489DFC6F46F2FC3DFB0BACCFA60FE4`
-- Authoritative Google ledger completion record was revision-guarded and verified by readback at revision `AIroW36Pdd17P_c07iiUWT1H5qZhSF4470eZUOzzRjpe2LF1HZpQtgCMZeEUVer8BH9LQupDTCYHSFdWZYkBpBeJNlUHYSU-AJzqnn8uHag`
+- Authoritative Google ledger production-integration order was revision-guarded and verified by readback at revision `AIroW37PnkPqMsbHyPFXDL72uZ-ytXchFloR1kcCa0KhAwyKdhfgD6WU1dcBQ6Z1_TKPzO-zGIuga59l_E6OQ9-wVTgoZCynTz9rwtNdkg4`
 
 ## Referenced decisions
 
