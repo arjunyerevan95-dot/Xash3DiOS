@@ -160,3 +160,33 @@ This manifest references the evidence used to close WO-056 Phases I and J at Out
 - Independent contents: all three production markers in proper owners, diagnostic machinery retained, 13 thin-arm64 objects, zero proprietary game assets.
 - Runtime evidence: none authorized or collected. Physical-device admission, terrain, maps, transitions, gameplay, and `ch1map1` remain unqualified.
 - First incomplete step: orchestrator review and explicit decision whether a new evidence-only device phase is justified.
+
+## Phase N ordinary-device Outcome B evidence
+
+- Status: accepted Outcome B from exactly one orchestrator-authorized Bundle 126 run; no rerun is authorized.
+- Candidate/control tuple: `5a529ff41d23b557e6e4e7878fb31284c7dfc661` / Phase M report `308978fde8f7904c3511ccd6eed6bfb5c975ad5c`.
+- Workflow/job/artifact: [32551387441](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32551387441) / `96978610370` / [9470194619](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32551387441/artifacts/9470194619). The workflow is successful and the artifact was unexpired at Phase O issuance.
+- IPA: `xash3d-fwgs-ios-arm64.ipa`, Bundle 126, `8,717,507` bytes, SHA-256 `F5FE061690C0532C3086B2CCD650E541FCEB14F35128F7A35C66B670AE105ACF`.
+- Tempfile identity at review: [page](https://tempfile.org/MrnVs2sedq5/) / [direct IPA](https://tempfile.org/MrnVs2sedq5/download), ID `MrnVs2sedq5`; metadata reported the exact filename/bytes, no warning, and the direct round-trip hash recorded in Phase M.
+- Device: iPhone 16 Pro Max, iOS 26.6; Apple A18 Pro GPU; `2868x1320` drawable.
+- Runtime identity: `5a529ff4-dirty`, `agent/ios-proof-of-life`, `apple-arm64`; exact ordinary arguments `(null) -dev 2 -log -game diffusion -ref gl4es`.
+- Screenshot attachment: `C:\Users\arjun\.codex\codex-remote-attachments\01a02450-2442-7bd3-9232-46419e80d731\A4B61257-63D1-4C6F-80E0-67E7106A501C\1-Photo-1.jpg`; `53,760` bytes; SHA-256 `9FF030CE0FA2471AF3A7DE354C610A1E1C9DC41CE02878B3DDE88EBE0AABBB47`. It visibly shows sky, water/reflection and intro text but no complete terrain/object scene.
+- Engine-log attachment: `C:\Users\arjun\.codex\codex-remote-attachments\01a02450-2442-7bd3-9232-46419e80d731\A4B61257-63D1-4C6F-80E0-67E7106A501C\2-engine.log`; `189,696` bytes; 2,976 lines; SHA-256 `F1888BC343ADECEFF74A697B7C9E8B73A6D3F0271E336D5D4BD9B929F479459D`.
+- Positive runtime evidence: Diffusion module initialization; `maps/ch1map0.bsp`; first three complete map-trace frames; at least frame 56; world uint-index ingress/native match; drawable presentation.
+- First production divergence: packaged provider marker absent from the log; `GL_EXT_texture_array - failed`; engine `procedures=4 max_layers=0 minimum=16 enabled=0`; Diffusion `extension=0 callbacks=1 max_layers=0 minimum=16 terrain_shaders=full enabled=0`; landscapes explicitly unavailable.
+- Downstream evidence: `GL_EXT_shader_texture_lod` rejected, `texture2DLodEXT` undeclared in Bmodel/Studio fragments, and 593 `StudioSolid` rejections. These are preserved but are not the selected Phase O repair boundary.
+- Termination evidence: log ends after further vegetation-surface creation without an in-process fatal/signal/clean-exit record. Matching current `.ips`: unavailable.
+- Rejected `.ips`: `C:\Users\arjun\.codex\codex-remote-attachments\01a02450-2442-7bd3-9232-46419e80d731\4D6959C3-4408-417A-A202-A0D383E43EE7\1-xash-2026-08-21-120428.ips`; `28,954` bytes; SHA-256 `CE2FF0E4938E929B6C2A5308BFE5F48FAE745120CC9637F14ADF85510D9310F9`; August 21 / Bundle 105. It is not attributable to the August 22 Bundle 126 run.
+- Qualification boundary: Bundle 126 fails live production texture-array admission and complete visible-scene/stability acceptance. Bundle 116 native conformance and Bundle 126 build/argument qualification remain valid.
+
+## Phase O pending provider-lifecycle evidence
+
+- Status: active; no implementation candidate, workflow, artifact, IPA, upload or device test exists at issuance.
+- Control baseline: `308978fde8f7904c3511ccd6eed6bfb5c975ad5c`; implementation baseline: `5a529ff41d23b557e6e4e7878fb31284c7dfc661`.
+- Required machine contract: `scripts/ios/wo56o-provider-lifecycle-contract.json` or the semantically equivalent path named in the report.
+- Required proof: context/currentness and provider discovery ordering; all writes/reads/resets of native ES version, procedures, layer limit, ESSL 300 and array capability; extension-list construction/cache lifecycle; native/wrapper limit agreement; diagnostic-versus-ordinary route comparison; and provider-marker execution-versus-transport.
+- Required rejection evidence: early/stale discovery, state reset, missing procedures, zero/insufficient layers, ESSL 300 failure, unavailable array route, cached list before capability, unconditional advertisement, fabricated limit, force path, direct native bypass, and every terrain fallback.
+- Preserved out-of-scope evidence: shader-LOD/Bmodel/Studio failures, 593 Studio rejections, incomplete scene, abrupt termination, maps/transitions/gameplay and `ch1map1`.
+- Outcome A may retain exactly one qualifying workflow/artifact and one verified IPA/tempfile identity; Outcomes B/C produce no partial runtime candidate.
+- Related decision: [`DEC-009`](../../Decisions/DEC-009.md).
+- Authoritative Google ledger Phase N/Phase O append: revision-guarded and verified by readback at revision `AIroW34aaNvQXMEgSa7x-l1eTqapjucXUj7nWl7rYAVamGDQKOk4YpYSSIBbEDA5_eZcuAhIlBdmkfCdh9xViN5R1a3p26kB_PqnzcSQWsM`.

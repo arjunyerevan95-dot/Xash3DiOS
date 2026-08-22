@@ -2835,3 +2835,35 @@ Remaining risks: Bundle 126 is build-qualified only. No physical-device evidence
 First incomplete step: orchestrator review and an explicit decision whether to authorize a separate evidence-only physical-device ordinary-bootstrap admission test. The unconsumed Phase L authorization did not transfer automatically and was not used.
 
 Stop state: **Work Order 56 Phase M Outcome A is complete at the orchestrator-review gate.** Do not contact Arjun, request evidence or device testing, launch Bundle 126, run another workflow/candidate/upload, enter terrain/gameplay, change `ch1map1`, or begin a later phase without a new explicit orchestrator-authored work order.
+
+## Work Order 56 Phase M acceptance and Phase N device Outcome B
+
+The orchestrator accepts Phase M Outcome A as exact ordinary-argument build qualification. After review, one bounded Bundle 126 run was explicitly authorized in chat on the established iPhone 16 Pro Max / iOS 26.6: install the exact IPA, launch normally, select Start once, wait up to 30 seconds, do not relaunch after termination, and return the screenshot/log plus a matching `.ips` if one exists. This completed run is now materialized as Phase N so its authority and result are durable.
+
+Exact tuple: candidate `5a529ff41d23b557e6e4e7878fb31284c7dfc661`; workflow `32551387441`; job `96978610370`; artifact `9470194619`; `xash3d-fwgs-ios-arm64.ipa`; Bundle 126; `8,717,507` bytes; SHA-256 `F5FE061690C0532C3086B2CCD650E541FCEB14F35128F7A35C66B670AE105ACF`. The log identifies `5a529ff4-dirty`, `agent/ios-proof-of-life`, `apple-arm64`, and exact ordinary arguments `(null) -dev 2 -log -game diffusion -ref gl4es`.
+
+The run advances the established boundary. Diffusion mounts and initializes; `maps/ch1map0.bsp` loads; the first three bounded map-trace frames return completely; at least frame 56 is reached; the world uint-index ingress/native record matches; and the screenshot proves drawable presentation of sky, water and intro text. This is not an immediate launcher failure or blank-screen failure.
+
+The first deterministic production divergence is earlier than the visible omissions: the packaged provider marker is absent from `engine.log` (execution versus transport remains unresolved); the engine reports `GL_EXT_texture_array - failed` and `procedures=4 max_layers=0 minimum=16 enabled=0`; Diffusion reports `extension=0 callbacks=1 max_layers=0 minimum=16 terrain_shaders=full enabled=0` and explicitly disables landscapes. No `GL_INVALID_OPERATION` occurs, so the Phase I sampler-uniform defect is not observed.
+
+The later scene failures are preserved as separate evidence. The live compiler rejects `GL_EXT_shader_texture_lod`; Bmodel/Studio fragments contain undeclared `texture2DLodEXT`; and 593 `StudioSolid` submissions are rejected because their program metadata/linkage is unavailable. The log ends after frame 56 and vegetation-surface creation without an engine fatal, signal or clean-exit record. A matching current `.ips` is unavailable. The supplied August 21 Bundle 105 `.ips` is rejected as evidence for this August 22 Bundle 126 run.
+
+Evidence: screenshot `1-Photo-1.jpg`, `53,760` bytes, SHA-256 `9FF030CE0FA2471AF3A7DE354C610A1E1C9DC41CE02878B3DDE88EBE0AABBB47`; complete `2-engine.log`, `189,696` bytes, 2,976 lines, SHA-256 `F1888BC343ADECEFF74A697B7C9E8B73A6D3F0271E336D5D4BD9B929F479459D`; rejected historical `.ips`, `28,954` bytes, SHA-256 `CE2FF0E4938E929B6C2A5308BFE5F48FAE745120CC9637F14ADF85510D9310F9`.
+
+Selected result: **WORK ORDER 56 PHASE N OUTCOME B.** Bundle 126 fails live production texture-array admission and complete visible-scene/stability qualification. Bundle 116's native-array conformance and Bundle 126's build/argument qualification remain accepted. No rerun is requested.
+
+## Work Order 56 Phase N acceptance and Phase O provider-admission order
+
+The orchestrator accepts Phase N Outcome B and selects the first deterministic disagreement only: **WORK ORDER 56 PHASE O - ORDINARY-RUNTIME GL4ES TEXTURE-ARRAY PROVIDER ADMISSION.** This remains a continuation of WO-056. It does not authorize shader-LOD/Studio/model, foliage, crash, terrain-visual, transition, gameplay or `ch1map1` changes.
+
+Baseline: control `308978fde8f7904c3511ccd6eed6bfb5c975ad5c`; qualified ordinary candidate `5a529ff41d23b557e6e4e7878fb31284c7dfc661`; accepted device prerequisite Bundle 116 Phase J. The first incomplete action is a complete call/lifecycle provenance table from SDL/UIKit/EAGL context creation and currentness through `initialize_gl4es`, `GetHardwareExtensions`, native ES/procedure/layer/ESSL discovery, all `hardext.texture_array` and `hardext.maxarraylayers` writes/resets, `gl4es_texture_array_available()`, extension-list construction/cache, wrapper `glGetString`/`glGetIntegerv`, engine `GL_CheckExtension`, and Diffusion admission. Compare the Phase J diagnostic route with the Phase N ordinary route and distinguish missing marker execution from log transport.
+
+If and only if that audit proves one complete structural cause, Phase O authorizes the smallest coherent correction at its GL4ES/engine lifecycle owner, a machine-readable `scripts/ios/wo56o-provider-lifecycle-contract.json` or semantic equivalent, full positive/mutation/pin/build/package qualification, and at most one retained qualifying workflow/artifact/IPA. The conditional all-required predicate remains live ES3+, required procedures, at least 16 live layers, ESSL 300, compiled GL4ES array route, engine agreement and Diffusion agreement.
+
+Unconditional extension advertisement, fabricated limits, force paths, direct engine/Diffusion native bypass, 2-D/atlas/CPU/layer-zero fallback, changed ordinary arguments, automatic self-test, shader-LOD/Bmodel/Studio/model/vegetation/crash changes, game-data/input/map/transition/gameplay/`ch1map1` changes and Phase O device testing are prohibited. Outcomes are: A, one source-proven correction and one build-qualified candidate; B, a proven broader lifecycle/interface boundary with no partial candidate; C, unresolved alternatives and a minimal future discriminator with no instrumentation-only IPA.
+
+ControlPlane authority is `WorkOrders/WO-056.md`, `Documentation/CURRENT_STATE.md`, `Decisions/DEC-009.md`, and `Evidence/WO-056/manifest.md`. The preserved worker must update/read-back verify ControlPlane and both ledgers, push its final report, confirm local/remote equality, send the mandatory completion callback to the delegating orchestrator, and stop at orchestrator review.
+
+The authoritative Google Docs ledger append was revision-guarded and verified by readback at revision `AIroW34aaNvQXMEgSa7x-l1eTqapjucXUj7nWl7rYAVamGDQKOk4YpYSSIBbEDA5_eZcuAhIlBdmkfCdh9xViN5R1a3p26kB_PqnzcSQWsM`.
+
+Stop state: **Work Order 56 Phase O is active.** No Phase O device test or later phase is authorized.
