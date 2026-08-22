@@ -2772,3 +2772,66 @@ Complete authority, rejection fixtures, evidence fields, and stopping conditions
 Stop state: **Work Order 56 Phase M is active.** The preserved worker may execute the published build-only order, update/read-back verify all durable records, push, send the mandatory completion callback, and stop at orchestrator review. No device or later phase is authorized.
 
 The authoritative Google Docs ledger was appended under revision guard and its Phase M stop-state paragraph was verified by readback at revision `AIroW37tae1LAWrBYYTMvYeeh_9sHD6ReMvvblPZDotrbAQSlIRULeEX4Xtbxvp6FKtHH08vVjI5DdWIvkmENwrDk9vVvA2jZdRMSmIwXfY`.
+
+## 2026-08-22 — Work Order 56 Phase M Outcome A worker report
+
+Selected outcome: **WORK ORDER 56 PHASE M — Outcome A, ordinary-argument candidate build-qualified.** Control baseline `38114ad981ecc145c16e2672abbc2dc688bcdaad`; implementation/candidate commit `5a529ff41d23b557e6e4e7878fb31284c7dfc661`. No device launch, screenshot, engine log, terrain, map, transition, gameplay, or `ch1map1` action was authorized or performed.
+
+### Verified boundary, argument ownership, and structural cause
+
+The verified failure boundary inherited from Phase L was deterministic argument ownership before device installation: Bundle 124's sole disabled field armed the self-test instead of ordinary startup. Phase M proved the complete route: `IOS_LaunchDialog` owns the exact locked field value and tokenizes it into `szArgc/szArgv`; `IOS_GetArgs` returns those values; iOS `main` passes them unchanged to `Host_Main`. No settings, environment, cvar, fallback, or alternate action overrides that route.
+
+The structural correction changes only the locked source value to exact `-dev 2 -log -game diffusion -ref gl4es`, retaining `setEnabled:NO`. The self-test flag parser, conditional host/renderer dispatch, 57-item contract, harness, markers, bounded terminal path, and clean shutdown remain compiled but dormant unless the flag is explicitly supplied through a separately authorized future route. Phase K's provider/engine/Diffusion predicates and terrain consumer are byte-locked by the machine contract and unchanged. Machine-readable contract: `scripts/ios/wo56m-ordinary-bootstrap-contract.json`.
+
+Argument ownership table:
+
+- Locked source value — `IOS_LaunchDialog`, `engine/platform/ios/launchdialog.m`: one exact ordinary tuple assigned to the sole disabled field.
+- Tokenization — `IOS_LaunchDialog`: field text split on spaces into `szArgc/szArgv`, without settings/fallback override.
+- Export — `IOS_GetArgs`: returns those exact values.
+- Host admission — `engine/common/launcher.c::main`: `IOS_LaunchDialog` → `IOS_GetArgs` → `Host_Main`.
+
+### Exact files and commits
+
+Implementation commit: `5a529ff41d23b557e6e4e7878fb31284c7dfc661` (`ios: qualify locked ordinary Diffusion bootstrap`). Exact implementation files changed:
+
+- `engine/platform/ios/launchdialog.m`
+- `scripts/gha/build_ios.sh`
+- `scripts/ios/validate-ios-ordinary-bootstrap.py`
+- `scripts/ios/validate-ios-production-array-admission.py`
+- `scripts/ios/validate-ios-renderer-contract.py`
+- `scripts/ios/validate-ios-selftest-boot.py`
+- `scripts/ios/validate-ios-texture-array.py`
+- `scripts/ios/verify_ipa.sh`
+- `scripts/ios/wo56m-ordinary-bootstrap-contract.json`
+
+Final reporting changes are limited to `Documentation/CURRENT_STATE.md`, `Documentation/XASH3DIOS_PORTING_STATE.md`, `WorkOrders/WO-056.md`, `Decisions/DEC-008.md`, and `Evidence/WO-056/manifest.md`; they are committed separately with `[skip ci]` after this report.
+
+### Validation and rejection proof
+
+- Python compilation and JSON parsing passed for the affected validators and new contract; `git diff --check` passed.
+- Focused Phase M positive and mutation fixtures passed, rejecting tuple inequality, combined automatic self-test, Valve substitution, editable field, field-authority removal, call-flow bypass/reordering, removed flag parser/harness/terminal/marker, unconditional dispatch, settings/fallback override, substring-only package checks, and every locked Phase K production-owner mutation.
+- Retained self-test bootstrap, 57-item renderer contract, native texture-array sampling/readback, production array admission, direct drawable, uint element, index trace, WO49 topology/transform/per-unit target, WO51 material state, WO52 material trace/inactive sampler, and Diffusion shader-policy suites passed.
+- Exact patch replay passed against GL4ES `81547d986798e876de8b434193920b606a72363f`, Diffusion `14d156bf3a6993c172697fac83a937836c3b5561`, MainUI `8c68de2f2325a0130953719efc3ae413eb24e01a`, executable `9505a1c01f597e23c3acb7cbb8852b9dcfb0a038`, and SDL `5d249570393f7a37e037abf22cd6012a4cc56a71`.
+- CI performed the affected Objective-C translation-unit and full iPhoneOS arm64 engine, Half-Life, and Diffusion client/server/menu qualification, then passed the IPA contract.
+
+### Workflow, artifact, IPA, and publication
+
+- Sole retained qualifying workflow: [32551387441](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32551387441), push event, success, exact head `5a529ff41d23b557e6e4e7878fb31284c7dfc661`; job [96978610370](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32551387441/job/96978610370).
+- Automatic PR duplicate `32551389885` was cancelled during dependency installation; its build, IPA verification, and upload steps were skipped, so it produced no qualifying candidate or artifact.
+- Retained GitHub artifact: [Xash3DiOS-arm64-unsigned](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32551387441/artifacts/9470194619), ID `9470194619`, archive size `8,617,082` bytes, digest `sha256:400cde7cf33dc29b6ca72e0376f6d05bc979202622e1e3b98d5cb3d7126e3eef`, expiry `2026-09-05T04:23:34Z`.
+- Exact unsigned IPA: `xash3d-fwgs-ios-arm64.ipa`, Bundle 126, `8,717,507` bytes, SHA-256 `F5FE061690C0532C3086B2CCD650E541FCEB14F35128F7A35C66B670AE105ACF`.
+- Exactly one tempfile object: [information page](https://tempfile.org/MrnVs2sedq5/); [direct IPA](https://tempfile.org/MrnVs2sedq5/download); ID `MrnVs2sedq5`; expiry epoch-ms `1787545730208`. Metadata/security reports the exact filename, byte count and SHA-256, risk `safe`, no warning and no suspicious patterns. A fresh direct-download round trip reproduced the exact size and SHA-256.
+
+Independent package extraction verified Bundle 126, one exact standalone ordinary tuple in `xash`, zero combined ordinary-plus-self-test tuple, one separate self-test flag token, the provider and engine production markers in `libref_gl4es.dylib`, the admission marker in Diffusion `client_arm64.dylib`, retained diagnostic markers, 13 Mach-O objects all thin arm64 (`CPU 0x0100000C`), and zero proprietary game assets.
+
+### Expected markers, qualification boundary, risks, and stop state
+
+Expected ordinary runtime markers remain `iOS production texture array provider:`, `iOS production texture array engine:`, and `iOS production texture array admission:`. Diagnostic markers remain packaged but must not appear from automatic self-test dispatch under the ordinary tuple.
+
+Why the correction addresses the cause: it changes the authoritative locked argument owner, and exact-line source/package discrimination proves the ordinary string cannot pass merely as a prefix of the removed combined string. The byte-locked renderer contracts prove the change does not broaden capability, enable terrain, or weaken the accepted self-test machinery.
+
+Remaining risks: Bundle 126 is build-qualified only. No physical-device evidence proves live provider/engine/Diffusion agreement under ordinary startup. Terrain discovery/loading, production array creation, terrain shader use, drawing, presentation, maps, transitions, gameplay, and `ch1map1` remain unqualified and untouched. GitHub and tempfile retention are finite.
+
+First incomplete step: orchestrator review and an explicit decision whether to authorize a separate evidence-only physical-device ordinary-bootstrap admission test. The unconsumed Phase L authorization did not transfer automatically and was not used.
+
+Stop state: **Work Order 56 Phase M Outcome A is complete at the orchestrator-review gate.** Do not contact Arjun, request evidence or device testing, launch Bundle 126, run another workflow/candidate/upload, enter terrain/gameplay, change `ch1map1`, or begin a later phase without a new explicit orchestrator-authored work order.

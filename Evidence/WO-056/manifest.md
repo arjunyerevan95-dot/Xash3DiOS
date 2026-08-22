@@ -134,7 +134,7 @@ This manifest references the evidence used to close WO-056 Phases I and J at Out
 
 ## Phase M pending ordinary-bootstrap candidate evidence
 
-- Status: active; one bounded audit, locked-tuple implementation, validation update, and build-qualified candidate are authorized. No device test is authorized.
+- Status: superseded by the completed Phase M Outcome A evidence below; no device test was authorized or performed.
 - Control baseline: `c7be0a237ad223e60b7808a903d2411a9154c153`; qualified production baseline: `976c38f3d99d7ef6eaf348188fabf4fe4e722be9` / workflow `32510363562` / artifact `9456949434` / Bundle 124 SHA-256 `FB62C2903E21152DCB74C709656F8FEF841ACE2A22C281F27B90AC02F0E1D04F`.
 - Required source tuple: exact standalone `-dev 2 -log -game diffusion -ref gl4es` in the disabled iOS launch field.
 - Required negative proof: the combined tuple ending in `-gl4es_texture_array_selftest` is absent as a default source/package string; no substring-only verifier may satisfy this gate.
@@ -144,3 +144,19 @@ This manifest references the evidence used to close WO-056 Phases I and J at Out
 - Qualification boundary: Phase M can build-qualify argument routing only. It cannot consume a device authorization or qualify live admission, terrain, maps, transitions, gameplay, or `ch1map1`.
 - Related decision: [`DEC-008`](../../Decisions/DEC-008.md).
 - Authoritative Google ledger: Phase M order appended under revision guard and stop-state paragraph read-back verified at revision `AIroW37tae1LAWrBYYTMvYeeh_9sHD6ReMvvblPZDotrbAQSlIRULeEX4Xtbxvp6FKtHH08vVjI5DdWIvkmENwrDk9vVvA2jZdRMSmIwXfY`.
+
+## Phase M completed ordinary-bootstrap candidate evidence
+
+- Selected outcome: Outcome A; build-qualified only.
+- Baseline: control commit `38114ad981ecc145c16e2672abbc2dc688bcdaad`; implementation/candidate commit `5a529ff41d23b557e6e4e7878fb31284c7dfc661`.
+- Contract: `scripts/ios/wo56m-ordinary-bootstrap-contract.json`; the argument table covers locked source value, tokenization, `IOS_GetArgs`, and `Host_Main` admission.
+- Source/package discriminator: exact standalone `-dev 2 -log -game diffusion -ref gl4es` present once in `xash`; combined default absent; separate self-test token, flag parser, conditional dispatch, harness terminal, and accepted markers retained.
+- Local validation: Python compilation, JSON parsing, focused positive/rejection fixtures, self-test bootstrap and 57-item renderer contract, exact-pin GL4ES/Diffusion patch replay, native array, production admission, drawable, uint-index, index trace, WO49 topology/transform/per-unit target, WO51 material, WO52 trace/inactive-sampler, Diffusion policy, and `git diff --check` passed.
+- Pins: GL4ES `81547d986798e876de8b434193920b606a72363f`; Diffusion `14d156bf3a6993c172697fac83a937836c3b5561`; MainUI `8c68de2f2325a0130953719efc3ae413eb24e01a`; executable `9505a1c01f597e23c3acb7cbb8852b9dcfb0a038`; SDL `5d249570393f7a37e037abf22cd6012a4cc56a71`.
+- Qualifying workflow: [32551387441](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32551387441), job [96978610370](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32551387441/job/96978610370), success. Duplicate PR run `32551389885` cancelled before build/artifact.
+- Artifact: [ID 9470194619](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32551387441/artifacts/9470194619), `8,617,082`-byte archive, digest `sha256:400cde7cf33dc29b6ca72e0376f6d05bc979202622e1e3b98d5cb3d7126e3eef`, expiry `2026-09-05T04:23:34Z`.
+- IPA: `xash3d-fwgs-ios-arm64.ipa`, Bundle 126, `8,717,507` bytes, SHA-256 `F5FE061690C0532C3086B2CCD650E541FCEB14F35128F7A35C66B670AE105ACF`.
+- Mirror: [tempfile page](https://tempfile.org/MrnVs2sedq5/), [direct IPA](https://tempfile.org/MrnVs2sedq5/download); server metadata/security and a fresh download reproduce the IPA identity, `safe` risk, and no warning.
+- Independent contents: all three production markers in proper owners, diagnostic machinery retained, 13 thin-arm64 objects, zero proprietary game assets.
+- Runtime evidence: none authorized or collected. Physical-device admission, terrain, maps, transitions, gameplay, and `ch1map1` remain unqualified.
+- First incomplete step: orchestrator review and explicit decision whether a new evidence-only device phase is justified.
