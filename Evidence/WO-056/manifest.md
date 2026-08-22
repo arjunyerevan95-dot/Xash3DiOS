@@ -85,9 +85,9 @@ This manifest references the evidence used to close WO-056 Phases I and J at Out
 - [`DEC-005`](../../Decisions/DEC-005.md)
 - [`DEC-006`](../../Decisions/DEC-006.md)
 
-## Phase K admission evidence and pending proof
+## Phase K issuance snapshot (superseded by Outcome A below)
 
-- Status: Phase K active; no implementation candidate, workflow, artifact, IPA, or device evidence exists yet.
+- Historical status at issuance: Phase K was active and no implementation candidate, workflow, artifact, IPA, or device evidence existed yet. The later Phase K Outcome A section is authoritative for the completed build result.
 - Authoritative Google ledger Phase K order was appended under revision guard and verified by readback at revision `AIroW37mgJWSAdh9os0FJ0VzXL-r36Dj5xAz9EfzGMg_oXINPkRe-WWO3uZKluW6OOn4DguV3EyefcmwR0ZwOd7v-shLklDwN20hf5dbH84`.
 - Admission baseline: Phase J Outcome A record `cc02ebaa192abb3a11ce5ea520649a096a68ed44`; qualified implementation `bc4b2b7181b3111053f14ff86e8ff634718acf30`.
 - Established runtime boundary: the Phase J log reports `GL_EXT_texture_array - failed` after the successful bounded harness because production capability advertisement remains deliberately disabled.
@@ -96,8 +96,8 @@ This manifest references the evidence used to close WO-056 Phases I and J at Out
 - Diffusion source boundary: its renderer separately gates `R_TEXTURE_ARRAY_EXT`; `GLSL_ALLOW_TEXTURE_ARRAY`, landscape `LOAD_TEXTURE_ARRAY`, and terrain shader use depend on that state.
 - Shader boundary: terrain GLSL uses `sampler2DArray` under `GLSL_ALLOW_TEXTURE_ARRAY && BMODEL_MULTI_LAYERS`; `scripts/ios/diffusion-ios.patch` currently filters `MULTI_LAYERS` on iOS.
 - Required Phase K artifact: `scripts/ios/wo56k-production-array-admission-contract.json` or the semantically equivalent machine-readable path named in the worker report.
-- Required CI evidence if Outcome A: exactly one qualifying workflow and artifact tied to one immutable candidate; all identifiers and IPA hash remain pending.
-- Phase K does not authorize device evidence. A build-qualified candidate, if produced, must stop at orchestrator review and must not be described as terrain/device-accepted.
+- Required CI evidence at issuance was exactly one qualifying workflow and artifact tied to one immutable candidate. That evidence is now recorded in the Phase K Outcome A section below.
+- Phase K did not authorize device evidence. Its completed candidate remains build-qualified rather than terrain/device-accepted.
 
 ## Phase K Outcome A build evidence
 
@@ -131,3 +131,16 @@ This manifest references the evidence used to close WO-056 Phases I and J at Out
 - Qualification boundary: Phase K production admission remains build-qualified; live ordinary-bootstrap production admission remains unqualified. Terrain loading, terrain shader execution, drawing, maps, gameplay, transitions, and `ch1map1` remain prohibited and unqualified.
 - Related decision: [`DEC-007`](../../Decisions/DEC-007.md).
 - First incomplete step: orchestrator review and decision whether a separately authorized ordinary-argument candidate is justified. No automatic patch/build/retry is authorized.
+
+## Phase M pending ordinary-bootstrap candidate evidence
+
+- Status: active; one bounded audit, locked-tuple implementation, validation update, and build-qualified candidate are authorized. No device test is authorized.
+- Control baseline: `c7be0a237ad223e60b7808a903d2411a9154c153`; qualified production baseline: `976c38f3d99d7ef6eaf348188fabf4fe4e722be9` / workflow `32510363562` / artifact `9456949434` / Bundle 124 SHA-256 `FB62C2903E21152DCB74C709656F8FEF841ACE2A22C281F27B90AC02F0E1D04F`.
+- Required source tuple: exact standalone `-dev 2 -log -game diffusion -ref gl4es` in the disabled iOS launch field.
+- Required negative proof: the combined tuple ending in `-gl4es_texture_array_selftest` is absent as a default source/package string; no substring-only verifier may satisfy this gate.
+- Required retained proof: explicit self-test flag parsing, conditional dispatch, bounded terminal machinery, historical markers, and all Phase K provider/engine/Diffusion markers remain compiled and correctly owned, but the default launch cannot arm the diagnostic route.
+- Pending contract: `scripts/ios/wo56m-ordinary-bootstrap-contract.json` or the semantically equivalent path named in the worker report.
+- Pending build evidence for Outcome A: implementation commit, qualifying workflow/job/artifact, IPA bundle version/name/bytes/SHA-256, package-string/owner/architecture/proprietary-data checks, and optional mirror round-trip identity.
+- Qualification boundary: Phase M can build-qualify argument routing only. It cannot consume a device authorization or qualify live admission, terrain, maps, transitions, gameplay, or `ch1map1`.
+- Related decision: [`DEC-008`](../../Decisions/DEC-008.md).
+- Authoritative Google ledger: Phase M order appended under revision guard and stop-state paragraph read-back verified at revision `AIroW37tae1LAWrBYYTMvYeeh_9sHD6ReMvvblPZDotrbAQSlIRULeEX4Xtbxvp6FKtHH08vVjI5DdWIvkmENwrDk9vVvA2jZdRMSmIwXfY`.

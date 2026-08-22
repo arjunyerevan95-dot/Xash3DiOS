@@ -1,34 +1,34 @@
 # Xash3DiOS Current State
 
-Last updated: `2026-08-22T01:53:53+05:30`
+Last updated: `2026-08-22T08:59:27+05:30`
 
 ## Repository
 
 - Project: Xash3DiOS / Half-Life Diffusion iOS port
 - Branch: `agent/ios-proof-of-life`
-- Local HEAD before Phase L materialization: `62ce9f8da4f095122d69628af53a9dfb4b9a16ac`
-- Remote HEAD before Phase L materialization: `62ce9f8da4f095122d69628af53a9dfb4b9a16ac`
-- Worktree before ControlPlane reconciliation: clean; local and remote equal
+- Local HEAD before Phase M materialization: `c7be0a237ad223e60b7808a903d2411a9154c153`
+- Remote HEAD before Phase M materialization: `c7be0a237ad223e60b7808a903d2411a9154c153`
+- Worktree before Phase M materialization: clean; local and remote equal
 - Phase K implementation series: `c063202dc0c0111304e2d0a82a2506f1457f1454` → `12a80912c8c18870cad71e6116fbfeda2e26e2c3` → `38d429b189efc9a46e1a47f8463bf04797641fd6` → candidate `976c38f3d99d7ef6eaf348188fabf4fe4e722be9`
 - Phase K worker-report commit: `a067869505778dcabd8ab47b6b2e583892f8ce36`
 
 ## Current control state
 
-- Current issued work order: [WO-056](../WorkOrders/WO-056.md), Phase L
-- Status: Phase L complete at Outcome C; stopped before device launch and awaiting orchestrator review
-- Current phase: WO-056 Phase L — inconclusive because exact Bundle 124 enforces the prohibited self-test flag
-- First incomplete step: orchestrator decides whether a separately authorized ordinary-argument candidate is justified; the worker must not patch or rebuild automatically
-- Current blocker: exact Bundle 124 cannot run the required ordinary arguments because its disabled launch field hardcodes `-gl4es_texture_array_selftest`
+- Current issued work order: [WO-056](../WorkOrders/WO-056.md), Phase M
+- Status: active; one bounded ordinary-argument implementation and build-qualified candidate are authorized
+- Current phase: WO-056 Phase M — locked ordinary-bootstrap candidate build qualification
+- First incomplete step: the preserved worker audits every source, validator, and packaged-string owner of the launch tuple, then records the complete Phase M argument/dormancy contract before or with implementation
+- Current blocker: no build-qualified IPA yet combines the accepted Phase K production-admission route with the exact ordinary launch tuple `-dev 2 -log -game diffusion -ref gl4es`
 - Current unresolved boundary: live physical-device production texture-array admission before any terrain, map, transition, or gameplay execution
 
 ## Qualification state
 
 - Highest physical-device-qualified gate: WO-056 Phase J / Bundle 116 bounded native texture-array conformance
 - Highest build-qualified production gate: WO-056 Phase K / Bundle 124 conditional production texture-array admission
-- First unqualified gate: physical-device ordinary-bootstrap agreement of the three production-admission markers using a candidate that actually omits the self-test flag
+- First unqualified gate: build/package qualification of an ordinary-argument production-admission candidate; physical-device admission remains the following separate gate
 - Latest candidate: Bundle 124, candidate `976c38f3d99d7ef6eaf348188fabf4fe4e722be9`, workflow `32510363562`
 - Latest IPA: `xash3d-fwgs-ios-arm64.ipa`, `8,717,677` bytes, SHA-256 `FB62C2903E21152DCB74C709656F8FEF841ACE2A22C281F27B90AC02F0E1D04F`
-- Phase K Outcome A remains accepted as build-qualified only. Phase L closed at Outcome C without a launch because Bundle 124 cannot satisfy its ordinary-argument precondition; terrain, map, transition, and gameplay testing remain prohibited.
+- Phase K Outcome A remains accepted as build-qualified only. Phase L Outcome C is accepted as a correct pre-launch stop. Phase M may build one ordinary-argument candidate; no device, terrain, map, transition, or gameplay test is authorized.
 
 ## Accepted Phase K result
 
@@ -46,10 +46,18 @@ Last updated: `2026-08-22T01:53:53+05:30`
 - No install, launch, screenshot, log, `.ips`, terrain, map, transition, gameplay, or `ch1map1` action occurred. The one-run authorization was not consumed.
 - Outcome C does not reject the renderer or production-admission implementation. It leaves live ordinary-bootstrap agreement unqualified.
 
+## Active Phase M boundary
+
+- Change only the locked iOS launch tuple from the diagnostic self-test form to exact ordinary arguments `-dev 2 -log -game diffusion -ref gl4es`; keep the launch field disabled for this candidate.
+- Preserve the self-test implementation and its explicit flag gates as dormant regression machinery. The combined ordinary-plus-self-test launch string must disappear from source and the packaged executable.
+- Update the affected source, validation, mutation, contract, and IPA-verification surfaces so they prove exact ordinary default arguments, reject automatic self-test activation, and retain the already-qualified renderer and harness contracts.
+- Produce at most one qualifying workflow/artifact/IPA, record its exact identities and hashes, and stop at orchestrator review without requesting or performing a device test.
+
 ## Surviving hypotheses and boundaries
 
 - Source, mutation, exact-pin replay, full arm64 build, and packaged-owner verification establish one coherent conditional production admission path.
 - Those gates do not prove that ordinary Diffusion terrain loads, renders, or transitions correctly on physical iOS hardware. Phase L intentionally stops before that boundary.
+- Phase M is an argument-routing/build experiment only. It must not reinterpret Phase K, change capability predicates, or exercise production terrain.
 - Bundle 116's device-qualified array primitive remains the runtime prerequisite; Bundle 124 extends it into production admission but has not exercised production terrain on device.
 - The independent `ch1map1` transition termination remains quarantined and unchanged.
 
@@ -62,13 +70,15 @@ Last updated: `2026-08-22T01:53:53+05:30`
 - Packaged verification: required production markers in their actual owners, 13 thin-arm64 Mach-O objects, and no proprietary game assets
 - Pre-qualification failures `32508365615`, `32509025360`, and `32509723819` are preserved negative evidence and produced no retained artifact
 - Complete evidence index: [Evidence/WO-056/manifest.md](../Evidence/WO-056/manifest.md)
-- Authoritative Google ledger Phase L order was appended under revision guard and verified by readback at revision `AIroW36cJUxGI7JGaMrb1e_-ZnY-2hz35dp3f9oR5_8XOk5WxxvOGFH_ylpE2YQB81wyRM8whgNLXFbiu6v0RmievJgG1VBId2Arbg8P0Cg`.
+- Authoritative Google ledger Phase M order was appended under revision guard and its stop-state paragraph was verified by readback at revision `AIroW37tae1LAWrBYYTMvYeeh_9sHD6ReMvvblPZDotrbAQSlIRULeEX4Xtbxvp6FKtHH08vVjI5DdWIvkmENwrDk9vVvA2jZdRMSmIwXfY`.
+- Phase L order revision: `AIroW36cJUxGI7JGaMrb1e_-ZnY-2hz35dp3f9oR5_8XOk5WxxvOGFH_ylpE2YQB81wyRM8whgNLXFbiu6v0RmievJgG1VBId2Arbg8P0Cg`.
 
 ## PortingOS experiment references
 
 - Completed and accepted prerequisite: WO-056 Phase J / Bundle 116 physical-device native array conformance
 - Accepted build-qualified result: WO-056 Phase K / Bundle 124 conditional production admission, Outcome A
 - Latest experiment: WO-056 Phase L / Bundle 124 ordinary-bootstrap admission-marker acceptance — Outcome C before launch
+- Active experiment: WO-056 Phase M / exact locked ordinary-bootstrap candidate build qualification
 - Phase I contract: `scripts/ios/wo56i-sampling-readback-contract.json`
 - Phase K contract: `scripts/ios/wo56k-production-array-admission-contract.json`
 - Canonical Phase K tuple: candidate `976c38f3` / workflow `32510363562` / Bundle 124 / IPA hash above
@@ -80,6 +90,7 @@ Last updated: `2026-08-22T01:53:53+05:30`
 - [DEC-005 — Accept Bundle 116 native texture-array conformance on device](../Decisions/DEC-005.md)
 - [DEC-006 — Admit device-qualified native texture arrays conditionally into production](../Decisions/DEC-006.md)
 - [DEC-007 — Accept Phase K and qualify live production admission before terrain](../Decisions/DEC-007.md)
+- [DEC-008 — Build one locked ordinary-argument candidate before device admission](../Decisions/DEC-008.md)
 
 ## Standing ControlPlane command
 
@@ -90,7 +101,7 @@ Every worker activation must also include a completion callback directive. After
 ## Future orchestrator/worker bootstrap
 
 1. Read `Documentation/CURRENT_STATE.md`.
-2. Read `WorkOrders/WO-056.md` (Phase L is complete at Outcome C; Bundle 124 must not be launched or rebuilt without a new explicit orchestrator decision).
+2. Read `WorkOrders/WO-056.md` (Phase M is active for one build-qualified ordinary-argument candidate; it does not authorize a device test).
 3. Read only the `Decisions/` and `Evidence/` records referenced there.
 4. Verify current Git/remote/CI state before acting.
 5. Use the historical Google Docs ledger only when deeper context is required.

@@ -2737,3 +2737,38 @@ Exact files changed for Phase L reporting: `Documentation/CURRENT_STATE.md`, `Wo
 First incomplete step: orchestrator review of the contradictory immutable candidate/argument tuple and a decision whether a separately authorized ordinary-argument candidate is justified. The worker does not propose or begin that change automatically.
 
 Stop state: **Work Order 56 Phase L is complete at Outcome C and the orchestrator-review gate.** Do not launch or retest Bundle 124, alter arguments or data, patch, build, run CI, create/upload an artifact, enter terrain/gameplay, modify `ch1map1`, or begin another phase without a new explicit orchestrator-authored order.
+
+## Work Order 56 Phase L acceptance and Phase M ordinary-bootstrap candidate order
+
+Orchestrator decision: **Work Order 56 Phase L Outcome C is accepted as a correct pre-launch stop.** Bundle 124's exact identity passed, but its disabled launch field deterministically includes `-gl4es_texture_array_selftest`; therefore launching it would repeat the diagnostic route instead of testing ordinary production admission. No device launch occurred and the one-run authorization remains unconsumed. Phase K's build-qualified production texture-array implementation is not rejected or reinterpreted.
+
+Selected next boundary: **WORK ORDER 56 PHASE M — LOCKED ORDINARY-BOOTSTRAP CANDIDATE BUILD QUALIFICATION.** This remains a continuation of WO-056. It authorizes one bounded audit and the minimum coherent source/validation/package change needed to build a candidate whose exact locked arguments are `-dev 2 -log -game diffusion -ref gl4es`. It does not authorize device evidence, terrain, gameplay, or `ch1map1`.
+
+### Baseline, objective, and first incomplete action
+
+- Control baseline: `c7be0a237ad223e60b7808a903d2411a9154c153`; production baseline: candidate `976c38f3d99d7ef6eaf348188fabf4fe4e722be9`, workflow `32510363562`, artifact `9456949434`, Bundle 124 IPA SHA-256 `FB62C2903E21152DCB74C709656F8FEF841ACE2A22C281F27B90AC02F0E1D04F`.
+- The iOS call graph is direct: `main` calls `IOS_LaunchDialog`, then `IOS_GetArgs`, then passes the resulting `argc/argv` to `Host_Main`. The disabled text field is therefore the authoritative candidate tuple.
+- Objective: replace only the locked diagnostic tuple with the exact ordinary tuple, keep the field disabled, retain the self-test as explicit-flag-only dormant regression machinery, adapt the affected source/validation/package contracts, build at most one qualifying candidate, and stop before runtime qualification.
+- First incomplete action: inventory every source, validator, mutation fixture, and IPA string check that encodes the default self-test tuple or dormancy invariant and record `scripts/ios/wo56m-ordinary-bootstrap-contract.json` or the reported semantic equivalent before or with implementation.
+
+### Required implementation and package contract
+
+The candidate must contain one exact standalone ordinary launch string and must not contain the old combined ordinary-plus-self-test default string. Package verification must use exact-line or equivalent discrimination rather than prefix substring matching. The self-test flag parser, conditional dispatch, bounded terminal route, harness, and markers must remain compiled but must not be automatically armed. Phase K's provider/engine/Diffusion predicates and markers remain unchanged.
+
+Authorized runtime scope is limited to the locked value in `engine/platform/ios/launchdialog.m`; an accurate constant rename is allowed. Directly affected validators, mutation fixtures, the new machine contract, and `verify_ipa.sh` may change to enforce exact ordinary default arguments, reject accidental self-test activation, and retain all prior regression gates. The field remains disabled; editable settings, `settings.bin` behavior, alternate selectors/actions, cvars, environment overrides, force-enables, fallbacks, and workflow changes are prohibited.
+
+Do not change GL4ES, renderer/engine/Diffusion capability gates, landscape loading, shaders, materials, texture units, samplers, cleanup, data, input, menus beyond the locked text value, maps, terrain, transitions, gameplay, or `ch1map1`. Do not delete or weaken the diagnostic harness. Do not request/run a device test or transfer the unconsumed Phase L authorization to the new candidate.
+
+### Validation, outcomes, and stop gate
+
+Positive and mutation coverage must prove exact ordinary tuple equality, locked-field authority, launch-to-`Host_Main` ownership, absence of the combined default string, dormant explicit-flag self-test machinery, rejection of unconditional dispatch/removal/Valve substitution/editable-field restoration/override/fallback, unchanged production predicates, and correct exact packaged-string logic. Retain every accepted Python/JSON, exact-pin, renderer-contract, texture-array, normal-bootstrap, drawable, uint-index, per-unit-target, material, lifecycle, shader, arm64, IPA, and proprietary-data gate; perform full iPhoneOS arm64 engine/Half-Life/Diffusion qualification.
+
+- **Outcome A:** one coherent ordinary-argument candidate passes source, rejection, exact-pin, full-build, and IPA gates. Retain one qualifying workflow/artifact, publish and independently verify the unsigned IPA once, update/read back ControlPlane and both ledgers, and stop. The result is build-qualified only.
+- **Outcome B:** the audit proves broader launch/settings/harness/renderer/data/workflow coupling is required. Make no partial runtime change or CI build; record the exact boundary and stop.
+- **Outcome C:** source/package evidence cannot distinguish the exact standalone tuple or prove retained self-test dormancy. Make no runtime change/build; record the missing discriminator and stop.
+
+Complete authority, rejection fixtures, evidence fields, and stopping conditions are materialized in `WorkOrders/WO-056.md`; `Documentation/CURRENT_STATE.md`, `Decisions/DEC-008.md`, and `Evidence/WO-056/manifest.md` form the current ControlPlane checkpoint.
+
+Stop state: **Work Order 56 Phase M is active.** The preserved worker may execute the published build-only order, update/read-back verify all durable records, push, send the mandatory completion callback, and stop at orchestrator review. No device or later phase is authorized.
+
+The authoritative Google Docs ledger was appended under revision guard and its Phase M stop-state paragraph was verified by readback at revision `AIroW37tae1LAWrBYYTMvYeeh_9sHD6ReMvvblPZDotrbAQSlIRULeEX4Xtbxvp6FKtHH08vVjI5DdWIvkmENwrDk9vVvA2jZdRMSmIwXfY`.
