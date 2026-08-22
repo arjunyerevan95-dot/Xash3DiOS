@@ -115,6 +115,11 @@ def validate(files: dict[str, str]) -> list[str]:
         "iOS production texture array engine:",
     ):
         require(engine, token, "engine capability gate", failures)
+    if not re.search(
+        r"hardext\.texture_array\s*=\s*hardext\.maxarraylayers\s*>=\s*16\s*;",
+        hardext,
+    ):
+        failures.append("native provider accepts zero or insufficient array layers")
     for token in (
         "GL_TEXTURE_ARRAY_EXT", "IMAGE_MULTILAYER", "GL_TEXTURE_2D_ARRAY_EXT",
         "GL_CreateTextureArray", "GL_LoadTextureArray",
@@ -219,7 +224,7 @@ def fixtures(files: dict[str, str]) -> list[str]:
         ("missing image proc", "hardext", 'gles_getProcAddress("glTexImage3D")', "1"),
         ("missing subimage proc", "hardext", 'gles_getProcAddress("glTexSubImage3D")', "1"),
         ("missing storage proc", "hardext", 'gles_getProcAddress("glTexStorage3D")', "1"),
-        ("zero-layer admission", "hardext", "hardext.maxarraylayers >= 16", "hardext.maxarraylayers >= 0"),
+        ("zero-layer admission", "hardext", "hardext.texture_array = hardext.maxarraylayers >= 16;", "hardext.texture_array = hardext.maxarraylayers >= 0;"),
         ("engine limit disagreement", "engine", "glConfig.max_2d_texture_layers < 16", "glConfig.max_2d_texture_layers < 0"),
         ("absent callbacks accepted", "diffusion_gl", "const bool callbacks = gRenderfuncs.GL_LoadTextureArray != NULL && gRenderfuncs.GL_CreateTextureArray != NULL;", "const bool callbacks = true;"),
         ("wrong texture target", "engine_image", "tex->target = GL_TEXTURE_2D_ARRAY_EXT;", "tex->target = GL_TEXTURE_2D;"),
