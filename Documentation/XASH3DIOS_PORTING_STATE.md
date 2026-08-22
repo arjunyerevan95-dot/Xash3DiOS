@@ -2994,3 +2994,17 @@ The worker must update and read-back verify ControlPlane, this ledger, and the a
 Authoritative Google ledger update was revision-guarded and verified by readback at revision `AIroW36mLoq7WrJrz_hQ7VNAZ8_Cp4ALusa3DW2ZE0kSZO_GS5x9v3CU-c9dwzB8xNVgb24EwecG-HOmPXZeJG3_1ndUT06S-r9l7deSS2o`.
 
 Stop state: **Work Order 56 Phase P is active.** No device test, crash investigation, later phase, or other engineering work is authorized.
+
+## Work Order 56 Phase P source-lineage acceptance and downstream patch checkpoint
+
+The orchestrator accepts the documentation-only Phase P source-lineage checkpoint at `8391769f836d38636895c607180b2b6c83975909`. The evidence establishes one shared GL4ES owner: texture-array fragments already require ESSL 300, but baseline conversion incorrectly applies the ESSL-100-only explicit-LOD extension path; `shaderconv_need_t` plus program compatibility and `redoShader` reconversion must carry the ESSL 300 requirement to the paired vertex stage. This is source-lineage qualification only, not production implementation or native compile/link qualification.
+
+The active executor is now the fresh Xash3DiOS ControlPlane worker, thread `01a02a6a-349a-75f1-88dc-c1ad920dd38e`. The prior `Continue Work Order 56` thread remains retained as history and is no longer the active executor.
+
+The next bounded continuation remains **WO-056 Phase P**. Create only `scripts/ios/gl4es-wo56-shader-lod-compatibility-ios.patch`, representing the verified changes to GL4ES `src/gl/shader.c`, `src/gl/shader.h`, and `src/gl/shaderconv.c`. Replay it in a fresh disposable checkout at exact GL4ES pin `81547d986798e876de8b434193920b606a72363f` after the accepted iOS patch stack. Prove clean application/reversal; core ESSL 300 `textureLod` and cross-stage vertex reconversion for `BmodelSolid`, `StudioSolid`, and `GrassDlight`; preserved ESSL 100/ES2 behavior; and rejection of semantic weakening, bypass, force, unlinked acceptance, error suppression, direct nested-checkout promotion, or unrelated scope.
+
+This checkpoint does not authorize production-stack integration, the full Phase P validator matrix, CI, a candidate, artifact, IPA/tempfile, device testing, crash investigation, or a later phase. The worker must update/read-back verify ControlPlane and both ledgers, push, confirm clean local/remote equality, send the mandatory completion callback, and stop for orchestrator review. No Phase P Outcome A/B/C is selected at this intermediate gate.
+
+Stop state: **WO-056 Phase P downstream patch-materialization checkpoint is active.**
+
+The authoritative Google Docs ledger append was revision-guarded and verified by readback at revision `AIroW37dnb32wczhEtqJuP9iOHLjo5RJGSvYiJXADi9pEq0Myki7rJpJ30vQDRxyHZrca7wDOitGkb6Ak6uR6jp39WTo_H_-1OlxQ6_Bu8Y`.

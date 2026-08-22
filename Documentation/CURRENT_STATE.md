@@ -1,6 +1,6 @@
 # Xash3DiOS Current State
 
-Last updated: `2026-08-22T22:44:34+05:30`
+Last updated: `2026-08-22T23:16:43+05:30`
 
 ## Repository
 
@@ -15,7 +15,7 @@ Last updated: `2026-08-22T22:44:34+05:30`
 ## Current control state
 
 - Current issued work order: [WO-056](../WorkOrders/WO-056.md), Phase P active
-- Status: Phase O Outcome A is accepted; the Phase P source-lineage checkpoint is complete and proves one shared GL4ES ESSL-version/explicit-LOD conversion boundary
+- Status: Phase O Outcome A is accepted; the Phase P source-lineage checkpoint is complete, and the bounded downstream patch-materialization checkpoint is active
 - Current phase: WO-056 Phase P - ordinary-runtime fragment explicit-LOD shader compatibility
 - First incomplete step: encode the verified `shader.c` / `shader.h` / `shaderconv.c` cross-stage ESSL 300 convergence as a new top-level `scripts/ios/gl4es-wo56-shader-lod-compatibility-ios.patch`; preserved nested GL4ES checkouts remain evidence only
 - Corrected boundary: GL4ES's generic ESSL probe formed malformed `#version 300 es#extension ...` source, leaving `hardext.glsl300es=0`; `BuildExtensionsList` therefore withheld `GL_EXT_texture_array` before the engine layer query
@@ -24,11 +24,12 @@ Last updated: `2026-08-22T22:44:34+05:30`
 
 ## Active worker binding
 
-- Active implementation worker: `Continue Work Order 56`, thread `01a022ae-5ea9-7121-8512-2fe40f5e99a2`, host `slingshot:env_e_6a6f826a8f4483218b6956e12dea53cc`.
+- Active implementation worker: fresh Xash3DiOS ControlPlane worker, thread `01a02a6a-349a-75f1-88dc-c1ad920dd38e`, host `slingshot:env_e_6a6f826a8f4483218b6956e12dea53cc`.
+- Superseded continuation worker: `Continue Work Order 56`, thread `01a022ae-5ea9-7121-8512-2fe40f5e99a2`; retained as implementation history after repeated context/policy transport failures and no longer the active executor.
 - Superseded execution worker: `Xash3DiOS Worker Bootstrap`, thread `019ff1ea-8387-7291-b391-f030d22db2ef`; retained as implementation history but removed from active execution after repeated context/policy transport failures and current `systemError` status.
 - Handoff boundary: the superseded worker consumed no Phase P CI run or candidate and made no top-level source commit. It left exploratory, unaccepted edits in the ignored replay checkout `build/wo56m-gl4es-replay4`, principally `src/gl/shaderconv.c` and `src/glx/hardext.c`.
 - Verified lineage finding: fragment-only ESSL 300 promotion leaves the paired vertex shader at ESSL 100; adding `need_essl300` to GL4ES's existing `shaderconv_need_t` accumulation, compatibility, and `redoShader` reconversion owner makes both stages converge on ESSL 300. This is source-lineage qualification only, not production implementation or native compile/link qualification.
-- The active worker must read this file, [WO-056](../WorkOrders/WO-056.md), [DEC-010](../Decisions/DEC-010.md), and the referenced evidence; inspect the preserved replay diff; and continue from Phase P's first incomplete step without accepting or discarding the exploratory diff by assumption.
+- The active worker must read this file, [WO-056](../WorkOrders/WO-056.md), [DEC-010](../Decisions/DEC-010.md), and the referenced evidence; execute only the active Phase P downstream patch-materialization checkpoint; and stop before CI, candidate, IPA, or device work.
 - Completion callback target: orchestrator thread `01a02450-2442-7bd3-9232-46419e80d731` on host `slingshot:env_e_6a6f826a8f4483218b6956e12dea53cc`.
 
 ## Qualification state
@@ -64,7 +65,7 @@ Last updated: `2026-08-22T22:44:34+05:30`
 - Representative `BmodelSolid`, `StudioSolid`, and `GrassDlight` vertex/fragment lineage is verified from Diffusion's assembled desktop GLSL 130 through matched baseline/replay `ConvertShader` output; the exact table and fingerprints are recorded in [WO-056](../WorkOrders/WO-056.md) and the evidence manifest.
 - Baseline fragments are ESSL 300 because of texture arrays yet carry the ESSL 100 `GL_EXT_shader_texture_lod` / `texture2DLodEXT` path; replay fragments use core `textureLod`, and GL4ES program-level need accumulation/reconversion promotes their ESSL 100 vertex partners to ESSL 300.
 - Source lineage identifies one shared structural owner: GL4ES `shaderconv_need_t` plus `gl4es_glLinkProgram` compatibility/reconversion. Native Apple compile/link success has not been claimed or tested in this documentation-only checkpoint.
-- The next authorized action is only the top-level patch-stack implementation named above; complete positive/rejection coverage and candidate qualification remain later gates under this Phase P order.
+- The active checkpoint authorizes only the top-level patch-stack materialization named above and focused deterministic local replay proof. Complete validator-matrix integration, native/CI qualification, artifact/IPA production, and device testing remain later gates under this Phase P order.
 - Preserve explicit mip-LOD behavior; no implicit sampling, constant-LOD, disabled-family, per-family, force, fabricated-capability, unlinked-program, CPU/2-D/atlas, or error-suppression workaround is allowed.
 - Do not alter accepted texture-array admission, arguments, diagnostic harness, materials/data, model/vegetation policy, maps, menus, input, transitions, gameplay, `ch1map1`, crash handling, or platform lifecycle. No Phase P device test is authorized.
 
@@ -78,7 +79,7 @@ Last updated: `2026-08-22T22:44:34+05:30`
 - Phase M contract: `scripts/ios/wo56m-ordinary-bootstrap-contract.json`
 - Phase O contract: `scripts/ios/wo56o-provider-lifecycle-contract.json`
 - Phase P required contract: `scripts/ios/wo56p-shader-lod-compatibility-contract.json` or the semantic equivalent named in the worker report
-- Authoritative Google ledger Phase O acceptance / Bundle 130 observation / Phase P order was revision-guarded and verified by readback at revision `AIroW36mLoq7WrJrz_hQ7VNAZ8_Cp4ALusa3DW2ZE0kSZO_GS5x9v3CU-c9dwzB8xNVgb24EwecG-HOmPXZeJG3_1ndUT06S-r9l7deSS2o`
+- Authoritative Google ledger Phase P downstream patch-materialization checkpoint was revision-guarded and verified by readback at revision `AIroW37dnb32wczhEtqJuP9iOHLjo5RJGSvYiJXADi9pEq0Myki7rJpJ30vQDRxyHZrca7wDOitGkb6Ak6uR6jp39WTo_H_-1OlxQ6_Bu8Y`
 
 ## Referenced decisions
 

@@ -244,3 +244,16 @@ Phase O's worker-produced result was build-qualified only. The later user-perfor
 - Qualification boundary: source lineage and shared ownership are verified; production patch-stack implementation and native compile/link validation are not.
 - First incomplete action: encode the verified three-file convergence in a new top-level `scripts/ios/gl4es-wo56-shader-lod-compatibility-ios.patch`. Nested GL4ES checkouts remain replay/validation environments only.
 - Stop state: documentation checkpoint only; no CI, IPA, device test, crash investigation, or later phase is authorized or started.
+
+## Phase P downstream patch-materialization checkpoint — evidence required
+
+- Baseline/control: `8391769f836d38636895c607180b2b6c83975909`; local and remote were equal and the tree was clean when this checkpoint was issued.
+- Active executor: fresh Xash3DiOS ControlPlane worker, thread `01a02a6a-349a-75f1-88dc-c1ad920dd38e`.
+- Required durable implementation: `scripts/ios/gl4es-wo56-shader-lod-compatibility-ios.patch`.
+- Authorized replay scope: exact GL4ES pin `81547d986798e876de8b434193920b606a72363f`; accepted iOS patch stack followed by the new patch; upstream paths limited to `src/gl/shader.c`, `src/gl/shader.h`, and `src/gl/shaderconv.c`.
+- Required positive evidence: clean stack application; core ESSL 300 `textureLod` for `BmodelSolid`, `StudioSolid`, and `GrassDlight`; program-level reconversion of paired vertices to ESSL 300; retained ESSL 100/ES2 behavior; clean reverse and disposable-checkout state.
+- Required negative evidence: no rejected EXT directive/intrinsic in ESSL 300 output; no family-specific bypass, semantic weakening, fabricated capability, unlinked acceptance, error suppression, direct nested-checkout promotion, or unrelated file scope.
+- Required identities: implementation/reporting commit(s), patch bytes and SHA-256, representative output fingerprints, exact replay checkout/pin and accepted patch order, commands/results, and any minimal proof fixture.
+- Explicitly absent at this gate: full Phase P validator-matrix integration, production patch-stack wiring, CI run/job, candidate, artifact, IPA/tempfile, device test, crash investigation, and Phase P final outcome selection.
+- Stop gate: worker updates and read-back verifies ControlPlane and both ledgers, pushes, confirms clean local/remote equality, sends the mandatory callback, and stops for orchestrator review.
+- Authoritative Google ledger order record: target document `1IYL3pI07fWvoYniP_NxZ7yO3gz9vbnM6sBFK8BT2zLU`, tab `t.0`; revision-guarded append and heading/stop-state readback verified at revision `AIroW37dnb32wczhEtqJuP9iOHLjo5RJGSvYiJXADi9pEq0Myki7rJpJ30vQDRxyHZrca7wDOitGkb6Ak6uR6jp39WTo_H_-1OlxQ6_Bu8Y`.
