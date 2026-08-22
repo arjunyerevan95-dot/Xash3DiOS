@@ -1,6 +1,6 @@
 # Xash3DiOS Current State
 
-Last updated: `2026-08-22T19:21:13+05:30`
+Last updated: `2026-08-22T22:44:34+05:30`
 
 ## Repository
 
@@ -15,11 +15,11 @@ Last updated: `2026-08-22T19:21:13+05:30`
 ## Current control state
 
 - Current issued work order: [WO-056](../WorkOrders/WO-056.md), Phase P active
-- Status: Phase O Outcome A is accepted; Bundle 130 device evidence qualifies live ordinary texture-array admission and exposes the fragment explicit-LOD conversion/compiler boundary
+- Status: Phase O Outcome A is accepted; the Phase P source-lineage checkpoint is complete and proves one shared GL4ES ESSL-version/explicit-LOD conversion boundary
 - Current phase: WO-056 Phase P - ordinary-runtime fragment explicit-LOD shader compatibility
-- First incomplete step: produce a representative BmodelSolid/StudioSolid/GrassDlight source-lineage and capability table from Diffusion's assembled GLSL through GL4ES `ConvertShader` to the native Apple compiler before changing runtime code
+- First incomplete step: encode the verified `shader.c` / `shader.h` / `shaderconv.c` cross-stage ESSL 300 convergence as a new top-level `scripts/ios/gl4es-wo56-shader-lod-compatibility-ios.patch`; preserved nested GL4ES checkouts remain evidence only
 - Corrected boundary: GL4ES's generic ESSL probe formed malformed `#version 300 es#extension ...` source, leaving `hardext.glsl300es=0`; `BuildExtensionsList` therefore withheld `GL_EXT_texture_array` before the engine layer query
-- Active boundary: `GL_EXT_shader_texture_lod` is present in the native extension string, but GL4ES emits a rejected extension directive and undeclared `texture2DLodEXT` calls for affected Diffusion fragment shaders
+- Verified Phase P boundary: texture-array use promotes the affected fragment shaders to ESSL 300, but baseline GL4ES still applies its ESSL 100 extension rewrite, emitting a rejected `GL_EXT_shader_texture_lod` directive and undeclared `texture2DLodEXT`; the paired vertex stage remains ESSL 100 unless GL4ES's existing program compatibility/reconversion state carries an ESSL 300 requirement across both stages
 - Preserved unresolved boundary: the user-observed hard crash occurs after the last durable engine record and remains separate from Phase P
 
 ## Active worker binding
@@ -27,7 +27,7 @@ Last updated: `2026-08-22T19:21:13+05:30`
 - Active implementation worker: `Continue Work Order 56`, thread `01a022ae-5ea9-7121-8512-2fe40f5e99a2`, host `slingshot:env_e_6a6f826a8f4483218b6956e12dea53cc`.
 - Superseded execution worker: `Xash3DiOS Worker Bootstrap`, thread `019ff1ea-8387-7291-b391-f030d22db2ef`; retained as implementation history but removed from active execution after repeated context/policy transport failures and current `systemError` status.
 - Handoff boundary: the superseded worker consumed no Phase P CI run or candidate and made no top-level source commit. It left exploratory, unaccepted edits in the ignored replay checkout `build/wo56m-gl4es-replay4`, principally `src/gl/shaderconv.c` and `src/glx/hardext.c`.
-- Preserved implementation finding, not yet an accepted project decision: fragment-only promotion to ESSL 300 would leave the paired vertex shader at ESSL 100 and fail program linking; GL4ES's existing cross-stage compatibility/reconversion path must therefore be included in the Phase P source-lineage proof before any candidate is promoted.
+- Verified lineage finding: fragment-only ESSL 300 promotion leaves the paired vertex shader at ESSL 100; adding `need_essl300` to GL4ES's existing `shaderconv_need_t` accumulation, compatibility, and `redoShader` reconversion owner makes both stages converge on ESSL 300. This is source-lineage qualification only, not production implementation or native compile/link qualification.
 - The active worker must read this file, [WO-056](../WorkOrders/WO-056.md), [DEC-010](../Decisions/DEC-010.md), and the referenced evidence; inspect the preserved replay diff; and continue from Phase P's first incomplete step without accepting or discarding the exploratory diff by assumption.
 - Completion callback target: orchestrator thread `01a02450-2442-7bd3-9232-46419e80d731` on host `slingshot:env_e_6a6f826a8f4483218b6956e12dea53cc`.
 
@@ -36,7 +36,7 @@ Last updated: `2026-08-22T19:21:13+05:30`
 - Highest physical-device-qualified gate: Bundle 130 ordinary provider/engine/Diffusion texture-array admission with `2,048` live layers
 - Highest build-qualified ordinary candidate: WO-056 Phase O / Bundle 130
 - Latest device result: unplanned but accepted Bundle 130 observation; array admission succeeds, the same incomplete sky/water/text scene appears, affected fragment shader families fail, and the user observes a hard crash after frame 56 or later
-- First unqualified gate: coherent explicit-LOD shader source/version compatibility across Diffusion, GL4ES conversion, and the Apple compiler
+- First unqualified gate: production patch-stack implementation and local compile/link validation of the source-proven GL4ES cross-stage ESSL 300 explicit-LOD correction
 - Latest candidate tuple: `f42f2c96b61624fe510fe32288bfbfa6873cc686`; workflow `32570119378`; job `97024299913`; artifact `9475150885`
 - Latest IPA: `xash3d-fwgs-ios-arm64.ipa`, Bundle 130, `8,718,358` bytes, SHA-256 `9FD6E3DD7E8FE19B4B3987479D2E69FFD99EF7FF4368FD1F9884286BB095BB5D`
 
@@ -59,11 +59,12 @@ Last updated: `2026-08-22T19:21:13+05:30`
 - First remaining divergence: 44 fragment compile failures reject `GL_EXT_shader_texture_lod`; 396 `texture2DLodEXT` calls are undeclared; Bmodel/Studio/Grass programs fail and 593 `StudioSolid` submissions are rejected.
 - Termination: the user directly observes a hard crash. The log has no fatal/signal/shutdown marker and ends after frame 56 with the render gate open; no matching Bundle 130 `.ips` is supplied.
 
-## Phase P objective and boundaries
+## Phase P verified lineage and remaining boundaries
 
-- Prove the exact source/version lineage from Diffusion desktop GLSL 130 through `GL_ProcessShader`, `GL_LoadGPUShader`, GL4ES `gl4es_glShaderSource` / `ConvertShader`, and the native Apple compiler.
-- Distinguish ESSL 100 extension `texture2DLodEXT` semantics from ESSL 300 core `textureLod`, and explain the runtime contradiction between advertised `GL_EXT_shader_texture_lod` and compiler rejection.
-- If and only if one shared structural cause is source-proven, correct it at the translator/shader-contract owner, add complete positive/rejection coverage, and retain at most one qualifying ordinary candidate.
+- Representative `BmodelSolid`, `StudioSolid`, and `GrassDlight` vertex/fragment lineage is verified from Diffusion's assembled desktop GLSL 130 through matched baseline/replay `ConvertShader` output; the exact table and fingerprints are recorded in [WO-056](../WorkOrders/WO-056.md) and the evidence manifest.
+- Baseline fragments are ESSL 300 because of texture arrays yet carry the ESSL 100 `GL_EXT_shader_texture_lod` / `texture2DLodEXT` path; replay fragments use core `textureLod`, and GL4ES program-level need accumulation/reconversion promotes their ESSL 100 vertex partners to ESSL 300.
+- Source lineage identifies one shared structural owner: GL4ES `shaderconv_need_t` plus `gl4es_glLinkProgram` compatibility/reconversion. Native Apple compile/link success has not been claimed or tested in this documentation-only checkpoint.
+- The next authorized action is only the top-level patch-stack implementation named above; complete positive/rejection coverage and candidate qualification remain later gates under this Phase P order.
 - Preserve explicit mip-LOD behavior; no implicit sampling, constant-LOD, disabled-family, per-family, force, fabricated-capability, unlinked-program, CPU/2-D/atlas, or error-suppression workaround is allowed.
 - Do not alter accepted texture-array admission, arguments, diagnostic harness, materials/data, model/vegetation policy, maps, menus, input, transitions, gameplay, `ch1map1`, crash handling, or platform lifecycle. No Phase P device test is authorized.
 

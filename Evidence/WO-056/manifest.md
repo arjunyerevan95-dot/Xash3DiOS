@@ -232,3 +232,15 @@ Phase O's worker-produced result was build-qualified only. The later user-perfor
 - Latest useful prior-worker report: no Phase P commit, CI run, candidate, artifact, upload, or device test was consumed. It identified that fragment-only ESSL 300 promotion would pair with an ESSL 100 vertex shader and fail linking, requiring audit of GL4ES's existing cross-stage compatibility/reconversion owner.
 - Preserved exploratory workspace: ignored nested checkout `build/wo56m-gl4es-replay4`; notable unaccepted edits are in `src/gl/shaderconv.c` and `src/glx/hardext.c`. The replay checkout also contains the retained patch-stack modifications, so its aggregate dirty status is not itself a Phase P diff.
 - Qualification rule: the active worker must inspect and source-prove the cross-stage finding within the required BmodelSolid/StudioSolid/GrassDlight lineage before promoting, rewriting, or discarding the exploratory implementation. The finding does not authorize a candidate by itself.
+
+## Phase P source-lineage checkpoint
+
+- Status: complete at documentation-only checkpoint `2026-08-22T22:44:34+05:30`; no production source, CI, IPA, or device action was consumed.
+- Preserved inputs: `build/wo56p-gl4es-baseline`, `build/wo56p-gl4es-replay`, and `C:\Users\arjun\Documents\Codex\2026-08-22\you-are-the-fresh-implementation-worker\.tmp\wo56p`; all were inspected without alteration.
+- Representative evidence: the exact `BmodelSolid`, `StudioSolid`, and `GrassDlight` source/output SHA-256 tuples and the compact vertex/fragment lineage table are recorded in the active Phase P section of [WO-056](../../WorkOrders/WO-056.md).
+- Verified Diffusion origin: `GL_ProcessShader` assembles each stage as desktop `#version 130`; all three fragment families directly include shared `glsl/texfetch.h`, which supplies their `texture2DLod` helpers.
+- Verified provider/baseline: native ES/ESSL 3 and `hardext.glsl300es=1`; the native extension string plus `noshaderlod=0` sets `hardext.shaderlod=1`, while `hardext.cubelod` is not exercised by these 2-D fixtures. Vertices emit ESSL 100; texture-array fragments emit ESSL 300 but still receive the ESSL 100 `GL_EXT_shader_texture_lod` directive and `texture2DLodEXT` rewrite. Apple rejects the fragment extension path, leaving the affected programs unlinked.
+- Verified replay: fragments emit ESSL 300 core `textureLod` with no LOD extension; `need_essl300` is accumulated by `gl4es_glLinkProgram`, makes the initial ESSL 100 vertex conversion incompatible, and causes `redoShader` / `ConvertShader` to reconvert it as ESSL 300.
+- Qualification boundary: source lineage and shared ownership are verified; production patch-stack implementation and native compile/link validation are not.
+- First incomplete action: encode the verified three-file convergence in a new top-level `scripts/ios/gl4es-wo56-shader-lod-compatibility-ios.patch`. Nested GL4ES checkouts remain replay/validation environments only.
+- Stop state: documentation checkpoint only; no CI, IPA, device test, crash investigation, or later phase is authorized or started.
