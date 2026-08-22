@@ -2867,3 +2867,84 @@ ControlPlane authority is `WorkOrders/WO-056.md`, `Documentation/CURRENT_STATE.m
 The authoritative Google Docs ledger append was revision-guarded and verified by readback at revision `AIroW34aaNvQXMEgSa7x-l1eTqapjucXUj7nWl7rYAVamGDQKOk4YpYSSIBbEDA5_eZcuAhIlBdmkfCdh9xViN5R1a3p26kB_PqnzcSQWsM`.
 
 Stop state: **Work Order 56 Phase O is active.** No Phase O device test or later phase is authorized.
++
+
+## Work Order 56 Phase O worker report — Outcome A
+
+Selected outcome: **Outcome A — coherent production admission build-qualified.** Starting ControlPlane/remote head was `4591b6753ca068185c7edb2be62348a5be99692e`. The structural implementation is `15b831ae6a25d79a01cff0a2d14c53e13cd9f89a`; the exact candidate head, including the rejection-fixture correction, is `f42f2c96b61624fe510fe32288bfbfa6873cc686`. Candidate Bundle 130 is build-qualified only, not device-, terrain-, scene-, or stability-accepted.
+
+### Verified boundary, provenance, and structural cause
+
+The first deterministic Phase N boundary is ordinary GL4ES provider admission before engine/Diffusion array consumption. Source tracing proves this lifecycle:
+
+| Stage | Owner and call | Proven result |
+| --- | --- | --- |
+| Context create/current | SDL/UIKit/EAGL `SDL_GL_CreateContext` -> `SDL_GL_MakeCurrent` | Requested ES3 context is current before renderer extension initialization. |
+| Renderer entry | `VID_SetMode` -> `GL_OnContextCreated` | GL4ES get-proc callback is registered before provider initialization. |
+| Provider initialization | `initialize_gl4es` -> `GetHardwareExtensions` | With `NO_INIT_CONSTRUCTOR`, discovery runs once against the live current context. |
+| Native capability | `glGetString(GL_VERSION)`, three 3-D proc lookups, `GL_MAX_ARRAY_TEXTURE_LAYERS` | Native ES major, required procs, and live layer limit are cached conditionally. |
+| ESSL capability | old `testGLSL("#version 300 es", 0)` | The generic helper concatenated `#version 300 es` directly with malformed `#extension require GL_IMG_uniform_buffer_object...` text, so the ESSL 300 probe could not establish `hardext.glsl300es`. |
+| Extension construction | `BuildExtensionsList` | Its correct all-required predicate short-circuited on false `glsl300es`, omitting `GL_EXT_texture_array`. |
+| Engine admission | wrapper `glGetString` -> `GL_CheckExtension` -> layer query | The missing token prevented the engine limit query; Bundle 126 therefore reported four callbacks but `max_layers=0 enabled=0`. |
+| Diffusion admission | engine extension/callback/limit export | Diffusion correctly rejected landscapes from the disabled engine contract. |
+| Teardown | `close_gl4es` -> route reset -> `ResetHardwareExtensions` | Provider and extension cache are destroyed before a future context generation. |
+
+Bundle 116’s diagnostic self-test and Bundle 126’s ordinary route share the same current context and provider discovery. The diagnostic harness directly exercised the wrapper array operations and did not depend on production extension-token admission; the ordinary engine/Diffusion path did. The absent old provider marker was a transport issue: `SHUT_LOGD` is suppressed by the shared-library `nobanner=1` policy and is not an engine.log sink.
+
+The complete predicate remains: live ES3+, `glTexImage3D`, `glTexSubImage3D`, and `glTexStorage3D`; at least 16 live array layers; successful valid ESSL 300 compile; compiled GL4ES array route; engine token/callback/limit agreement; and Diffusion token/callback/limit/terrain-shader agreement.
+
+### Correction and why it addresses the cause
+
+The GL4ES provider now compiles one complete, stage-correct ESSL 300 vertex source with a newline after `#version 300 es`. It does not force the result. The provider caches native-major/procedure/route provenance and exports a read-only snapshot that performs no GL call, error drain, extension rebuild, or cache mutation. The engine prints that snapshot through its durable console transport before its existing independent admission gate. The extension token, limit, wrapper route, engine gate, Diffusion gate, full texture-array consumer, locked ordinary arguments, and dormant diagnostic harness remain conditional and unchanged.
+
+Machine contract: `scripts/ios/wo56o-provider-lifecycle-contract.json`. Expected runtime markers:
+
+- `iOS production texture array provider: native_es_major=<>=3 procedures=1 max_layers=<>=16 minimum=16 glsl300=1 route=1 advertised=1 source=live-context`
+- `iOS production texture array engine: procedures=4 max_layers=<>=16 minimum=16 enabled=1`
+- `iOS production texture array admission: extension=1 callbacks=1 max_layers=<>=16 minimum=16 terrain_shaders=full enabled=1`
+
+No Phase O runtime/device result is claimed.
+
+### Exact files and commits
+
+Implementation commit `15b831ae6a25d79a01cff0a2d14c53e13cd9f89a`:
+
+- `ref/gl/gl_opengl.c`
+- `scripts/gha/build_ios.sh`
+- `scripts/ios/gl4es-wo56-provider-lifecycle-ios.patch`
+- `scripts/ios/validate-ios-provider-lifecycle.py`
+- `scripts/ios/validate-ios-renderer-contract.py`
+- `scripts/ios/validate-ios-selftest-boot.py`
+- `scripts/ios/wo56m-ordinary-bootstrap-contract.json`
+- `scripts/ios/wo56o-provider-lifecycle-contract.json`
+
+Validation-only candidate commit `f42f2c96b61624fe510fe32288bfbfa6873cc686`:
+
+- `scripts/ios/validate-ios-production-array-admission.py`
+
+Reporting changes are limited to `Documentation/CURRENT_STATE.md`, `Documentation/XASH3DIOS_PORTING_STATE.md`, `WorkOrders/WO-056.md`, `Decisions/DEC-009.md`, and `Evidence/WO-056/manifest.md`; the final reporting commit is the commit containing this report and is identified in the Google ledger, callback, and final worker handoff.
+
+### Validation and CI
+
+- Exact GL4ES pin `81547d986798e876de8b434193920b606a72363f` replayed cleanly through all twelve retained patches and the new Phase O patch, then reversed to a clean nested checkout.
+- Eleven locally runnable retained/Phase O validators passed with mutation suites: uint elements, index trace, WO49 topology/transform/per-unit texture target, WO52 material trace, texture array, provider lifecycle, self-test boot, ordinary bootstrap, and the 57-item renderer contract.
+- The Phase K production-admission suite was replayed against pinned, fully patched Diffusion `14d156bf3a6993c172697fac83a937836c3b5561` and rejected the tightened zero-layer fixture. Python compilation, JSON parsing, and `git diff --check` passed.
+- The SDL drawable validator could not run in the local top-level checkout because its CI-fetched SDL source was absent; both successful CI validation and full build covered it.
+- Push run `32569704879` and PR duplicate `32569706595` failed before artifact creation because the pre-existing Phase K zero-layer fixture loosely matched a second legitimate `>=16` expression introduced by the read-only snapshot. The exact provider-assignment fixture was corrected without a runtime change.
+- Sole qualifying workflow: [32570119378](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32570119378), success on exact head `f42f2c96b61624fe510fe32288bfbfa6873cc686`; job [97024299913](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32570119378/job/97024299913). Automatic PR iOS duplicate `32570121887` was cancelled and produced no artifact; deployment workflows skipped.
+- CI passed every source/rejection/pin gate, full iPhoneOS arm64 engine, Half-Life, Diffusion client/server/menu build, IPA contract, marker-owner, architecture, and proprietary-data checks.
+
+### Artifact and IPA
+
+- Retained GitHub artifact: [Xash3DiOS-arm64-unsigned](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32570119378/artifacts/9475150885), ID `9475150885`, archive size `8,620,189` bytes, digest `sha256:0ff55313fc563a301563af10724de5ced9555d518a24768f46c2673e47099293`, expiry `2026-09-05T11:27:53Z`.
+- IPA: `xash3d-fwgs-ios-arm64.ipa`, Bundle 130, `8,718,358` bytes, SHA-256 `9FD6E3DD7E8FE19B4B3987479D2E69FFD99EF7FF4368FD1F9884286BB095BB5D`.
+- Exactly one tempfile.org object: [information page](https://tempfile.org/EA5v8CtY9bT/) and [direct IPA download](https://tempfile.org/EA5v8CtY9bT/download), ID `EA5v8CtY9bT`, expiry `2026-08-24T11:37:45.305Z`. Metadata/security readback matches filename, size, and SHA-256, reports `safe`, no warning, and no suspicious patterns. A fresh direct download reproduced the exact bytes and hash.
+- Independent extraction confirmed Bundle 130; main executable, GL4ES renderer, and Diffusion client/server/menu are thin arm64 Mach-O; all three production markers are present in the correct owner binaries; no proprietary game data is packaged.
+
+### Remaining risks and stop state
+
+Bundle 130 is build-qualified only. The valid ESSL 300 provider probe, enabled provider/engine/Diffusion agreement, landscape availability, terrain creation/shader execution, scene output, later shader-LOD/Bmodel/Studio failures, process termination, transitions, gameplay, and `ch1map1` have no Phase O physical-device qualification. Bundle 126 was not retested.
+
+Single device test/evidence request: **none authorized or requested in Phase O**. The orchestrator may decide in a later explicit order whether a bounded ordinary-bootstrap admission observation is justified.
+
+First incomplete step: orchestrator review of Outcome A and an explicit next decision. Stop state: **Work Order 56 Phase O is complete at the orchestrator-review gate.** Do not contact Arjun, request evidence/testing, launch Bundle 130, run another workflow, create another artifact/upload, address later shader/scene/termination evidence, or begin another phase.

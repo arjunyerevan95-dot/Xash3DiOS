@@ -190,3 +190,18 @@ This manifest references the evidence used to close WO-056 Phases I and J at Out
 - Outcome A may retain exactly one qualifying workflow/artifact and one verified IPA/tempfile identity; Outcomes B/C produce no partial runtime candidate.
 - Related decision: [`DEC-009`](../../Decisions/DEC-009.md).
 - Authoritative Google ledger Phase N/Phase O append: revision-guarded and verified by readback at revision `AIroW34aaNvQXMEgSa7x-l1eTqapjucXUj7nWl7rYAVamGDQKOk4YpYSSIBbEDA5_eZcuAhIlBdmkfCdh9xViN5R1a3p26kB_PqnzcSQWsM`.
+
+## Phase O Outcome A build evidence — Bundle 130
+
+- Starting ControlPlane/remote head: `4591b6753ca068185c7edb2be62348a5be99692e`.
+- Structural implementation: `15b831ae6a25d79a01cff0a2d14c53e13cd9f89a`; exact rejection-fixture correction/candidate head: `f42f2c96b61624fe510fe32288bfbfa6873cc686`.
+- Machine-readable audit: `scripts/ios/wo56o-provider-lifecycle-contract.json`; validator: `scripts/ios/validate-ios-provider-lifecycle.py`.
+- Source proof: `GetHardwareExtensions` ran after current-context establishment, but `testGLSL("#version 300 es", 0)` generated malformed source and prevented `hardext.glsl300es`; conditional extension construction then withheld `GL_EXT_texture_array`.
+- Qualifying push workflow: [32570119378](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32570119378), success; job [97024299913](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32570119378/job/97024299913).
+- Retained artifact: [Xash3DiOS-arm64-unsigned](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32570119378/artifacts/9475150885), ID `9475150885`, archive size `8,620,189` bytes, digest `sha256:0ff55313fc563a301563af10724de5ced9555d518a24768f46c2673e47099293`, expiry `2026-09-05T11:27:53Z`.
+- Exact IPA: `xash3d-fwgs-ios-arm64.ipa`, Bundle 130, `8,718,358` bytes, SHA-256 `9FD6E3DD7E8FE19B4B3987479D2E69FFD99EF7FF4368FD1F9884286BB095BB5D`.
+- Tempfile publication: [information page](https://tempfile.org/EA5v8CtY9bT/) and [direct IPA](https://tempfile.org/EA5v8CtY9bT/download), ID `EA5v8CtY9bT`, expiry `2026-08-24T11:37:45.305Z`. Metadata/security and a fresh direct download match the exact byte count and SHA-256; risk is `safe`, with no warning or suspicious patterns.
+- Pre-artifact CI evidence: push run `32569704879` and its PR duplicate `32569706595` failed at the Phase K zero-layer mutation fixture because the old validator matched a second legitimate `>=16` snapshot expression. Neither produced an artifact. The exact-assignment fixture was corrected without changing runtime code. The later PR duplicate `32570121887` was cancelled and produced no artifact.
+- Independent extraction: Bundle 130; main executable, GL4ES renderer, and Diffusion client/server/menu Mach-O headers are thin arm64 (`CFFAEDFE`, CPU `0C000001`); provider/engine/admission markers are in their owning binaries; the package inventory contains no proprietary game data.
+
+Phase O is build-qualified only. Bundle 126 was not retested, no Phase O device evidence was requested or gathered, and no later phase is authorized.

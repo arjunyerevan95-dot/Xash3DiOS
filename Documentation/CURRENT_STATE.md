@@ -1,33 +1,33 @@
 # Xash3DiOS Current State
 
-Last updated: `2026-08-22T14:35:55+05:30`
+Last updated: `2026-08-22T17:15:02+05:30`
 
 ## Repository
 
 - Project: Xash3DiOS / Half-Life Diffusion iOS port
 - Branch: `agent/ios-proof-of-life`
-- Control baseline before Phase O issuance: `308978fde8f7904c3511ccd6eed6bfb5c975ad5c`
-- Local HEAD and `origin/agent/ios-proof-of-life`: equal at the control baseline with a clean worktree
-- Latest implementation candidate: `5a529ff41d23b557e6e4e7878fb31284c7dfc661` (Bundle 126)
-- No relevant GitHub Actions run is active at Phase O issuance
+- Phase O starting ControlPlane commit: `4591b6753ca068185c7edb2be62348a5be99692e`
+- Phase O implementation/candidate commits: `15b831ae6a25d79a01cff0a2d14c53e13cd9f89a` and `f42f2c96b61624fe510fe32288bfbfa6873cc686`
+- Latest build-qualified candidate: Bundle 130 at `f42f2c96b61624fe510fe32288bfbfa6873cc686`
+- Qualifying workflow `32570119378`, job `97024299913`, artifact `9475150885`; no relevant workflow remains active
 
 ## Current control state
 
-- Current issued work order: [WO-056](../WorkOrders/WO-056.md), Phase O active
-- Status: Phase N physical-device run complete at Outcome B; Phase O provider-admission first-divergence audit/correction is authorized
-- Current phase: WO-056 Phase O - ordinary-runtime GL4ES texture-array provider admission
-- First incomplete step: the preserved worker must trace and record the live context/provider/extension-list lifecycle from SDL/EAGL context currentness through `GetHardwareExtensions`, `BuildExtensionsList`, engine `GL_CheckExtension`, the layer-limit query, and Diffusion admission before changing runtime code
-- Current blocker: Bundle 126 ordinary startup exposes four engine callbacks but reports `GL_EXT_texture_array - failed`, `max_layers=0`, and disabled engine/Diffusion admission despite Bundle 116's device-qualified native array primitive
-- Current unresolved boundary: why the qualified native ES3 array capability is not reflected through GL4ES's ordinary production provider state. The later shader failures and termination are preserved but are not Phase O repair scope
+- Current issued work order: [WO-056](../WorkOrders/WO-056.md), Phase O complete at Outcome A
+- Status: the source-proven ordinary-provider admission defect is coherently corrected and Bundle 130 is build-qualified; stop for orchestrator review
+- Current phase: WO-056 Phase O - worker complete, no later phase authorized
+- First incomplete step: orchestrator review and an explicit future decision whether to authorize physical-device ordinary-bootstrap admission evidence for Bundle 130
+- Corrected boundary: GL4ES's generic ESSL probe formed malformed `#version 300 es#extension ...` source, leaving `hardext.glsl300es=0`; `BuildExtensionsList` therefore withheld `GL_EXT_texture_array` before the engine layer query
+- Preserved unresolved boundary: live device admission and all later shader-LOD/model/scene/termination evidence remain unqualified and out of Phase O scope
 
 ## Qualification state
 
 - Highest physical-device-qualified gate: WO-056 Phase J / Bundle 116 bounded native texture-array conformance
-- Highest build-qualified ordinary candidate: WO-056 Phase M / Bundle 126
+- Highest build-qualified ordinary candidate: WO-056 Phase O / Bundle 130
 - Latest device result: WO-056 Phase N / Bundle 126 Outcome B; `ch1map0.bsp` loaded and drawable frames were presented, but production texture-array admission failed, landscapes were disabled, model/world shader families failed, and the process terminated after at least 56 frames
-- First unqualified gate: live GL4ES provider initialization and conditional `GL_EXT_texture_array` advertisement during ordinary startup
-- Latest candidate tuple: `5a529ff41d23b557e6e4e7878fb31284c7dfc661`; workflow `32551387441`; job `96978610370`; artifact `9470194619`
-- Latest IPA: `xash3d-fwgs-ios-arm64.ipa`, Bundle 126, `8,717,507` bytes, SHA-256 `F5FE061690C0532C3086B2CCD650E541FCEB14F35128F7A35C66B670AE105ACF`
+- First unqualified gate: live device proof that provider, engine, and Diffusion admission markers agree on the corrected ordinary path
+- Latest candidate tuple: `f42f2c96b61624fe510fe32288bfbfa6873cc686`; workflow `32570119378`; job `97024299913`; artifact `9475150885`
+- Latest IPA: `xash3d-fwgs-ios-arm64.ipa`, Bundle 130, `8,718,358` bytes, SHA-256 `9FD6E3DD7E8FE19B4B3987479D2E69FFD99EF7FF4368FD1F9884286BB095BB5D`
 
 ## Phase N device result
 
