@@ -2867,8 +2867,6 @@ ControlPlane authority is `WorkOrders/WO-056.md`, `Documentation/CURRENT_STATE.m
 The authoritative Google Docs ledger append was revision-guarded and verified by readback at revision `AIroW34aaNvQXMEgSa7x-l1eTqapjucXUj7nWl7rYAVamGDQKOk4YpYSSIBbEDA5_eZcuAhIlBdmkfCdh9xViN5R1a3p26kB_PqnzcSQWsM`.
 
 Stop state: **Work Order 56 Phase O is active.** No Phase O device test or later phase is authorized.
-+
-
 ## Work Order 56 Phase O worker report — Outcome A
 
 Selected outcome: **Outcome A — coherent production admission build-qualified.** Starting ControlPlane/remote head was `4591b6753ca068185c7edb2be62348a5be99692e`. The structural implementation is `15b831ae6a25d79a01cff0a2d14c53e13cd9f89a`; the exact candidate head, including the rejection-fixture correction, is `f42f2c96b61624fe510fe32288bfbfa6873cc686`. Candidate Bundle 130 is build-qualified only, not device-, terrain-, scene-, or stability-accepted.
@@ -2948,3 +2946,51 @@ Bundle 130 is build-qualified only. The valid ESSL 300 provider probe, enabled p
 Single device test/evidence request: **none authorized or requested in Phase O**. The orchestrator may decide in a later explicit order whether a bounded ordinary-bootstrap admission observation is justified.
 
 First incomplete step: orchestrator review of Outcome A and an explicit next decision. Stop state: **Work Order 56 Phase O is complete at the orchestrator-review gate.** Do not contact Arjun, request evidence/testing, launch Bundle 130, run another workflow, create another artifact/upload, address later shader/scene/termination evidence, or begin another phase.
+
+## Work Order 56 Phase O acceptance, Bundle 130 device observation, and Phase P order
+
+The orchestrator accepts Phase O Outcome A as coherent build qualification. Candidate `f42f2c96b61624fe510fe32288bfbfa6873cc686`, reporting head `78ae00a86b2938943b8c0d2f7ba6846bee6b7538`, workflow `32570119378`, job `97024299913`, artifact `9475150885`, and Bundle 130 IPA identity remain accepted. The malformed ESSL 300 provider probe is corrected and that boundary is not reopened.
+
+A subsequent user-performed ordinary Bundle 130 run is accepted as unplanned but valid evidence without retroactively changing Phase O's no-device-test authority. The established iPhone 16 Pro Max / iOS 26.6 reports `f42f2c96-dirty`, branch `agent/ios-proof-of-life`, `apple-arm64`, and exact arguments `(null) -dev 2 -log -game diffusion -ref gl4es`.
+
+Live ordinary array admission succeeds:
+
+- Provider: `native_es_major=3 procedures=1 max_layers=2048 minimum=16 glsl300=1 route=1 advertised=1 source=live-context`.
+- Engine: `GL_EXT_texture_array` enabled; `procedures=4 max_layers=2048 minimum=16 enabled=1`.
+- Diffusion: `extension=1 callbacks=1 max_layers=2048 minimum=16 terrain_shaders=full enabled=1`.
+
+This qualifies provider/engine/Diffusion texture-array admission on device. It does not establish landscape creation, terrain drawing, complete scene output, or stability.
+
+The first deterministic remaining divergence is the shared fragment explicit-LOD conversion/compiler boundary. `GL4ES_EXTENSIONS` contains `GL_EXT_shader_texture_lod`, yet 44 fragment compilations reject the extension, 396 `texture2DLodEXT` calls are undeclared, Bmodel/Studio/Grass programs fail, and 593 `StudioSolid` submissions are rejected. The screenshot still shows an incomplete sky/water/cloud/text scene.
+
+The user directly observed a hard crash. The complete log contains no fatal, signal, assertion, clean shutdown, or crash marker and ends after frame 56 with the render gate open. That absence does not contradict the device observation; it leaves the mechanism outside the last durable engine record. No matching Bundle 130 `.ips` is supplied. The crash remains downstream and must not be attributed to shader LOD without a source-proven relationship.
+
+Evidence: screenshot `55,609` bytes, SHA-256 `C88414F8C5B66644D645E13F6B60A3B1DF94FCD0084F4A7793E58B57CE4D7ED9`; `engine.log` `196,032` bytes, 3,055 lines, SHA-256 `A4D92F07FCC2401C615B7179D45A06EB01289007D40AFDF537B3324510ACAE47`. No rerun is requested.
+
+Selected next boundary: **WORK ORDER 56 PHASE P — ORDINARY-RUNTIME FRAGMENT EXPLICIT-LOD SHADER COMPATIBILITY.**
+
+Baseline is branch `agent/ios-proof-of-life`, ControlPlane/reporting head `78ae00a86b2938943b8c0d2f7ba6846bee6b7538`, exact candidate `f42f2c96b61624fe510fe32288bfbfa6873cc686`, Bundle 130, workflow `32570119378`, artifact `9475150885`. Phase O array admission is an accepted prerequisite.
+
+Objective: prove the source/version semantics from Diffusion's assembled desktop GLSL through GL4ES `gl4es_glShaderSource` / `ConvertShader` to the native Apple ESSL compiler, explain why `hardext.shaderlod` selects an EXT directive/intrinsic path that the live compiler rejects, and—only if one structural cause is proven—correct the complete explicit-LOD compatibility contract at its responsible translator or shader-contract owner.
+
+The first incomplete action is a source-lineage and capability table for representative `BmodelSolid`, `StudioSolid`, and `GrassDlight` fragment variants. It must record Diffusion source/includes/defines and assembled `#version 130` input, original GL4ES input, selected converter target version, native ES/ESSL and `hardext.shaderlod` / `cubelod` provenance, emitted native version/directives/intrinsics, compile/link/cache outcome, downstream consumption, and the shared `texfetch.h` lineage. No runtime code may change before that table identifies shared ownership.
+
+The audit must trace `GL_ProcessShader`, `GL_LoadGPUShader`, `pglShaderSourceARB`, GL4ES `gl4es_glShaderSource`, `ConvertShader`, native source/compile calls, `GL_CreateUberShader`, and affected program caches. It must distinguish desktop GLSL 130 `texture2DLod`, ESSL 100 extension `texture2DLodEXT`, and ESSL 300 core `textureLod`; explain the advertised-extension/compiler contradiction; and prove whether the failure is one shared GL4ES conversion defect, a Diffusion source-contract defect, a mixed-version path, or multiple defects.
+
+Only after one complete structural cause is proven may the worker apply the smallest coherent owner correction, preserve explicit mip-LOD semantics, add `scripts/ios/wo56p-shader-lod-compatibility-contract.json` or its semantic equivalent, run complete positive/mutation/rejection/pin/build/package qualification, and retain at most one candidate/workflow/artifact/IPA.
+
+Prohibited: implicit sampling, constant/layer-zero result, CPU/2-D/atlas fallback, disabled shader families, directive-only deletion with incompatible EXT intrinsics, blind global renaming, forced/fabricated capability, error suppression, uncompiled/unlinked acceptance, per-family workarounds where a shared owner exists, changes to accepted array admission/markers, arguments, diagnostics, materials/model data, vegetation policy, maps, menus, input, transitions, gameplay, `ch1map1`, crash handling, or lifecycle. No Phase P device test, crash investigation, user contact, or later phase is authorized.
+
+Validation must cover representative/shared source lineage; version and extension/core branching; directive placement; intrinsic spelling; `shaderlod` / `cubelod`; false/missing extension; ES2/ES3; no-shader-lod; converter bypass; source corruption; semantic weakening; partial-family patches; unlinked acceptance; and error suppression. Retain all Phase I/J/K/M/O renderer, array, argument, drawable, index, material, lifecycle, pin, arm64, IPA, marker-owner, and data-exclusion gates.
+
+Outcomes:
+
+- Outcome A: one source-proven shared defect is corrected, complete gates pass, and exactly one build-qualified candidate is published once. No device/scene/stability/gameplay acceptance.
+- Outcome B: a broader shader-language migration or translator redesign is required; no partial candidate/build/upload.
+- Outcome C: alternatives remain unresolved; record the minimum discriminator and produce no candidate/build/upload or instrumentation-only IPA.
+
+The worker must update and read-back verify ControlPlane, this ledger, and the authoritative Google ledger; push; confirm clean local/remote equality; and callback orchestrator thread `01a02450-2442-7bd3-9232-46419e80d731` on host `local` with outcome, final reporting commit, CI/artifact/IPA identity where applicable, qualification boundary, first incomplete step, and stop state.
+
+Authoritative Google ledger update was revision-guarded and verified by readback at revision `AIroW36mLoq7WrJrz_hQ7VNAZ8_Cp4ALusa3DW2ZE0kSZO_GS5x9v3CU-c9dwzB8xNVgb24EwecG-HOmPXZeJG3_1ndUT06S-r9l7deSS2o`.
+
+Stop state: **Work Order 56 Phase P is active.** No device test, crash investigation, later phase, or other engineering work is authorized.

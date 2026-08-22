@@ -204,4 +204,23 @@ This manifest references the evidence used to close WO-056 Phases I and J at Out
 - Pre-artifact CI evidence: push run `32569704879` and its PR duplicate `32569706595` failed at the Phase K zero-layer mutation fixture because the old validator matched a second legitimate `>=16` snapshot expression. Neither produced an artifact. The exact-assignment fixture was corrected without changing runtime code. The later PR duplicate `32570121887` was cancelled and produced no artifact.
 - Independent extraction: Bundle 130; main executable, GL4ES renderer, and Diffusion client/server/menu Mach-O headers are thin arm64 (`CFFAEDFE`, CPU `0C000001`); provider/engine/admission markers are in their owning binaries; the package inventory contains no proprietary game data.
 
-Phase O is build-qualified only. Bundle 126 was not retested, no Phase O device evidence was requested or gathered, and no later phase is authorized.
+Phase O's worker-produced result was build-qualified only. The later user-performed Bundle 130 observation below is separate evidence and does not retroactively change Phase O's authorization.
+
+## Bundle 130 device observation and Phase P prerequisite
+
+- Status: unplanned but accepted single ordinary-runtime observation on the established iPhone 16 Pro Max / iOS 26.6; no rerun requested.
+- Candidate: `f42f2c96b61624fe510fe32288bfbfa6873cc686`; runtime `f42f2c96-dirty`, branch `agent/ios-proof-of-life`, `apple-arm64`.
+- Exact arguments: `(null) -dev 2 -log -game diffusion -ref gl4es`.
+- Provider marker: `native_es_major=3 procedures=1 max_layers=2048 minimum=16 glsl300=1 route=1 advertised=1 source=live-context`.
+- Engine marker: `GL_EXT_texture_array` enabled; `procedures=4 max_layers=2048 minimum=16 enabled=1`.
+- Diffusion marker: `extension=1 callbacks=1 max_layers=2048 minimum=16 terrain_shaders=full enabled=1`.
+- Accepted boundary: live ordinary provider/engine/Diffusion texture-array admission. Landscape creation/drawing and complete scene/stability are not established.
+- First deterministic remaining divergence: native `GL4ES_EXTENSIONS` includes `GL_EXT_shader_texture_lod`, yet 44 fragment compilations reject the extension, 396 `texture2DLodEXT` calls are undeclared, affected Bmodel/Studio/Grass programs fail, and 593 `StudioSolid` submissions are rejected.
+- Screenshot: `C:\Users\arjun\.codex\codex-remote-attachments\01a02450-2442-7bd3-9232-46419e80d731\A69C4C28-8963-4A2C-AAA7-BF134733EECF\1-Photo-1.jpg`; `55,609` bytes; SHA-256 `C88414F8C5B66644D645E13F6B60A3B1DF94FCD0084F4A7793E58B57CE4D7ED9`.
+- Engine log: `C:\Users\arjun\.codex\codex-remote-attachments\01a02450-2442-7bd3-9232-46419e80d731\A69C4C28-8963-4A2C-AAA7-BF134733EECF\2-engine.log`; `196,032` bytes; 3,055 lines; SHA-256 `A4D92F07FCC2401C615B7179D45A06EB01289007D40AFDF537B3324510ACAE47`.
+- User observation: the process hard crashed. The log has no fatal/signal/assertion/shutdown record and ends after frame 56 with the render gate open; no matching Bundle 130 `.ips` is supplied.
+- Phase P required audit: Diffusion `GL_ProcessShader` / `GL_LoadGPUShader`; GL4ES `gl4es_glShaderSource` / `ConvertShader`; `hardext.shaderlod` / `cubelod`; emitted native version/directive/intrinsic; native compile/link and shared `texfetch.h` consumer lineage.
+- Phase P machine contract: `scripts/ios/wo56p-shader-lod-compatibility-contract.json` or the semantic equivalent named in the worker report.
+- Related decision: [DEC-010](../../Decisions/DEC-010.md).
+- Authoritative Google ledger: revision-guarded and verified by readback at `AIroW36mLoq7WrJrz_hQ7VNAZ8_Cp4ALusa3DW2ZE0kSZO_GS5x9v3CU-c9dwzB8xNVgb24EwecG-HOmPXZeJG3_1ndUT06S-r9l7deSS2o`.
+- Stop state: WO-056 Phase P active; no device test, crash investigation, or later phase authorized.

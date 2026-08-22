@@ -1,6 +1,6 @@
 # Xash3DiOS Current State
 
-Last updated: `2026-08-22T17:15:02+05:30`
+Last updated: `2026-08-22T17:58:37+05:30`
 
 ## Repository
 
@@ -8,24 +8,26 @@ Last updated: `2026-08-22T17:15:02+05:30`
 - Branch: `agent/ios-proof-of-life`
 - Phase O starting ControlPlane commit: `4591b6753ca068185c7edb2be62348a5be99692e`
 - Phase O implementation/candidate commits: `15b831ae6a25d79a01cff0a2d14c53e13cd9f89a` and `f42f2c96b61624fe510fe32288bfbfa6873cc686`
+- Phase O reporting / Phase P ControlPlane baseline: `78ae00a86b2938943b8c0d2f7ba6846bee6b7538`
 - Latest build-qualified candidate: Bundle 130 at `f42f2c96b61624fe510fe32288bfbfa6873cc686`
 - Qualifying workflow `32570119378`, job `97024299913`, artifact `9475150885`; no relevant workflow remains active
 
 ## Current control state
 
-- Current issued work order: [WO-056](../WorkOrders/WO-056.md), Phase O complete at Outcome A
-- Status: the source-proven ordinary-provider admission defect is coherently corrected and Bundle 130 is build-qualified; stop for orchestrator review
-- Current phase: WO-056 Phase O - worker complete, no later phase authorized
-- First incomplete step: orchestrator review and an explicit future decision whether to authorize physical-device ordinary-bootstrap admission evidence for Bundle 130
+- Current issued work order: [WO-056](../WorkOrders/WO-056.md), Phase P active
+- Status: Phase O Outcome A is accepted; Bundle 130 device evidence qualifies live ordinary texture-array admission and exposes the fragment explicit-LOD conversion/compiler boundary
+- Current phase: WO-056 Phase P - ordinary-runtime fragment explicit-LOD shader compatibility
+- First incomplete step: produce a representative BmodelSolid/StudioSolid/GrassDlight source-lineage and capability table from Diffusion's assembled GLSL through GL4ES `ConvertShader` to the native Apple compiler before changing runtime code
 - Corrected boundary: GL4ES's generic ESSL probe formed malformed `#version 300 es#extension ...` source, leaving `hardext.glsl300es=0`; `BuildExtensionsList` therefore withheld `GL_EXT_texture_array` before the engine layer query
-- Preserved unresolved boundary: live device admission and all later shader-LOD/model/scene/termination evidence remain unqualified and out of Phase O scope
+- Active boundary: `GL_EXT_shader_texture_lod` is present in the native extension string, but GL4ES emits a rejected extension directive and undeclared `texture2DLodEXT` calls for affected Diffusion fragment shaders
+- Preserved unresolved boundary: the user-observed hard crash occurs after the last durable engine record and remains separate from Phase P
 
 ## Qualification state
 
-- Highest physical-device-qualified gate: WO-056 Phase J / Bundle 116 bounded native texture-array conformance
+- Highest physical-device-qualified gate: Bundle 130 ordinary provider/engine/Diffusion texture-array admission with `2,048` live layers
 - Highest build-qualified ordinary candidate: WO-056 Phase O / Bundle 130
-- Latest device result: WO-056 Phase N / Bundle 126 Outcome B; `ch1map0.bsp` loaded and drawable frames were presented, but production texture-array admission failed, landscapes were disabled, model/world shader families failed, and the process terminated after at least 56 frames
-- First unqualified gate: live device proof that provider, engine, and Diffusion admission markers agree on the corrected ordinary path
+- Latest device result: unplanned but accepted Bundle 130 observation; array admission succeeds, the same incomplete sky/water/text scene appears, affected fragment shader families fail, and the user observes a hard crash after frame 56 or later
+- First unqualified gate: coherent explicit-LOD shader source/version compatibility across Diffusion, GL4ES conversion, and the Apple compiler
 - Latest candidate tuple: `f42f2c96b61624fe510fe32288bfbfa6873cc686`; workflow `32570119378`; job `97024299913`; artifact `9475150885`
 - Latest IPA: `xash3d-fwgs-ios-arm64.ipa`, Bundle 130, `8,718,358` bytes, SHA-256 `9FD6E3DD7E8FE19B4B3987479D2E69FFD99EF7FF4368FD1F9884286BB095BB5D`
 
@@ -39,24 +41,34 @@ Last updated: `2026-08-22T17:15:02+05:30`
 - Termination boundary: the log ends after frame 56 and further vegetation-surface creation without an in-process fatal/signal record. No matching current `.ips` exists. The supplied August 21 `.ips` is Bundle 105 and is rejected as evidence for this run.
 - Outcome B does not revoke Bundle 116 native-array conformance or Bundle 126's build/argument qualification. It rejects live production admission and visible-scene qualification for Bundle 126.
 
-## Phase O objective and boundaries
+## Bundle 130 device evidence
 
-- Prove whether ordinary GL4ES provider discovery runs against a current ES3 context, whether `hardext.maxarraylayers` and `hardext.texture_array` are populated and retained, whether the extension list is constructed or cached before those values exist, whether `gl4es_texture_array_available()` participates at the correct time, and whether the absent provider marker is execution or transport loss.
-- Compare the Bundle 116 diagnostic route with the Bundle 126 ordinary route without moving production ownership outside GL4ES.
-- If and only if one structural cause is source-proven, correct it at its owner, add the complete contract/positive/rejection coverage, and build at most one qualifying ordinary candidate.
-- Preserve conditional rejection for ES2/unknown providers, missing procedures, fewer than 16 layers, failed ESSL 300, or unavailable GL4ES array routes. No unconditional token, fabricated limit, force-enable, direct engine/Diffusion native bypass, 2-D/atlas/CPU fallback, or layer-zero substitution is allowed.
-- Do not change the locked ordinary arguments, diagnostic harness, Diffusion shader-LOD/model families, materials, data, maps, input, transitions, gameplay, crash handling, or `ch1map1`. Do not request or perform a device test in Phase O.
+- Runtime identity: `f42f2c96-dirty`, branch `agent/ios-proof-of-life`, `apple-arm64`; exact ordinary arguments `(null) -dev 2 -log -game diffusion -ref gl4es`.
+- Provider: `native_es_major=3 procedures=1 max_layers=2048 minimum=16 glsl300=1 route=1 advertised=1 source=live-context`.
+- Engine: `GL_EXT_texture_array` enabled; `procedures=4 max_layers=2048 minimum=16 enabled=1`.
+- Diffusion: `extension=1 callbacks=1 max_layers=2048 minimum=16 terrain_shaders=full enabled=1`.
+- First remaining divergence: 44 fragment compile failures reject `GL_EXT_shader_texture_lod`; 396 `texture2DLodEXT` calls are undeclared; Bmodel/Studio/Grass programs fail and 593 `StudioSolid` submissions are rejected.
+- Termination: the user directly observes a hard crash. The log has no fatal/signal/shutdown marker and ends after frame 56 with the render gate open; no matching Bundle 130 `.ips` is supplied.
+
+## Phase P objective and boundaries
+
+- Prove the exact source/version lineage from Diffusion desktop GLSL 130 through `GL_ProcessShader`, `GL_LoadGPUShader`, GL4ES `gl4es_glShaderSource` / `ConvertShader`, and the native Apple compiler.
+- Distinguish ESSL 100 extension `texture2DLodEXT` semantics from ESSL 300 core `textureLod`, and explain the runtime contradiction between advertised `GL_EXT_shader_texture_lod` and compiler rejection.
+- If and only if one shared structural cause is source-proven, correct it at the translator/shader-contract owner, add complete positive/rejection coverage, and retain at most one qualifying ordinary candidate.
+- Preserve explicit mip-LOD behavior; no implicit sampling, constant-LOD, disabled-family, per-family, force, fabricated-capability, unlinked-program, CPU/2-D/atlas, or error-suppression workaround is allowed.
+- Do not alter accepted texture-array admission, arguments, diagnostic harness, materials/data, model/vegetation policy, maps, menus, input, transitions, gameplay, `ch1map1`, crash handling, or platform lifecycle. No Phase P device test is authorized.
 
 ## Latest important evidence
 
-- Screenshot: `1-Photo-1.jpg`, `53,760` bytes, SHA-256 `9FF030CE0FA2471AF3A7DE354C610A1E1C9DC41CE02878B3DDE88EBE0AABBB47`
-- Engine log: `2-engine.log`, `189,696` bytes, 2,976 lines, SHA-256 `F1888BC343ADECEFF74A697B7C9E8B73A6D3F0271E336D5D4BD9B929F479459D`
+- Bundle 130 screenshot: `1-Photo-1.jpg`, `55,609` bytes, SHA-256 `C88414F8C5B66644D645E13F6B60A3B1DF94FCD0084F4A7793E58B57CE4D7ED9`
+- Bundle 130 engine log: `engine.log`, `196,032` bytes, 3,055 lines, SHA-256 `A4D92F07FCC2401C615B7179D45A06EB01289007D40AFDF537B3324510ACAE47`
 - Nonmatching historical crash report: `xash-2026-08-21-120428.ips`, Bundle 105, SHA-256 `CE2FF0E4938E929B6C2A5308BFE5F48FAE745120CC9637F14ADF85510D9310F9`; not attributable to Bundle 126
 - Complete evidence index: [Evidence/WO-056/manifest.md](../Evidence/WO-056/manifest.md)
 - Phase K contract: `scripts/ios/wo56k-production-array-admission-contract.json`
 - Phase M contract: `scripts/ios/wo56m-ordinary-bootstrap-contract.json`
-- Phase O required contract: `scripts/ios/wo56o-provider-lifecycle-contract.json` or the semantic equivalent named in the worker report
-- Authoritative Google ledger Phase N/Phase O append was revision-guarded and verified by readback at revision `AIroW34aaNvQXMEgSa7x-l1eTqapjucXUj7nWl7rYAVamGDQKOk4YpYSSIBbEDA5_eZcuAhIlBdmkfCdh9xViN5R1a3p26kB_PqnzcSQWsM`
+- Phase O contract: `scripts/ios/wo56o-provider-lifecycle-contract.json`
+- Phase P required contract: `scripts/ios/wo56p-shader-lod-compatibility-contract.json` or the semantic equivalent named in the worker report
+- Authoritative Google ledger Phase O acceptance / Bundle 130 observation / Phase P order was revision-guarded and verified by readback at revision `AIroW36mLoq7WrJrz_hQ7VNAZ8_Cp4ALusa3DW2ZE0kSZO_GS5x9v3CU-c9dwzB8xNVgb24EwecG-HOmPXZeJG3_1ndUT06S-r9l7deSS2o`
 
 ## Referenced decisions
 
@@ -65,6 +77,7 @@ Last updated: `2026-08-22T17:15:02+05:30`
 - [DEC-007 - Accept Phase K and qualify live production admission before terrain](../Decisions/DEC-007.md)
 - [DEC-008 - Build one locked ordinary-argument candidate before device admission](../Decisions/DEC-008.md)
 - [DEC-009 - Preserve Phase N Outcome B and repair the first provider-admission divergence](../Decisions/DEC-009.md)
+- [DEC-010 - Accept Bundle 130 array admission and select shader-LOD compatibility](../Decisions/DEC-010.md)
 
 ## Standing ControlPlane commands
 
@@ -77,7 +90,7 @@ Every worker activation must include a completion callback directive. After the 
 ## Future orchestrator/worker bootstrap
 
 1. Read `Documentation/CURRENT_STATE.md`.
-2. Read `WorkOrders/WO-056.md` (Phase O is active).
+2. Read `WorkOrders/WO-056.md` (Phase P is active).
 3. Read only the `Decisions/` and `Evidence/` records referenced there.
 4. Verify current Git/remote/CI state before acting.
 5. Use the historical Google Docs ledger only when deeper context is required.
