@@ -3008,3 +3008,17 @@ This checkpoint does not authorize production-stack integration, the full Phase 
 Stop state: **WO-056 Phase P downstream patch-materialization checkpoint is active.**
 
 The authoritative Google Docs ledger append was revision-guarded and verified by readback at revision `AIroW37dnb32wczhEtqJuP9iOHLjo5RJGSvYiJXADi9pEq0Myki7rJpJ30vQDRxyHZrca7wDOitGkb6Ak6uR6jp39WTo_H_-1OlxQ6_Bu8Y`.
+
+## Work Order 56 Phase P downstream patch-materialization checkpoint — complete
+
+The bounded Phase P patch checkpoint is complete at orchestrator review. Implementation commit `d37bf36a5b707273359728a5ae08f81e712bea5d` creates `scripts/ios/gl4es-wo56-shader-lod-compatibility-ios.patch`, `10,564` bytes, SHA-256 `91AB64B6C392303BEA189BE2D66E409836489DFC6F46F2FC3DFB0BACCFA60FE4`. It represents exactly GL4ES `src/gl/shader.c`, `src/gl/shader.h`, and `src/gl/shaderconv.c` at pin `81547d986798e876de8b434193920b606a72363f`.
+
+Repeated implementation-worker transports, including a genuinely fresh small-context turn, failed at the generated-edit boundary and wrote no repository state; this orchestrator transport also reproduced the failure. The orchestrator therefore derived the already-qualified three-file before/after delta mechanically. This changed neither the accepted design nor its scope.
+
+Pinned apply/reverse checks pass. A disposable replay matches all three accepted replay files after newline normalization and reverses exactly to baseline. BmodelSolid and StudioSolid fragments produce ESSL 300 core-LOD count 11, GrassDlight count 9, with no rejected LOD extension directive or EXT intrinsic. All three paired vertices reconvert to ESSL 300 through `need_essl300`. With ESSL 300 unavailable, a representative explicit-LOD control is byte-identical before/after at SHA-256 `937a60863d52d6b5ff7d73aa19baa8ea13c81a8a7cde325193f368860e8cd387`, remains ESSL 100, and retains its extension path. Exact scope and source/output checks reject family-specific bypass, semantic weakening, fabricated capability, unlinked acceptance, and error suppression.
+
+No production patch-stack integration, complete Phase P validator matrix, CI, candidate, artifact, IPA/tempfile, device test, crash investigation, later phase, or Phase P Outcome A/B/C was consumed. First incomplete action is orchestrator review and an explicit decision on a separate validator/integration checkpoint.
+
+Stop state: **WO-056 Phase P downstream patch-materialization checkpoint is complete at orchestrator review.**
+
+The authoritative Google Docs ledger completion append was revision-guarded and verified by readback at revision `AIroW36Pdd17P_c07iiUWT1H5qZhSF4470eZUOzzRjpe2LF1HZpQtgCMZeEUVer8BH9LQupDTCYHSFdWZYkBpBeJNlUHYSU-AJzqnn8uHag`.

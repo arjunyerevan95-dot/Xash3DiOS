@@ -257,3 +257,17 @@ Phase O's worker-produced result was build-qualified only. The later user-perfor
 - Explicitly absent at this gate: full Phase P validator-matrix integration, production patch-stack wiring, CI run/job, candidate, artifact, IPA/tempfile, device test, crash investigation, and Phase P final outcome selection.
 - Stop gate: worker updates and read-back verifies ControlPlane and both ledgers, pushes, confirms clean local/remote equality, sends the mandatory callback, and stops for orchestrator review.
 - Authoritative Google ledger order record: target document `1IYL3pI07fWvoYniP_NxZ7yO3gz9vbnM6sBFK8BT2zLU`, tab `t.0`; revision-guarded append and heading/stop-state readback verified at revision `AIroW37dnb32wczhEtqJuP9iOHLjo5RJGSvYiJXADi9pEq0Myki7rJpJ30vQDRxyHZrca7wDOitGkb6Ak6uR6jp39WTo_H_-1OlxQ6_Bu8Y`.
+
+## Phase P downstream patch-materialization checkpoint — completed evidence
+
+- Implementation commit: `d37bf36a5b707273359728a5ae08f81e712bea5d`; patch path `scripts/ios/gl4es-wo56-shader-lod-compatibility-ios.patch`; `10,564` bytes; SHA-256 `91AB64B6C392303BEA189BE2D66E409836489DFC6F46F2FC3DFB0BACCFA60FE4`.
+- Exact patch scope: `src/gl/shader.c`, `src/gl/shader.h`, and `src/gl/shaderconv.c`; three `diff --git` entries and no other path.
+- Exact replay pin: `81547d986798e876de8b434193920b606a72363f` in both preserved baseline/replay environments.
+- Apply/reverse: non-mutating pinned checks passed. Disposable proof directory: `C:\Users\arjun\Documents\Codex\2026-08-21\you-are-the-successor-orchestrator-for\.tmp\wo56p-patch-proof-d37bf36a`; applied content matched all three replay files after newline normalization and reverse matched all three baseline files exactly.
+- Family outputs: `BmodelSolid` and `StudioSolid` fragment core-LOD count `11`; `GrassDlight` count `9`; extension-directive and EXT-intrinsic counts are zero for all replay fragments. Paired reconverted vertices report ESSL 300, stage mappings, and `need_essl300=1`.
+- Legacy negative control: before/after byte equality `true`; SHA-256 `937a60863d52d6b5ff7d73aa19baa8ea13c81a8a7cde325193f368860e8cd387`; ESSL 300 false; one extension directive and one EXT intrinsic retained.
+- Negative scope: no family-specific path, semantic weakening, fabricated capability, unlinked acceptance, error suppression, nested-checkout promotion, or unrelated top-level change.
+- Worker transport: repeated old/fresh worker failures and one orchestrator prompt failure occurred before repository writes. The durable patch was mechanically derived from accepted before/after evidence; no failed-thread state was adopted.
+- Explicitly absent: production-stack integration, Phase P machine contract/full validator matrix, CI run/job, candidate, artifact, IPA/tempfile, device test, crash work, and Phase P final outcome.
+- Authoritative Google ledger completion: target document `1IYL3pI07fWvoYniP_NxZ7yO3gz9vbnM6sBFK8BT2zLU`, tab `t.0`; verified readback revision `AIroW36Pdd17P_c07iiUWT1H5qZhSF4470eZUOzzRjpe2LF1HZpQtgCMZeEUVer8BH9LQupDTCYHSFdWZYkBpBeJNlUHYSU-AJzqnn8uHag`.
+- Stop gate: checkpoint complete at orchestrator review; first incomplete action is the explicit validator/integration decision.
