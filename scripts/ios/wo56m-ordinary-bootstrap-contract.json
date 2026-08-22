@@ -56,7 +56,7 @@
     "scripts/ios/wo56k-production-array-admission-contract.json": "ec57137fcc02caecce5deb08e0dc226320f7accf5c6f322729ee786881c1622a",
     "scripts/ios/gl4es-wo56-production-array-admission-ios.patch": "56b7cea85b2df69193e81a18a8dff933bdc5716b72adee2c0afc7aa500ce8f05",
     "scripts/ios/diffusion-wo56-production-array-admission-ios.patch": "53ed027bca76bb2415db16b9fc041d8fc7cef81ec0a9b15d1304dc85f7fd86ca",
-    "ref/gl/gl_opengl.c": "e83b6f52e9745d43cbecb8c0f92d3c6097b06d5833c0ce9b74e3c70264133aee",
+    "ref/gl/gl_opengl.c": "45af59be990a89cd46057ac822e6060b783e3e3880618bfb09f03e2bbfba7874",
     "ref/gl/gl_image.c": "942c1c63375e44a9fa87a24a8b88ea232f305cd963ba0745f1dc8de65ecacfb9",
     "ref/gl/gl_context.c": "90df60a4508aa194dd56181adc7130158620eabc8da92c0cfe7ab6ecdc459f3f"
   },

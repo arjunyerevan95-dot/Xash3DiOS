@@ -922,6 +922,16 @@ static void GL_InitExtensionsBigGL( void )
 	}
 
 	// 2d texture array support
+	#if XASH_IOS && XASH_GL4ES
+	{
+		int native_es_major = 0, procedures = 0, max_layers = 0;
+		int glsl300 = 0, route_available = 0, advertised = 0;
+		gl4es_get_texture_array_provider_state( &native_es_major, &procedures,
+			&max_layers, &glsl300, &route_available, &advertised );
+		gEngfuncs.Con_Printf( "iOS production texture array provider: native_es_major=%d procedures=%d max_layers=%d minimum=16 glsl300=%d route=%d advertised=%d source=live-context\n",
+			native_es_major, procedures, max_layers, glsl300, route_available, advertised );
+	}
+	#endif
 	if( GL_CheckExtension( "GL_EXT_texture_array", texturearrayfuncs, ARRAYSIZE( texturearrayfuncs ), "gl_texture_2d_array", GL_TEXTURE_ARRAY_EXT, 0 ))
 	{
 		pglGetIntegerv( GL_MAX_ARRAY_TEXTURE_LAYERS_EXT, &glConfig.max_2d_texture_layers );
