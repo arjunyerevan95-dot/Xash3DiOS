@@ -124,6 +124,10 @@ static struct sigaction old_segv_act;
 static struct sigaction old_abrt_act;
 static struct sigaction old_bus_act;
 static struct sigaction old_ill_act;
+static struct sigaction old_fpe_act;
+#ifdef SIGTRAP
+static struct sigaction old_trap_act;
+#endif
 
 void Sys_SetupCrashHandler( const char *argv0 )
 {
@@ -160,6 +164,10 @@ void Sys_SetupCrashHandler( const char *argv0 )
 	sigaction( SIGABRT, &act, &old_abrt_act );
 	sigaction( SIGBUS,  &act, &old_bus_act );
 	sigaction( SIGILL,  &act, &old_ill_act );
+	sigaction( SIGFPE,  &act, &old_fpe_act );
+#ifdef SIGTRAP
+	sigaction( SIGTRAP, &act, &old_trap_act );
+#endif
 }
 
 void Sys_RestoreCrashHandler( void )
@@ -168,6 +176,10 @@ void Sys_RestoreCrashHandler( void )
 	sigaction( SIGABRT, &old_abrt_act, NULL );
 	sigaction( SIGBUS,  &old_bus_act, NULL );
 	sigaction( SIGILL,  &old_ill_act, NULL );
+	sigaction( SIGFPE,  &old_fpe_act, NULL );
+#ifdef SIGTRAP
+	sigaction( SIGTRAP, &old_trap_act, NULL );
+#endif
 }
 
 #endif // XASH_FREEBSD || XASH_NETBSD || XASH_OPENBSD || XASH_ANDROID || XASH_LINUX

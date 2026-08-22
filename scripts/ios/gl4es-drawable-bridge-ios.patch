@@ -1,0 +1,232 @@
+diff --git a/include/gl4esinit.h b/include/gl4esinit.h
+index 79cbb344..5cbe66a6 100644
+--- a/include/gl4esinit.h
++++ b/include/gl4esinit.h
+@@ -27,0 +28,22 @@ void* APIENTRY_GL4ES gl4es_GetProcAddress(const char *name);
++#define GL4ES_EXTERNAL_DEFAULT_STATE_VERSION 1
++typedef struct gl4es_external_default_state_s {
++    unsigned int version;
++    unsigned int size;
++    unsigned int registered_framebuffer;
++    unsigned int generation;
++    unsigned int logical_current;
++    unsigned int logical_read;
++    unsigned int logical_draw;
++    unsigned int native_draw;
++    unsigned int native_read;
++    unsigned int framebuffer_status;
++    unsigned int checksum_valid;
++    unsigned int checksum;
++} gl4es_external_default_state_t;
++
++// Register an embedder-owned nonzero default FBO. Passing zero clears it.
++// GL4ES maps logical framebuffer zero to this object but never owns its storage.
++int set_external_default_framebuffer(unsigned int framebuffer);
++int gl4es_external_default_framebuffer_state(int width, int height,
++    int sample_pixels, gl4es_external_default_state_t *state);
++
+diff --git a/src/gl/fpe.c b/src/gl/fpe.c
+index 7d53643a..07f73eb3 100644
+--- a/src/gl/fpe.c
++++ b/src/gl/fpe.c
+@@ -5,0 +6 @@
++#include "framebuffers.h"
+@@ -1162 +1163 @@ void realize_glenv(int ispoint, int first, int count, GLenum type, const void* i
+-            gles_glBindFramebuffer(GL_FRAMEBUFFER, 0);
++            gles_glBindFramebuffer(GL_FRAMEBUFFER, gl4es_getDefaultFBO());
+diff --git a/src/gl/framebuffers.c b/src/gl/framebuffers.c
+index 93194fcf..771a43f6 100644
+--- a/src/gl/framebuffers.c
++++ b/src/gl/framebuffers.c
+@@ -10,0 +11,5 @@
++#include "gl4esinit.h"
++
++#ifndef GL_FRAMEBUFFER_BINDING
++#define GL_FRAMEBUFFER_BINDING 0x8CA6
++#endif
+@@ -26,0 +32,44 @@ int wrap_npot(GLenum wrap);
++static GLuint gl4es_defaultFramebuffer(void) {
++    if (glstate->fbo.external_default_active)
++        return glstate->fbo.external_default_fbo;
++    return glstate->fbo.mainfbo_fbo;
++}
++
++static GLuint gl4es_nativeFramebuffer(const glframebuffer_t *framebuffer) {
++    if (framebuffer && framebuffer->id)
++        return framebuffer->id;
++    return gl4es_defaultFramebuffer();
++}
++
++GLuint gl4es_getDefaultFBO(void) {
++    return gl4es_defaultFramebuffer();
++}
++
++int set_external_default_framebuffer(GLuint framebuffer) {
++    if (!glstate)
++        return 0;
++
++    if (!framebuffer) {
++        glstate->fbo.external_default_active = GL_FALSE;
++        glstate->fbo.external_default_fbo = 0;
++        ++glstate->fbo.external_default_generation;
++        return 1;
++    }
++
++    if (!glstate->fbo.external_default_active ||
++        glstate->fbo.external_default_fbo != framebuffer)
++        ++glstate->fbo.external_default_generation;
++    glstate->fbo.external_default_fbo = framebuffer;
++    glstate->fbo.external_default_active = GL_TRUE;
++
++    // Registration happens with GL4ES logical zero current. Rebind both native
++    // read and draw targets immediately so the cache and embedder agree.
++    if (glstate->fbo.fbo_read && glstate->fbo.fbo_draw &&
++        glstate->fbo.fbo_read->id == 0 && glstate->fbo.fbo_draw->id == 0) {
++        LOAD_GLES2_OR_OES(glBindFramebuffer);
++        gles_glBindFramebuffer(GL_FRAMEBUFFER, gl4es_defaultFramebuffer());
++        glstate->fbo.current_fb = glstate->fbo.fbo_0;
++    }
++    return 1;
++}
++
+@@ -57,3 +106 @@ void readfboBegin() {
+-    GLuint fbo = glstate->fbo.fbo_read->id;
+-    if (!fbo)
+-        fbo = glstate->fbo.mainfbo_fbo;
++    GLuint fbo = gl4es_nativeFramebuffer(glstate->fbo.fbo_read);
+@@ -71,3 +118 @@ void readfboEnd() {
+-    GLuint fbo = glstate->fbo.fbo_draw->id;
+-    if (!fbo)
+-        fbo = glstate->fbo.mainfbo_fbo;
++    GLuint fbo = gl4es_nativeFramebuffer(glstate->fbo.fbo_draw);
+@@ -257 +302 @@ void APIENTRY_GL4ES gl4es_glBindFramebuffer(GLenum target, GLuint framebuffer) {
+-        framebuffer = glstate->fbo.mainfbo_fbo;
++        framebuffer = gl4es_defaultFramebuffer();
+@@ -274 +319 @@ GLenum ReadDraw_Push(GLenum target) {
+-            gles_glBindFramebuffer(GL_FRAMEBUFFER, (glstate->fbo.fbo_draw->id)?glstate->fbo.fbo_draw->id:glstate->fbo.mainfbo_fbo);
++            gles_glBindFramebuffer(GL_FRAMEBUFFER, gl4es_nativeFramebuffer(glstate->fbo.fbo_draw));
+@@ -279 +324 @@ GLenum ReadDraw_Push(GLenum target) {
+-            gles_glBindFramebuffer(GL_FRAMEBUFFER, (glstate->fbo.fbo_read->id)?glstate->fbo.fbo_read->id:glstate->fbo.mainfbo_fbo);
++            gles_glBindFramebuffer(GL_FRAMEBUFFER, gl4es_nativeFramebuffer(glstate->fbo.fbo_read));
+@@ -289 +334 @@ void ReadDraw_Pop(GLenum target) {
+-        gles_glBindFramebuffer(GL_FRAMEBUFFER, (glstate->fbo.current_fb->id)?glstate->fbo.current_fb->id:glstate->fbo.mainfbo_fbo);
++        gles_glBindFramebuffer(GL_FRAMEBUFFER, gl4es_nativeFramebuffer(glstate->fbo.current_fb));
+@@ -292 +337 @@ void ReadDraw_Pop(GLenum target) {
+-        gles_glBindFramebuffer(GL_FRAMEBUFFER, (glstate->fbo.current_fb->id)?glstate->fbo.current_fb->id:glstate->fbo.mainfbo_fbo);
++        gles_glBindFramebuffer(GL_FRAMEBUFFER, gl4es_nativeFramebuffer(glstate->fbo.current_fb));
+@@ -1282 +1327 @@ void createMainFBO(int width, int height) {
+-    gles_glBindFramebuffer(GL_FRAMEBUFFER, 0);
++    gles_glBindFramebuffer(GL_FRAMEBUFFER, gl4es_defaultFramebuffer());
+@@ -1296 +1341 @@ void createMainFBO(int width, int height) {
+-        gles_glBindFramebuffer(GL_FRAMEBUFFER, glstate->fbo.current_fb->id);
++        gles_glBindFramebuffer(GL_FRAMEBUFFER, gl4es_nativeFramebuffer(glstate->fbo.current_fb));
+@@ -1299 +1344 @@ void createMainFBO(int width, int height) {
+-        gles_glBindFramebuffer(GL_FRAMEBUFFER, (glstate->fbo.current_fb->id)?glstate->fbo.current_fb->id:glstate->fbo.mainfbo_fbo);
++        gles_glBindFramebuffer(GL_FRAMEBUFFER, gl4es_nativeFramebuffer(glstate->fbo.current_fb));
+@@ -1355 +1400 @@ void unbindMainFBO() {
+-        gles_glBindFramebuffer(GL_FRAMEBUFFER, 0);
++        gles_glBindFramebuffer(GL_FRAMEBUFFER, gl4es_defaultFramebuffer());
+@@ -1504 +1549,65 @@ GLuint gl4es_getCurrentFBO() {
+-  return (glstate->fbo.current_fb->id)?glstate->fbo.current_fb->id:glstate->fbo.mainfbo_fbo;
++  return gl4es_nativeFramebuffer(glstate->fbo.current_fb);
++}
++
++static GLuint gl4es_externalDefaultChecksum(int width, int height) {
++    LOAD_GLES(glReadPixels);
++    GLubyte pixels[5][4 * 4 * 4];
++    int x[5] = { 0, width > 4 ? width - 4 : 0, 0,
++        width > 4 ? width - 4 : 0, width > 4 ? (width - 4) / 2 : 0 };
++    int y[5] = { 0, 0, height > 4 ? height - 4 : 0,
++        height > 4 ? height - 4 : 0, height > 4 ? (height - 4) / 2 : 0 };
++    int rw = width < 4 ? width : 4;
++    int rh = height < 4 ? height : 4;
++    GLuint hash = 2166136261u;
++    size_t bytes = (size_t)rw * (size_t)rh * 4;
++
++    memset(pixels, 0, sizeof(pixels));
++    for (int i = 0; i < 5; ++i)
++        gles_glReadPixels(x[i], y[i], rw, rh, GL_RGBA, GL_UNSIGNED_BYTE, pixels[i]);
++    for (int i = 0; i < 5; ++i)
++        for (size_t j = 0; j < bytes; ++j) {
++            hash ^= pixels[i][j];
++            hash *= 16777619u;
++        }
++    return hash;
++}
++
++int gl4es_external_default_framebuffer_state(int width, int height,
++    int sample_pixels, gl4es_external_default_state_t *state) {
++    LOAD_GLES(glGetIntegerv);
++    LOAD_GLES2_OR_OES(glCheckFramebufferStatus);
++    GLint native_draw = 0;
++    GLint native_read = 0;
++
++    if (!state || !glstate)
++        return 0;
++    memset(state, 0, sizeof(*state));
++    state->version = GL4ES_EXTERNAL_DEFAULT_STATE_VERSION;
++    state->size = sizeof(*state);
++    state->registered_framebuffer = glstate->fbo.external_default_active
++        ? glstate->fbo.external_default_fbo : 0;
++    state->generation = glstate->fbo.external_default_generation;
++    state->logical_current = glstate->fbo.current_fb ? glstate->fbo.current_fb->id : ~0u;
++    state->logical_read = glstate->fbo.fbo_read ? glstate->fbo.fbo_read->id : ~0u;
++    state->logical_draw = glstate->fbo.fbo_draw ? glstate->fbo.fbo_draw->id : ~0u;
++    // GL4ES runs on GLES2 here, where read/draw share one native binding.
++    // Querying the combined binding avoids relying on unsupported split enums.
++    gles_glGetIntegerv(GL_FRAMEBUFFER_BINDING, &native_draw);
++    native_read = native_draw;
++    state->native_draw = native_draw;
++    state->native_read = native_read;
++
++    if (!state->registered_framebuffer ||
++        state->logical_current || state->logical_read || state->logical_draw ||
++        state->native_draw != state->registered_framebuffer ||
++        state->native_read != state->registered_framebuffer)
++        return 0;
++
++    state->framebuffer_status = gles_glCheckFramebufferStatus(GL_FRAMEBUFFER);
++    if (state->framebuffer_status != GL_FRAMEBUFFER_COMPLETE)
++        return 0;
++    if (sample_pixels && width > 0 && height > 0) {
++        state->checksum = gl4es_externalDefaultChecksum(width, height);
++        state->checksum_valid = 1;
++    }
++    return 1;
+@@ -1509 +1618 @@ void gl4es_setCurrentFBO() {
+-  gles_glBindFramebuffer(GL_FRAMEBUFFER, (glstate->fbo.current_fb->id)?glstate->fbo.current_fb->id:glstate->fbo.mainfbo_fbo);
++  gles_glBindFramebuffer(GL_FRAMEBUFFER, gl4es_nativeFramebuffer(glstate->fbo.current_fb));
+@@ -1726,4 +1835,3 @@ void gl4es_saveCurrentFBO()
+-    // this, in fact, bind FBO to 0 if it wasn't
+-    GLuint framebuffer = (glstate->fbo.current_fb)?glstate->fbo.current_fb->id:0;
+-    if(framebuffer==0)
+-        framebuffer = glstate->fbo.mainfbo_fbo;
++    // Temporarily leave an ordinary FBO without violating an embedder-owned
++    // logical-zero mapping.
++    GLuint framebuffer = gl4es_nativeFramebuffer(glstate->fbo.current_fb);
+@@ -1734 +1842 @@ void gl4es_saveCurrentFBO()
+-        gles_glBindFramebuffer(GL_FRAMEBUFFER, 0);
++        gles_glBindFramebuffer(GL_FRAMEBUFFER, gl4es_defaultFramebuffer());
+@@ -1741,3 +1849 @@ void gl4es_restoreCurrentFBO()
+-    GLuint framebuffer = (glstate->fbo.current_fb)?glstate->fbo.current_fb->id:0;
+-    if(framebuffer==0)
+-        framebuffer = glstate->fbo.mainfbo_fbo;
++    GLuint framebuffer = gl4es_nativeFramebuffer(glstate->fbo.current_fb);
+diff --git a/src/gl/framebuffers.h b/src/gl/framebuffers.h
+index a917658a..6e6a67c4 100644
+--- a/src/gl/framebuffers.h
++++ b/src/gl/framebuffers.h
+@@ -59,0 +60,3 @@ void gl4es_restoreCurrentFBO();
++int set_external_default_framebuffer(GLuint framebuffer);
++GLuint gl4es_getDefaultFBO(void);
++
+diff --git a/src/gl/state.h b/src/gl/state.h
+index 02a7d3d7..fae31f57 100644
+--- a/src/gl/state.h
++++ b/src/gl/state.h
+@@ -317,0 +318,5 @@ typedef struct {
++    // Embedder-owned default framebuffer. GL4ES never creates or deletes it.
++    GLuint external_default_fbo;
++    GLuint external_default_generation;
++    GLboolean external_default_active;
++

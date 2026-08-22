@@ -1,0 +1,142 @@
+{
+  "schema": 1,
+  "workOrder": "56O",
+  "outcome": "A",
+  "verifiedFailureBoundary": "GL4ES ordinary provider admission withholds GL_EXT_texture_array because its cached ESSL 300 probe compiles malformed source",
+  "structuralCause": {
+    "owner": "GL4ES GetHardwareExtensions",
+    "source": "src/glx/hardext.c",
+    "defect": "testGLSL concatenates the version token directly with a malformed extension directive, so testGLSL(\"#version 300 es\", 0) cannot establish hardext.glsl300es",
+    "effect": "BuildExtensionsList short-circuits before gl4es_texture_array_available and omits GL_EXT_texture_array; the engine therefore never queries the wrapper layer limit and reports zero",
+    "correction": "use one complete stage-correct ESSL 300 vertex source for the live compile probe and expose only the cached provider result through a read-only embedder snapshot"
+  },
+  "lifecycle": [
+    {
+      "stage": "context-create",
+      "owner": "SDL/UIKit/EAGL",
+      "call": "SDL_GL_CreateContext",
+      "precondition": "requested iOS ES3 profile",
+      "result": "EAGL context and drawable storage exist"
+    },
+    {
+      "stage": "context-current",
+      "owner": "SDL",
+      "call": "SDL_GL_MakeCurrent",
+      "precondition": "created window and context",
+      "result": "native ES3 context is current before renderer extension initialization"
+    },
+    {
+      "stage": "renderer-entry",
+      "owner": "engine GL_InitExtensions",
+      "call": "GL_OnContextCreated",
+      "precondition": "VID_SetMode completed and current context retained",
+      "result": "GL4ES provider callback is registered before initialize_gl4es"
+    },
+    {
+      "stage": "provider-init",
+      "owner": "GL4ES initialize_gl4es",
+      "call": "GetHardwareExtensions",
+      "precondition": "NO_INIT_CONSTRUCTOR, NOEGL, live getProcAddress, current context",
+      "result": "singleton provider discovery executes once for the current context generation"
+    },
+    {
+      "stage": "native-discovery",
+      "owner": "GL4ES GetHardwareExtensions",
+      "call": "gles_glGetString and gles_getProcAddress",
+      "precondition": "native functions resolve through SDL",
+      "result": "native ES major and the three required 3-D procedures are cached"
+    },
+    {
+      "stage": "limit-discovery",
+      "owner": "GL4ES GetHardwareExtensions",
+      "call": "gles_glGetIntegerv(GL_MAX_ARRAY_TEXTURE_LAYERS)",
+      "precondition": "native ES3 and all required procedures",
+      "result": "live layer limit is cached; at least 16 is required"
+    },
+    {
+      "stage": "essl-discovery",
+      "owner": "GL4ES GetHardwareExtensions",
+      "call": "testGLSL300ES",
+      "precondition": "native shader compiler entry points",
+      "result": "one valid ESSL 300 vertex source determines hardext.glsl300es"
+    },
+    {
+      "stage": "extension-build",
+      "owner": "GL4ES BuildExtensionsList",
+      "call": "gl4es_glGetString(GL_EXTENSIONS)",
+      "precondition": "provider discovery complete",
+      "result": "token is added only when native ES3, procedures, at least 16 layers, ESSL 300, and the compiled array route all agree"
+    },
+    {
+      "stage": "provider-marker",
+      "owner": "engine console bridge",
+      "call": "gl4es_get_texture_array_provider_state",
+      "precondition": "provider cache complete",
+      "result": "cached state is reported without GL calls, error draining, extension rebuilding, or cache mutation"
+    },
+    {
+      "stage": "engine-admission",
+      "owner": "engine GL_CheckExtension",
+      "call": "glGetString then glGetIntegerv(GL_MAX_ARRAY_TEXTURE_LAYERS)",
+      "precondition": "conditional token and four wrapper callbacks",
+      "result": "engine admits only token, callbacks, and at least 16 layers"
+    },
+    {
+      "stage": "diffusion-admission",
+      "owner": "Diffusion GL_InitExtensions",
+      "call": "GL_CheckExtension and GL_MAX_ARRAY_TEXTURE_LAYERS_EXT",
+      "precondition": "engine export agreement",
+      "result": "R_TEXTURE_ARRAY_EXT remains conditional on token, callbacks, and at least 16 layers"
+    },
+    {
+      "stage": "teardown-reset",
+      "owner": "GL4ES close_gl4es",
+      "call": "gl_close, gl4es_texture_array_reset, ResetHardwareExtensions",
+      "precondition": "context destruction",
+      "result": "extension cache is freed with glstate and provider state is zeroed before a future generation"
+    }
+  ],
+  "diagnosticVersusOrdinary": {
+    "shared": [
+      "same SDL-owned current native ES3 context",
+      "same initialize_gl4es and GetHardwareExtensions provider discovery",
+      "same wrapper GL_MAX_ARRAY_TEXTURE_LAYERS cache"
+    ],
+    "diagnosticOnly": "the explicit self-test directly exercises array upload, shader translation, draw and wrapper readback before module startup; it does not require the production extension token",
+    "ordinaryOnly": "engine and Diffusion require BuildExtensionsList token admission before querying and consuming the array limit"
+  },
+  "markerTransport": {
+    "old": "SHUT_LOGD is suppressed by the shared-library nobanner default and is not an engine.log transport",
+    "new": "the engine prints a read-only cached provider snapshot through gEngfuncs.Con_Printf",
+    "glErrorPolicy": "no GL call and no glGetError is issued by the snapshot or marker"
+  },
+  "allRequiredPredicate": [
+    "current native ES major is at least 3",
+    "glTexImage3D resolves",
+    "glTexSubImage3D resolves",
+    "glTexStorage3D resolves",
+    "live GL_MAX_ARRAY_TEXTURE_LAYERS is at least 16",
+    "valid ESSL 300 vertex source compiles",
+    "GL4ES texture-array route is compiled and available",
+    "engine token, callbacks, and limit agree",
+    "Diffusion token, callbacks, limit, and terrain shader family agree"
+  ],
+  "rejections": [
+    "pre-current discovery",
+    "missing or replaced procedure",
+    "zero or fewer than 16 layers",
+    "ESSL 300 compile failure",
+    "unavailable GL4ES route",
+    "early or stale extension cache",
+    "provider reset before admission",
+    "native and wrapper limit disagreement",
+    "engine or Diffusion disagreement",
+    "ordinary tuple automatically arming the diagnostic self-test",
+    "unconditional token",
+    "fabricated limit",
+    "force-enable or direct-native bypass",
+    "2-D, atlas, CPU, layer-zero, or disabled-landscape fallback"
+  ],
+  "ordinaryArguments": "-dev 2 -log -game diffusion -ref gl4es",
+  "deviceQualification": "not performed or claimed in Phase O"
+}

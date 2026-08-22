@@ -452,6 +452,18 @@ void FS_Rescan( uint32_t flags, const char *language )
 
 	((gameinfo_t *)GI)->added = true; // getting rid of const here, as this modifier only for the engine
 	FS_AddGameHierarchy( GI->gamefolder, FS_GAMEDIR_PATH | flags );
+
+#if XASH_IOS
+	// Mount read-only compatibility assets after user archives so loose iOS
+	// fixes win without modifying the user's game installation or saves.
+	if( !COM_StringEmpty( fs_rodir ))
+	{
+		char override_path[MAX_SYSPATH];
+
+		Q_snprintf( override_path, sizeof( override_path ), "%s/ios_overrides/%s/", fs_rodir, GI->gamefolder );
+		FS_AddGameDirectory( override_path, FS_NOWRITE_PATH | FS_CUSTOM_PATH );
+	}
+#endif
 }
 
 /*

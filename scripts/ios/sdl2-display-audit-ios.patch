@@ -1,0 +1,350 @@
+diff --git a/src/video/uikit/SDL_uikitopengles.h b/src/video/uikit/SDL_uikitopengles.h
+index 0533f69..ab7513b 100644
+--- a/src/video/uikit/SDL_uikitopengles.h
++++ b/src/video/uikit/SDL_uikitopengles.h
+@@ -37,6 +37,10 @@ extern int UIKit_GL_LoadLibrary(_THIS, const char *path);
+ 
+ extern void UIKit_GL_RestoreCurrentContext(void);
+ 
++extern DECLSPEC void SDLCALL SDL_XASH_IOSDisplayAuditSnapshot(SDL_Window *window,
++                                                               const char *stage,
++                                                               Uint32 frame);
++
+ #endif // SDL_VIDEO_OPENGL_ES || defined(SDL_VIDEO_OPENGL_ES2)
+ 
+ #endif /* SDL_uikitopengles_ */
+diff --git a/src/video/uikit/SDL_uikitopengles.m b/src/video/uikit/SDL_uikitopengles.m
+index 988966d..6303dc1 100644
+--- a/src/video/uikit/SDL_uikitopengles.m
++++ b/src/video/uikit/SDL_uikitopengles.m
+@@ -128,6 +128,19 @@ int UIKit_GL_SwapWindow(_THIS, SDL_Window * window)
+     return 0;
+ }
+ 
++DECLSPEC void SDLCALL SDL_XASH_IOSDisplayAuditSnapshot(SDL_Window *window,
++                                                        const char *stage,
++                                                        Uint32 frame)
++{
++    @autoreleasepool {
++        SDLEAGLContext *context = (__bridge SDLEAGLContext *)SDL_GL_GetCurrentContext();
++
++        if (context && context.sdlView && stage && frame > 0 && frame <= 4) {
++            [context.sdlView xashAuditSnapshotForWindow:window stage:stage frame:frame];
++        }
++    }
++}
++
+ SDL_GLContext UIKit_GL_CreateContext(_THIS, SDL_Window * window)
+ {
+     @autoreleasepool {
+diff --git a/src/video/uikit/SDL_uikitopenglview.h b/src/video/uikit/SDL_uikitopenglview.h
+index 70abdc9..59250eb 100644
+--- a/src/video/uikit/SDL_uikitopenglview.h
++++ b/src/video/uikit/SDL_uikitopenglview.h
+@@ -55,6 +55,10 @@
+ 
+ - (void)swapBuffers;
+ 
++- (void)xashAuditSnapshotForWindow:(SDL_Window *)window
++                             stage:(const char *)stage
++                             frame:(Uint32)frame;
++
+ - (void)updateFrame;
+ 
+ @end
+diff --git a/src/video/uikit/SDL_uikitopenglview.m b/src/video/uikit/SDL_uikitopenglview.m
+index c36f060..f73c709 100644
+--- a/src/video/uikit/SDL_uikitopenglview.m
++++ b/src/video/uikit/SDL_uikitopenglview.m
+@@ -27,6 +27,43 @@
+ #import "SDL_uikitopenglview.h"
+ #include "SDL_uikitwindow.h"
+ 
++#define XASH_AUDIT_SAMPLE_EDGE 4
++#define XASH_AUDIT_SAMPLE_COUNT 5
++
++static Uint32 XASH_AuditHashBytes(Uint32 hash, const GLubyte *bytes, size_t count)
++{
++    size_t i;
++
++    for (i = 0; i < count; ++i) {
++        hash ^= bytes[i];
++        hash *= 16777619u;
++    }
++    return hash;
++}
++
++static void XASH_AuditDrainErrors(char *buffer, size_t bufferSize)
++{
++    GLenum error;
++    int count = 0;
++
++    buffer[0] = '\0';
++    while (count < 16 && (error = glGetError()) != GL_NO_ERROR) {
++        if (count < 8) {
++            size_t length = SDL_strlen(buffer);
++            SDL_snprintf(buffer + length, bufferSize - length, "%s0x%04x",
++                         count ? "," : "", (unsigned int)error);
++        }
++        ++count;
++    }
++
++    if (!count) {
++        SDL_strlcpy(buffer, "none", bufferSize);
++    } else if (count > 8) {
++        size_t length = SDL_strlen(buffer);
++        SDL_snprintf(buffer + length, bufferSize - length, ",+%d", count - 8);
++    }
++}
++
+ @implementation SDL_uikitopenglview {
+     /* The renderbuffer and framebuffer used to render to this layer. */
+     GLuint viewRenderbuffer, viewFramebuffer;
+@@ -46,6 +83,10 @@
+     int samples;
+ 
+     BOOL retainedBacking;
++
++    Uint32 xashAuditFrame;
++    Uint32 xashAuditBaselineChecksum;
++    BOOL xashAuditBaselineValid;
+ }
+ 
+ @synthesize context;
+@@ -277,8 +318,189 @@
+     }
+ }
+ 
++- (Uint32)xashDrawableChecksumWithStatus:(GLenum *)statusOut
++{
++    const GLint points[XASH_AUDIT_SAMPLE_COUNT][2] = {
++        { 8, 8 },
++        { backingWidth - XASH_AUDIT_SAMPLE_EDGE - 8, 8 },
++        { 8, backingHeight - XASH_AUDIT_SAMPLE_EDGE - 8 },
++        { backingWidth - XASH_AUDIT_SAMPLE_EDGE - 8, backingHeight - XASH_AUDIT_SAMPLE_EDGE - 8 },
++        { backingWidth / 2, backingHeight / 2 }
++    };
++    GLubyte pixels[XASH_AUDIT_SAMPLE_EDGE * XASH_AUDIT_SAMPLE_EDGE * 4];
++    GLint previousFramebuffer = 0;
++    GLint previousDrawFramebuffer = 0;
++    GLint previousReadFramebuffer = 0;
++    Uint32 hash = 2166136261u;
++    GLenum status;
++    int i;
++
++    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &previousFramebuffer);
++    if (context.API >= kEAGLRenderingAPIOpenGLES3) {
++        glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &previousDrawFramebuffer);
++        glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &previousReadFramebuffer);
++    }
++
++    glBindFramebuffer(GL_FRAMEBUFFER, viewFramebuffer);
++    status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
++    if (status == GL_FRAMEBUFFER_COMPLETE) {
++        for (i = 0; i < XASH_AUDIT_SAMPLE_COUNT; ++i) {
++            GLint x = SDL_max(0, SDL_min(points[i][0], backingWidth - XASH_AUDIT_SAMPLE_EDGE));
++            GLint y = SDL_max(0, SDL_min(points[i][1], backingHeight - XASH_AUDIT_SAMPLE_EDGE));
++
++            glReadPixels(x, y, XASH_AUDIT_SAMPLE_EDGE, XASH_AUDIT_SAMPLE_EDGE,
++                         GL_RGBA, GL_UNSIGNED_BYTE, pixels);
++            hash = XASH_AuditHashBytes(hash, pixels, sizeof(pixels));
++        }
++    } else {
++        hash = 0;
++    }
++
++    if (context.API >= kEAGLRenderingAPIOpenGLES3) {
++        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, (GLuint)previousDrawFramebuffer);
++        glBindFramebuffer(GL_READ_FRAMEBUFFER, (GLuint)previousReadFramebuffer);
++    } else {
++        glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)previousFramebuffer);
++    }
++
++    if (statusOut) {
++        *statusOut = status;
++    }
++    return hash;
++}
++
++- (void)xashDrawSentinelForFrame:(Uint32)frame
++{
++    GLint previousFramebuffer = 0;
++    GLint previousDrawFramebuffer = 0;
++    GLint previousReadFramebuffer = 0;
++    GLint previousScissor[4];
++    GLfloat previousClearColor[4];
++    GLboolean previousColorMask[4];
++    GLboolean scissorEnabled;
++    GLfloat color[3][3] = {
++        { 1.0f, 0.0f, 1.0f },
++        { 0.0f, 1.0f, 1.0f },
++        { 1.0f, 1.0f, 0.0f }
++    };
++    const int barCount = (int)SDL_min(frame, 3u);
++    const int sentinelX = 16;
++    const int sentinelY = SDL_max(0, backingHeight - 96);
++    int i;
++
++    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &previousFramebuffer);
++    if (context.API >= kEAGLRenderingAPIOpenGLES3) {
++        glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &previousDrawFramebuffer);
++        glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &previousReadFramebuffer);
++    }
++    glGetIntegerv(GL_SCISSOR_BOX, previousScissor);
++    glGetFloatv(GL_COLOR_CLEAR_VALUE, previousClearColor);
++    glGetBooleanv(GL_COLOR_WRITEMASK, previousColorMask);
++    scissorEnabled = glIsEnabled(GL_SCISSOR_TEST);
++
++    glBindFramebuffer(GL_FRAMEBUFFER, viewFramebuffer);
++    glEnable(GL_SCISSOR_TEST);
++    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
++
++    glScissor(sentinelX, sentinelY, 180, 72);
++    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
++    glClear(GL_COLOR_BUFFER_BIT);
++
++    glClearColor(color[frame - 1][0], color[frame - 1][1], color[frame - 1][2], 1.0f);
++    for (i = 0; i < barCount; ++i) {
++        glScissor(sentinelX + 10 + i * 55, sentinelY + 12, 42, 48);
++        glClear(GL_COLOR_BUFFER_BIT);
++    }
++
++    glClearColor(previousClearColor[0], previousClearColor[1], previousClearColor[2], previousClearColor[3]);
++    glColorMask(previousColorMask[0], previousColorMask[1], previousColorMask[2], previousColorMask[3]);
++    glScissor(previousScissor[0], previousScissor[1], previousScissor[2], previousScissor[3]);
++    if (!scissorEnabled) {
++        glDisable(GL_SCISSOR_TEST);
++    }
++
++    if (context.API >= kEAGLRenderingAPIOpenGLES3) {
++        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, (GLuint)previousDrawFramebuffer);
++        glBindFramebuffer(GL_READ_FRAMEBUFFER, (GLuint)previousReadFramebuffer);
++    } else {
++        glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)previousFramebuffer);
++    }
++}
++
++- (void)xashAuditSnapshotForWindow:(SDL_Window *)window
++                             stage:(const char *)stage
++                             frame:(Uint32)frame
++{
++    SDL_WindowData *data = window ? (__bridge SDL_WindowData *)window->driverdata : nil;
++    UIWindow *uiwindow = data.uiwindow;
++    UIView *controllerView = data.viewcontroller.view;
++    CAEAGLLayer *eaglLayer = (CAEAGLLayer *)self.layer;
++    GLint framebuffer = 0;
++    GLint drawFramebuffer = 0;
++    GLint readFramebuffer = 0;
++    GLint renderbuffer = 0;
++    GLint viewport[4] = { 0, 0, 0, 0 };
++    GLint scissor[4] = { 0, 0, 0, 0 };
++    GLboolean scissorEnabled;
++    GLenum baselineStatus = 0;
++    char errorsBefore[128];
++    char errorsAfter[128];
++
++    XASH_AuditDrainErrors(errorsBefore, sizeof(errorsBefore));
++    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &framebuffer);
++    if (context.API >= kEAGLRenderingAPIOpenGLES3) {
++        glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &drawFramebuffer);
++        glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &readFramebuffer);
++    } else {
++        drawFramebuffer = readFramebuffer = framebuffer;
++    }
++    glGetIntegerv(GL_RENDERBUFFER_BINDING, &renderbuffer);
++    glGetIntegerv(GL_VIEWPORT, viewport);
++    glGetIntegerv(GL_SCISSOR_BOX, scissor);
++    scissorEnabled = glIsEnabled(GL_SCISSOR_TEST);
++
++    if (frame == 1 && !SDL_strcmp(stage, "engine-frame-entry") && !xashAuditBaselineValid) {
++        xashAuditBaselineChecksum = [self xashDrawableChecksumWithStatus:&baselineStatus];
++        xashAuditBaselineValid = (baselineStatus == GL_FRAMEBUFFER_COMPLETE);
++    }
++
++    if (frame <= 3 && !SDL_strcmp(stage, "immediately-before-presentation")) {
++        xashAuditFrame = frame;
++    }
++
++    XASH_AuditDrainErrors(errorsAfter, sizeof(errorsAfter));
++    SDL_Log("iOS display audit native: frame=%u stage=%s thread=%u sdl_context=%p eagl_current=%p expected_context=%p window=%p uiwindow=%p root=%p controller_view=%p view=%p layer=%p attached=%d key=%d window_hidden=%d view_hidden=%d layer_hidden=%d opacity=%.3f drawable=%dx%d bounds=%.1fx%.1f content_scale=%.3f layer_scale=%.3f fb=%d draw_fb=%d read_fb=%d rb=%d expected_draw_fb=%u expected_present_fb=%u expected_rb=%u viewport=%d,%d,%d,%d scissor_enabled=%d scissor=%d,%d,%d,%d baseline_valid=%d baseline=0x%08x errors_before=%s errors_after=%s",
++            (unsigned int)frame, stage, (unsigned int)SDL_ThreadID(),
++            SDL_GL_GetCurrentContext(), [EAGLContext currentContext], context,
++            window, uiwindow, uiwindow.rootViewController, controllerView, self, eaglLayer,
++            self.window == uiwindow && controllerView == self && uiwindow.rootViewController == data.viewcontroller,
++            uiwindow.isKeyWindow, uiwindow.hidden, self.hidden, eaglLayer.hidden, eaglLayer.opacity,
++            backingWidth, backingHeight, self.bounds.size.width, self.bounds.size.height,
++            self.contentScaleFactor, eaglLayer.contentsScale,
++            framebuffer, drawFramebuffer, readFramebuffer, renderbuffer,
++            self.drawableFramebuffer, viewFramebuffer, viewRenderbuffer,
++            viewport[0], viewport[1], viewport[2], viewport[3], scissorEnabled,
++            scissor[0], scissor[1], scissor[2], scissor[3],
++            xashAuditBaselineValid, (unsigned int)xashAuditBaselineChecksum,
++            errorsBefore, errorsAfter);
++
++    if (frame <= 3 && !SDL_strcmp(stage, "immediately-after-presentation")) {
++        xashAuditFrame = 0;
++    }
++}
++
+ - (void)swapBuffers
+ {
++    Uint32 auditFrame = xashAuditFrame;
++    Uint32 checksumBeforeSentinel = 0;
++    Uint32 checksumAfterSentinel = 0;
++    GLenum checksumStatus = 0;
++    GLint framebufferAfterResolve = 0;
++    GLint drawFramebufferAfterResolve = 0;
++    GLint readFramebufferAfterResolve = 0;
++    GLint renderbufferAtPresent = 0;
++    char auditErrors[128];
++
+     if (msaaFramebuffer) {
+         const GLenum attachments[] = {GL_COLOR_ATTACHMENT0};
+ 
+@@ -308,10 +530,45 @@
+         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, msaaFramebuffer);
+     }
+ 
++    if (auditFrame > 0 && auditFrame <= 3) {
++        glGetIntegerv(GL_FRAMEBUFFER_BINDING, &framebufferAfterResolve);
++        if (context.API >= kEAGLRenderingAPIOpenGLES3) {
++            glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &drawFramebufferAfterResolve);
++            glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &readFramebufferAfterResolve);
++        } else {
++            drawFramebufferAfterResolve = readFramebufferAfterResolve = framebufferAfterResolve;
++        }
++
++        checksumBeforeSentinel = [self xashDrawableChecksumWithStatus:&checksumStatus];
++        [self xashDrawSentinelForFrame:auditFrame];
++        checksumAfterSentinel = [self xashDrawableChecksumWithStatus:NULL];
++        XASH_AuditDrainErrors(auditErrors, sizeof(auditErrors));
++
++        SDL_Log("iOS display audit drawable: frame=%u stage=after-resolve-before-present msaa=%d fb=%d draw_fb=%d read_fb=%d expected_draw_fb=%u present_fb=%u checksum_status=0x%04x baseline_valid=%d baseline=0x%08x checksum_pre=0x%08x equals_baseline=%d checksum_post=0x%08x sentinel_bars=%u sentinel_color=%s errors=%s",
++                (unsigned int)auditFrame, samples, framebufferAfterResolve,
++                drawFramebufferAfterResolve, readFramebufferAfterResolve,
++                self.drawableFramebuffer, viewFramebuffer, (unsigned int)checksumStatus,
++                xashAuditBaselineValid, (unsigned int)xashAuditBaselineChecksum,
++                (unsigned int)checksumBeforeSentinel,
++                xashAuditBaselineValid && checksumBeforeSentinel == xashAuditBaselineChecksum,
++                (unsigned int)checksumAfterSentinel, (unsigned int)auditFrame,
++                auditFrame == 1 ? "magenta" : (auditFrame == 2 ? "cyan" : "yellow"),
++                auditErrors);
++    }
++
+     /* viewRenderbuffer should always be bound here. Code that binds something
+      * else is responsible for rebinding viewRenderbuffer, to reduce duplicate
+      * state changes. */
+-    [context presentRenderbuffer:GL_RENDERBUFFER];
++    glGetIntegerv(GL_RENDERBUFFER_BINDING, &renderbufferAtPresent);
++    BOOL presentResult = [context presentRenderbuffer:GL_RENDERBUFFER];
++
++    if (auditFrame > 0 && auditFrame <= 3) {
++        XASH_AuditDrainErrors(auditErrors, sizeof(auditErrors));
++        SDL_Log("iOS display audit present: frame=%u thread=%u context=%p current=%p observed_rb=%d expected_rb=%u rb_match=%d result=%d errors=%s",
++                (unsigned int)auditFrame, (unsigned int)SDL_ThreadID(), context,
++                [EAGLContext currentContext], renderbufferAtPresent, viewRenderbuffer,
++                renderbufferAtPresent == (GLint)viewRenderbuffer, presentResult, auditErrors);
++    }
+ }
+ 
+ - (void)layoutSubviews

@@ -1,0 +1,725 @@
+diff --git a/client/render/r_shader.cpp b/client/render/r_shader.cpp
+index ac0cb89..6e6018e 100644
+--- a/client/render/r_shader.cpp
++++ b/client/render/r_shader.cpp
+@@ -559,6 +559,29 @@ void GL_ShowProgramUniforms( glsl_program_t *shader )
+ 	pglUseProgramObjectARB( GL_NONE );
+ }
+ 
++static int GL_ActiveUniformExtent( glsl_program_t *shader, const char *wantedName, GLenum wantedType )
++{
++	int count = 0;
++	char uniformName[256];
++
++	if( !shader || !wantedName )
++		return 0;
++
++	pglGetObjectParameterivARB( shader->handle, GL_OBJECT_ACTIVE_UNIFORMS_ARB, &count );
++	for( int i = 0; i < count; i++ )
++	{
++		GLint size = 0;
++		GLenum type = 0;
++		pglGetActiveUniformARB( shader->handle, i, sizeof( uniformName ), NULL, &size, &type, uniformName );
++		char *array = Q_strchr( uniformName, '[' );
++		if( array ) *array = '\0';
++		if( !Q_stricmp( uniformName, wantedName ) )
++			return type == wantedType ? size : 0;
++	}
++
++	return 0;
++}
++
+ void GL_BindShader( glsl_program_t *shader )
+ {
+ 	if( !shader && RI->currentshader )
+@@ -1297,6 +1320,14 @@ static void GL_InitSolidStudioUniforms( glsl_program_t *shader )
+ 
+ 	shader->u_RenderColor = pglGetUniformLocationARB( shader->handle, "u_RenderColor" );
+ 	shader->u_StudioParams = pglGetUniformLocationARB( shader->handle, "u_StudioParams" );
++	shader->studio_params_count = GL_FindShaderDirective( shader, "STUDIO_ADDITIVE" ) ?
++		( GL_FindShaderDirective( shader, "STUDIO_HAS_CHROME" ) ? 2 : 1 ) : 3;
++	shader->studio_params_linked_count = GL_ActiveUniformExtent( shader, "u_StudioParams", GL_FLOAT_VEC4_ARB );
++	if( shader->studio_params_count != shader->studio_params_linked_count )
++	{
++		ALERT( at_error, "%s has inconsistent u_StudioParams metadata=%d linked=%d\n",
++			shader->name, shader->studio_params_count, shader->studio_params_linked_count );
++	}
+ 	if( GL_FindShaderDirective( shader, "STUDIO_SWAY_FOLIAGE" ) )
+ 		shader->u_FoliageSwayHeight = pglGetUniformLocationARB( shader->handle, "u_FoliageSwayHeight" );
+ 
+@@ -2524,6 +2555,9 @@ word GL_UberShaderForSolidStudio( mstudiomaterial_t *mat, bool vertex_lighting,
+ 	memset( options, 0, sizeof( options ));
+ 
+ 	const bool bMasked = FBitSet( mat->flags, STUDIO_NF_MASKED ) ? true : false;
++	const bool has_chrome = FBitSet( mat->flags, STUDIO_NF_CHROME ) ? true : false;
++	const bool additive = FBitSet( mat->flags, STUDIO_NF_ADDITIVE ) ? true : false;
++	const int studio_params_count = additive ? ( has_chrome ? 2 : 1 ) : 3;
+ 
+ 	if( tr.materials[mat->gl_diffuse_id].fullbright ) // .monitor automatically sets this too
+ 		fullbright = true;
+@@ -2555,7 +2589,7 @@ word GL_UberShaderForSolidStudio( mstudiomaterial_t *mat, bool vertex_lighting,
+ 	if( bone_weighting )
+ 		GL_AddShaderDirective( options, "STUDIO_BONEWEIGHTING" );
+ 
+-	if( FBitSet( mat->flags, STUDIO_NF_CHROME ))
++	if( has_chrome )
+ 		GL_AddShaderDirective( options, "STUDIO_HAS_CHROME" );
+ 
+ 	if( vertex_lighting )
+@@ -2566,7 +2600,7 @@ word GL_UberShaderForSolidStudio( mstudiomaterial_t *mat, bool vertex_lighting,
+ 		GL_AddShaderDirective( options, "STUDIO_FULLBRIGHT" );
+ 	}
+ 
+-	if( FBitSet( mat->flags, STUDIO_NF_ADDITIVE ) )
++	if( additive )
+ 	{
+ 		GL_AddShaderDirective( options, "STUDIO_ADDITIVE" );
+ 	}
+@@ -2631,6 +2665,15 @@ word GL_UberShaderForSolidStudio( mstudiomaterial_t *mat, bool vertex_lighting,
+ 		SetBits( mat->flags, STUDIO_NF_NODRAW );
+ 		return 0; // something bad happens
+ 	}
++	if( shader->studio_params_count != studio_params_count ||
++		shader->studio_params_linked_count != studio_params_count )
++	{
++		ALERT( at_error, "%s rejected: u_StudioParams variant=%d metadata=%d linked=%d\n",
++			shader->name, studio_params_count, shader->studio_params_count,
++			shader->studio_params_linked_count );
++		SetBits( mat->flags, STUDIO_NF_NODRAW );
++		return 0;
++	}
+ 
+ 	word shaderNum = (shader - glsl_programs);
+ 
+diff --git a/client/render/r_shader.h b/client/render/r_shader.h
+index 3b8b9c4..505ee0b 100644
+--- a/client/render/r_shader.h
++++ b/client/render/r_shader.h
+@@ -104,6 +104,8 @@ typedef struct glsl_prog_s
+ 	GLint u_zFar;		// global z-far value
+ 	GLint u_BrushParams;
+ 	GLint u_StudioParams;
++	int studio_params_count;
++	int studio_params_linked_count;
+ 	GLint u_StudioLighting;
+ 	GLint u_FocalDepth;
+ 	GLint u_FocalLength;
+diff --git a/client/render/r_studio.cpp b/client/render/r_studio.cpp
+index 215504c..34e97c8 100644
+--- a/client/render/r_studio.cpp
++++ b/client/render/r_studio.cpp
+@@ -42,7 +42,27 @@ CStudioModelRenderer g_StudioRenderer;
+ 
+ #define MAX_STUDIO_SCALE 32.0f
+ 
++enum studio_texture_mode_e
++{
++	STUDIO_TEXTURE_MODE_INVALID = -1,
++	STUDIO_TEXTURE_MODE_BASE = 0,
++	STUDIO_TEXTURE_MODE_WHITE,
++	STUDIO_TEXTURE_MODE_COLORMAP,
++	STUDIO_TEXTURE_MODE_MONITOR,
++	STUDIO_TEXTURE_MODE_FALLBACK,
++	STUDIO_TEXTURE_MODE_ANIMATED,
++	STUDIO_TEXTURE_MODE_DRONE,
++	STUDIO_TEXTURE_MODE_INTERIOR,
++	STUDIO_TEXTURE_MODE_BLEND
++};
++
+ #if defined( XASH_IOS )
++static bool ios_material_policy_reported = false;
++static bool ios_material_cache_epoch_reported = false;
++static bool ios_material_terminal_reported = false;
++static bool ios_foliage_uniform_reported = false;
++static unsigned int ios_studio_params_counts_reported = 0;
++
+ #define WO49_TOPOLOGY_VERSION 1u
+ #define WO49_TOPOLOGY_ATTR_CAP 16u
+ #define WO49_TRANSFORM_VERSION 1u
+@@ -323,19 +343,51 @@ VidInit
+ void CStudioModelRenderer::VidInit( void )
+ {
+ 	ResetRenderCache();
++#if defined( XASH_IOS )
++	if( !ios_material_policy_reported )
++	{
++		ALERT( at_console, "iOS material-state policy: source-owned studio cache epochs, exact variant params, float foliage uniforms\n" );
++		ios_material_policy_reported = true;
++	}
++#endif
+ }
+ 
+ void CStudioModelRenderer::ResetRenderCache( void )
+ {
++	material_cache_epoch++;
++	cached_texture = -1;
++	cached_texture_object = -1;
++	cached_texture_mode = STUDIO_TEXTURE_MODE_INVALID;
+ 	cached_cubemap = NULL;
++	cached_cubemap_texture = -1;
+ 	cached_glossscale = -1.0f;
+ 	cached_glosssmoothness = -1.0f;
+ 	cached_embossscale = -1.0f;
+ 	cached_fresnel = -1.0f;
+ 	cached_reflectscale = { -1.0f, 0.0f };
+ 	cached_dynlightscale = -1.0f;
+-	cached_texture = -1;
+ 	cached_normalmap = -1;
++	cached_aux_texture = -1;
++	cached_aux_mode = STUDIO_TEXTURE_MODE_INVALID;
++	cached_aux_material = -1;
++	cached_colormask = -1;
++}
++
++void CStudioModelRenderer::InvalidateStudioMaterialCache( void )
++{
++	ResetRenderCache();
++#if defined( XASH_IOS )
++	if( !ios_material_cache_epoch_reported )
++	{
++		ALERT( at_console, "iOS studio texture cache epoch: cleanup=%u invalidated all studio material identities; next draw rebinds\n", material_cache_epoch );
++		ios_material_cache_epoch_reported = true;
++	}
++	if( !ios_material_terminal_reported )
++	{
++		ALERT( at_console, "iOS material-state terminal: first authoritative studio cleanup completed\n" );
++		ios_material_terminal_reported = true;
++	}
++#endif
+ }
+ 
+ /*
+@@ -346,6 +398,7 @@ CStudioModelRenderer
+ */
+ CStudioModelRenderer::CStudioModelRenderer( void )
+ {
++	material_cache_epoch = 0;
+ 	m_fDoInterp = true;
+ 	m_pCurrentEntity = NULL;
+ 	//	m_pCvarHiModels = NULL;
+@@ -5608,14 +5661,7 @@ void CStudioModelRenderer::DrawLightForMeshList( plight_t *pl )
+ 
+ 			// reset cache
+ 			if( reset_cache )
+-			{
+-				cached_texture = -1;
+-				cached_dynlightscale = -1.0f;
+-				cached_glossscale = -1.0f;
+-				cached_glosssmoothness = -1.0f;
+-				cached_embossscale = -1.0f;
+-				cached_normalmap = -1;
+-			}
++				ResetRenderCache();
+ 
+ 			cached_model = NULL;
+ 		}
+@@ -5646,9 +5692,6 @@ void CStudioModelRenderer::DrawLightForMeshList( plight_t *pl )
+ 		else
+ 			GL_Cull( GL_FRONT );
+ 
+-		if( FBitSet( mat->flags, STUDIO_NF_COLORMAP ) )
+-			cached_texture = -1;
+-
+ 		const float newdynlightscale = pl->brightness * tr.materials[iTexnum].DynlightScale;
+ 		if( newdynlightscale != cached_dynlightscale )
+ 		{
+@@ -5656,68 +5699,101 @@ void CStudioModelRenderer::DrawLightForMeshList( plight_t *pl )
+ 			cached_dynlightscale = newdynlightscale;
+ 		}
+ 
+-		if( cached_texture == -1 || cached_texture != iTexnum )
+-		{		
+-			if( r_lightmap->value && !r_fullbright->value )
+-				GL_Bind( GL_TEXTURE0, tr.whiteTexture );
+-			else if( FBitSet( mat->flags, STUDIO_NF_COLORMAP ) )
++		int texture_mode = STUDIO_TEXTURE_MODE_BASE;
++		int texture_object = iTexnum;
++		if( r_lightmap->value && !r_fullbright->value )
++		{
++			texture_mode = STUDIO_TEXTURE_MODE_WHITE;
++			texture_object = tr.whiteTexture;
++		}
++		else if( FBitSet( mat->flags, STUDIO_NF_COLORMAP ) )
++		{
++			// The remapped object is engine-owned and may change without a Diffusion
++			// texture id change, so this special route intentionally remains forced.
++			texture_mode = STUDIO_TEXTURE_MODE_COLORMAP;
++		}
++		else if( tr.materials[iTexnum].gl_fallbacktex_id > 0 )
++		{
++			texture_mode = STUDIO_TEXTURE_MODE_FALLBACK;
++			texture_object = tr.materials[iTexnum].gl_fallbacktex_id;
++		}
++		else if( iTexnum != tr.defaultTexture && tr.materials[iTexnum].animation_id >= 0 )
++		{
++			texture_mode = STUDIO_TEXTURE_MODE_ANIMATED;
++			texture_object = tr.animation[tr.materials[iTexnum].animation_id].GetAnimationCurFrame();
++		}
++		else if( tr.materials[iTexnum].drone_view )
++		{
++			texture_mode = STUDIO_TEXTURE_MODE_DRONE;
++			texture_object = tr.DroneViewTex;
++		}
++		else if( (m_pCurrentEntity->curstate.iuser3 == -670) && tr.materials[iTexnum].monitor && tr.studio_screen_tex[m_pCurrentEntity->index] )
++		{
++			texture_mode = STUDIO_TEXTURE_MODE_MONITOR;
++			texture_object = tr.studio_screen_tex[m_pCurrentEntity->index];
++		}
++
++		if( texture_mode == STUDIO_TEXTURE_MODE_COLORMAP ||
++			cached_texture != iTexnum || cached_texture_object != texture_object ||
++			cached_texture_mode != texture_mode )
++		{
++			if( texture_mode == STUDIO_TEXTURE_MODE_COLORMAP )
+ 				IEngineStudio.StudioSetupSkin( m_pStudioHeader, pskinref[pMesh->skinref] );
+-			else if( tr.materials[iTexnum].gl_fallbacktex_id > 0 )
+-				GL_Bind( GL_TEXTURE0, tr.materials[iTexnum].gl_fallbacktex_id );
+-			else if( iTexnum != tr.defaultTexture && tr.materials[iTexnum].animation_id >= 0 )
+-			{
+-				int anim_id = tr.materials[iTexnum].animation_id;
+-				GL_Bind( GL_TEXTURE0, tr.animation[anim_id].GetAnimationCurFrame() );
+-			}
+-			else if( tr.materials[iTexnum].drone_view )
+-				GL_Bind( GL_TEXTURE0, tr.DroneViewTex );
+-			else if( (m_pCurrentEntity->curstate.iuser3 == -670) && tr.materials[iTexnum].monitor && tr.studio_screen_tex[m_pCurrentEntity->index] )
+-				GL_Bind( GL_TEXTURE0, tr.studio_screen_tex[m_pCurrentEntity->index] );
+ 			else
+-				GL_Bind( GL_TEXTURE0, iTexnum );
++				GL_Bind( GL_TEXTURE0, texture_object );
++			cached_texture = iTexnum;
++			cached_texture_object = texture_object;
++			cached_texture_mode = texture_mode;
++		}
+ 
+-			if( RI->currentshader->status & SHADER_USE_BUMP && cached_normalmap != tr.materials[iTexnum].gl_normalmap_id ) // u_NormalMap
+-			{
+-				GL_Bind( GL_TEXTURE3, tr.materials[iTexnum].gl_normalmap_id );
+-				cached_normalmap = tr.materials[iTexnum].gl_normalmap_id;
+-			}
++		if( RI->currentshader->status & SHADER_USE_BUMP && cached_normalmap != tr.materials[iTexnum].gl_normalmap_id )
++		{
++			GL_Bind( GL_TEXTURE3, tr.materials[iTexnum].gl_normalmap_id );
++			cached_normalmap = tr.materials[iTexnum].gl_normalmap_id;
++		}
+ 
+-			// diffusion - interior mapping
+-			if( RI->currentshader->status & SHADER_USE_INTERIOR )
+-			{
+-				pglUniform3fARB( RI->currentshader->u_InteriorParams, tr.materials[iTexnum].InteriorGrid.x, tr.materials[iTexnum].InteriorGrid.y, (float)tr.materials[iTexnum].InteriorLightState );
+-				GL_Bind( GL_TEXTURE4, tr.materials[iTexnum].gl_interiormap_id ); // u_InteriorMap
+-			}
+-			else if( tr.materials[iTexnum].gl_blendtex_id > 0 )
+-			{
+-				GL_Bind( GL_TEXTURE4, tr.materials[iTexnum].gl_blendtex_id ); // u_BlendTexture
+-			}
++		int aux_mode = STUDIO_TEXTURE_MODE_INVALID;
++		int aux_texture = -1;
++		if( RI->currentshader->status & SHADER_USE_INTERIOR )
++		{
++			aux_mode = STUDIO_TEXTURE_MODE_INTERIOR;
++			aux_texture = tr.materials[iTexnum].gl_interiormap_id;
++			pglUniform3fARB( RI->currentshader->u_InteriorParams, tr.materials[iTexnum].InteriorGrid.x, tr.materials[iTexnum].InteriorGrid.y, (float)tr.materials[iTexnum].InteriorLightState );
++		}
++		else if( tr.materials[iTexnum].gl_blendtex_id > 0 )
++		{
++			aux_mode = STUDIO_TEXTURE_MODE_BLEND;
++			aux_texture = tr.materials[iTexnum].gl_blendtex_id;
++		}
++		if( aux_mode != STUDIO_TEXTURE_MODE_INVALID &&
++			( cached_aux_texture != aux_texture || cached_aux_mode != aux_mode || cached_aux_material != iTexnum ) )
++		{
++			GL_Bind( GL_TEXTURE4, aux_texture );
++			cached_aux_texture = aux_texture;
++			cached_aux_mode = aux_mode;
++			cached_aux_material = iTexnum;
++		}
+ 
+-			if( RI->currentshader->status & SHADER_USE_SPECULAR )
++		if( RI->currentshader->status & SHADER_USE_SPECULAR )
++		{
++			if( tr.materials[iTexnum].GlossSmoothness != cached_glosssmoothness )
+ 			{
+-				if( tr.materials[iTexnum].GlossSmoothness != cached_glosssmoothness )
+-				{
+-					pglUniform1fARB( RI->currentshader->u_GlossSmoothness, tr.materials[iTexnum].GlossSmoothness );
+-					cached_glosssmoothness = tr.materials[iTexnum].GlossSmoothness;
+-				}
+-
+-				if( tr.materials[iTexnum].GlossScale != cached_glossscale )
+-				{
+-					pglUniform1fARB( RI->currentshader->u_GlossScale, tr.materials[iTexnum].GlossScale );
+-					cached_glossscale = tr.materials[iTexnum].GlossScale;
+-				}
++				pglUniform1fARB( RI->currentshader->u_GlossSmoothness, tr.materials[iTexnum].GlossSmoothness );
++				cached_glosssmoothness = tr.materials[iTexnum].GlossSmoothness;
+ 			}
+ 
+-			if( RI->currentshader->status & SHADER_USE_EMBOSS )
++			if( tr.materials[iTexnum].GlossScale != cached_glossscale )
+ 			{
+-				if( tr.materials[iTexnum].EmbossScale != cached_embossscale )
+-				{
+-					pglUniform1fARB( RI->currentshader->u_EmbossScale, tr.materials[iTexnum].EmbossScale );
+-					cached_embossscale = tr.materials[iTexnum].EmbossScale;
+-				}
++				pglUniform1fARB( RI->currentshader->u_GlossScale, tr.materials[iTexnum].GlossScale );
++				cached_glossscale = tr.materials[iTexnum].GlossScale;
+ 			}
++		}
+ 
+-			cached_texture = iTexnum;
++		if( RI->currentshader->status & SHADER_USE_EMBOSS &&
++			tr.materials[iTexnum].EmbossScale != cached_embossscale )
++		{
++			pglUniform1fARB( RI->currentshader->u_EmbossScale, tr.materials[iTexnum].EmbossScale );
++			cached_embossscale = tr.materials[iTexnum].EmbossScale;
+ 		}
+ 
+ 		// diffusion - apply custom color to a specific texture
+@@ -5737,8 +5813,12 @@ void CStudioModelRenderer::DrawLightForMeshList( plight_t *pl )
+ 					pglUniform4fARB( RI->currentshader->u_RenderColor, RI->currententity->curstate.rendercolor.r / 255.0f, RI->currententity->curstate.rendercolor.g / 255.0f, RI->currententity->curstate.rendercolor.b / 255.0f, tr.blend );
+ 
+ 				// color mask
+-				if( tr.materials[iTexnum].gl_colormask_id > 0 )
++				if( tr.materials[iTexnum].gl_colormask_id > 0 &&
++					cached_colormask != tr.materials[iTexnum].gl_colormask_id )
++				{
+ 					GL_Bind( GL_TEXTURE5, tr.materials[iTexnum].gl_colormask_id ); // u_ColorMask
++					cached_colormask = tr.materials[iTexnum].gl_colormask_id;
++				}
+ 			}
+ 			else
+ 				R_SetRenderColor( m_pCurrentEntity );
+@@ -5791,6 +5871,7 @@ void CStudioModelRenderer::RenderDynLightList( void )
+ 	pglDisable( GL_SCISSOR_TEST );
+ 	GL_DepthMask( GL_TRUE ); // diffusion
+ 	GL_CleanUpTextureUnits( 0 );
++	InvalidateStudioMaterialCache();
+ 	RI->currentlight = NULL;
+ }
+ 
+@@ -5901,8 +5982,21 @@ void CStudioModelRenderer::DrawStudioMeshes( void )
+ 			GL_BindShader( &glsl_programs[entry->hProgram] );
+ 
+ 			ASSERT( RI->currentshader != NULL );
++			ASSERT( RI->currentshader->studio_params_count >= 1 && RI->currentshader->studio_params_count <= 3 );
++			ASSERT( RI->currentshader->studio_params_count == RI->currentshader->studio_params_linked_count );
+ 			// write constants
+-			pglUniform4fvARB( RI->currentshader->u_StudioParams, 3, &studio_params[0][0] );
++			pglUniform4fvARB( RI->currentshader->u_StudioParams,
++				RI->currentshader->studio_params_count, &studio_params[0][0] );
++#if defined( XASH_IOS )
++			const unsigned int params_count_bit = 1u << RI->currentshader->studio_params_count;
++			if( !( ios_studio_params_counts_reported & params_count_bit ) )
++			{
++				ALERT( at_console, "iOS studio params exact count: program=%s count=%d linked=%d\n",
++					RI->currentshader->name, RI->currentshader->studio_params_count,
++					RI->currentshader->studio_params_linked_count );
++				ios_studio_params_counts_reported |= params_count_bit;
++			}
++#endif
+ 
+ 			if( FBitSet( m_pModelInstance->info_flags, MF_VERTEX_LIGHTING ) )
+ 				pglUniform4fvARB( RI->currentshader->u_GammaTable, 64, &tr.gamma_table[0][0] );
+@@ -5911,16 +6005,7 @@ void CStudioModelRenderer::DrawStudioMeshes( void )
+ 
+ 			// reset cache
+ 			if( reset_cache )
+-			{
+-				cached_texture = -1;
+-				cached_cubemap = NULL;
+-				cached_glossscale = -1.0f;
+-				cached_glosssmoothness = -1.0f;
+-				cached_embossscale = -1.0f;
+-				cached_fresnel = -1.0f;
+-				cached_reflectscale = { -1.0f, 0.0f };
+-				cached_normalmap = -1;
+-			}
++				ResetRenderCache();
+ 
+ 			cached_entity = NULL;
+ 			cached_model = NULL;
+@@ -5967,74 +6052,114 @@ void CStudioModelRenderer::DrawStudioMeshes( void )
+ 		else
+ 			GL_Cull( GL_FRONT );
+ 
+-		if( FBitSet( mat->flags, STUDIO_NF_COLORMAP ) )
+-			cached_texture = -1;
++		int texture_mode = STUDIO_TEXTURE_MODE_BASE;
++		int texture_object = iTexnum;
++		if( r_lightmap->value && !r_fullbright->value )
++		{
++			texture_mode = STUDIO_TEXTURE_MODE_WHITE;
++			texture_object = tr.whiteTexture;
++		}
++		else if( FBitSet( mat->flags, STUDIO_NF_COLORMAP ) )
++		{
++			// The remapped object is engine-owned and may change without a Diffusion
++			// texture id change, so this special route intentionally remains forced.
++			texture_mode = STUDIO_TEXTURE_MODE_COLORMAP;
++		}
++		else if( (m_pCurrentEntity->curstate.iuser3 == -670) && tr.materials[iTexnum].monitor && tr.studio_screen_tex[m_pCurrentEntity->index] )
++		{
++			texture_mode = STUDIO_TEXTURE_MODE_MONITOR;
++			texture_object = tr.studio_screen_tex[m_pCurrentEntity->index];
++		}
++		else if( tr.materials[iTexnum].gl_fallbacktex_id > 0 )
++		{
++			texture_mode = STUDIO_TEXTURE_MODE_FALLBACK;
++			texture_object = tr.materials[iTexnum].gl_fallbacktex_id;
++		}
++		else if( iTexnum != tr.defaultTexture && tr.materials[iTexnum].animation_id >= 0 )
++		{
++			texture_mode = STUDIO_TEXTURE_MODE_ANIMATED;
++			texture_object = tr.animation[tr.materials[iTexnum].animation_id].GetAnimationCurFrame();
++		}
++		else if( tr.materials[iTexnum].drone_view )
++		{
++			texture_mode = STUDIO_TEXTURE_MODE_DRONE;
++			texture_object = tr.DroneViewTex;
++		}
+ 
+-		if( cached_texture == -1 || cached_texture != iTexnum )
++		if( texture_mode == STUDIO_TEXTURE_MODE_COLORMAP ||
++			cached_texture != iTexnum || cached_texture_object != texture_object ||
++			cached_texture_mode != texture_mode )
+ 		{
+-			if( r_lightmap->value && !r_fullbright->value )
+-				GL_Bind( GL_TEXTURE0, tr.whiteTexture );
+-			else if( FBitSet( mat->flags, STUDIO_NF_COLORMAP ) )
++			if( texture_mode == STUDIO_TEXTURE_MODE_COLORMAP )
+ 				IEngineStudio.StudioSetupSkin( m_pStudioHeader, pskinref[pMesh->skinref] );
+-			else if( (m_pCurrentEntity->curstate.iuser3 == -670) && tr.materials[iTexnum].monitor && tr.studio_screen_tex[m_pCurrentEntity->index] )
+-				GL_Bind( GL_TEXTURE0, tr.studio_screen_tex[m_pCurrentEntity->index] );
+-			else if( tr.materials[iTexnum].gl_fallbacktex_id > 0 )
+-				GL_Bind( GL_TEXTURE0, tr.materials[iTexnum].gl_fallbacktex_id );
+-			else if( iTexnum != tr.defaultTexture && tr.materials[iTexnum].animation_id >= 0 )
+-			{
+-				int anim_id = tr.materials[iTexnum].animation_id;
+-				GL_Bind( GL_TEXTURE0, tr.animation[anim_id].GetAnimationCurFrame() );
+-			}
+-			else if( tr.materials[iTexnum].drone_view )
+-				GL_Bind( GL_TEXTURE0, tr.DroneViewTex );
+-			else 
+-				GL_Bind( GL_TEXTURE0, iTexnum );
++			else
++				GL_Bind( GL_TEXTURE0, texture_object );
++			cached_texture = iTexnum;
++			cached_texture_object = texture_object;
++			cached_texture_mode = texture_mode;
++		}
+ 
+-			if( RI->currentshader->status & SHADER_USE_BUMP && cached_normalmap != tr.materials[iTexnum].gl_normalmap_id )
+-			{
+-				GL_Bind( GL_TEXTURE1, tr.materials[iTexnum].gl_normalmap_id ); // u_NormalMap
+-				cached_normalmap = tr.materials[iTexnum].gl_normalmap_id;
+-			}
++		if( RI->currentshader->status & SHADER_USE_BUMP && cached_normalmap != tr.materials[iTexnum].gl_normalmap_id )
++		{
++			GL_Bind( GL_TEXTURE1, tr.materials[iTexnum].gl_normalmap_id ); // u_NormalMap
++			cached_normalmap = tr.materials[iTexnum].gl_normalmap_id;
++		}
+ 
+-			// diffusion - interior mapping
+-			if( RI->currentshader->status & SHADER_USE_INTERIOR )
+-			{
+-				pglUniform3fARB( RI->currentshader->u_InteriorParams, tr.materials[iTexnum].InteriorGrid.x, tr.materials[iTexnum].InteriorGrid.y, (float)tr.materials[iTexnum].InteriorLightState );
+-				GL_Bind( GL_TEXTURE4, tr.materials[iTexnum].gl_interiormap_id ); // u_InteriorMap
+-			}
+-			else if( tr.materials[iTexnum].gl_blendtex_id > 0 )
++		int aux_mode = STUDIO_TEXTURE_MODE_INVALID;
++		int aux_texture = -1;
++		if( RI->currentshader->status & SHADER_USE_INTERIOR )
++		{
++			aux_mode = STUDIO_TEXTURE_MODE_INTERIOR;
++			aux_texture = tr.materials[iTexnum].gl_interiormap_id;
++			pglUniform3fARB( RI->currentshader->u_InteriorParams, tr.materials[iTexnum].InteriorGrid.x, tr.materials[iTexnum].InteriorGrid.y, (float)tr.materials[iTexnum].InteriorLightState );
++		}
++		else if( tr.materials[iTexnum].gl_blendtex_id > 0 )
++		{
++			aux_mode = STUDIO_TEXTURE_MODE_BLEND;
++			aux_texture = tr.materials[iTexnum].gl_blendtex_id;
++		}
++		if( aux_mode != STUDIO_TEXTURE_MODE_INVALID &&
++			( cached_aux_texture != aux_texture || cached_aux_mode != aux_mode || cached_aux_material != iTexnum ) )
++		{
++			GL_Bind( GL_TEXTURE4, aux_texture );
++			cached_aux_texture = aux_texture;
++			cached_aux_mode = aux_mode;
++			cached_aux_material = iTexnum;
++		}
++
++		if( tr.materials[iTexnum].FoliageSwayHeight != 0 )
++		{
++			pglUniform1fARB( RI->currentshader->u_FoliageSwayHeight,
++				(float)tr.materials[iTexnum].FoliageSwayHeight );
++#if defined( XASH_IOS )
++			if( !ios_foliage_uniform_reported )
+ 			{
+-				GL_Bind( GL_TEXTURE4, tr.materials[iTexnum].gl_blendtex_id ); // u_BlendTexture
++				ALERT( at_console, "iOS foliage uniform type: float declaration and glUniform1f producer\n" );
++				ios_foliage_uniform_reported = true;
+ 			}
++#endif
++		}
+ 
+-			if( tr.materials[iTexnum].FoliageSwayHeight != 0 )
+-				pglUniform1iARB( RI->currentshader->u_FoliageSwayHeight, tr.materials[iTexnum].FoliageSwayHeight );
+-
+-			if( RI->currentshader->status & SHADER_USE_SPECULAR )
++		if( RI->currentshader->status & SHADER_USE_SPECULAR )
++		{
++			if( tr.materials[iTexnum].GlossSmoothness != cached_glosssmoothness )
+ 			{
+-				if( tr.materials[iTexnum].GlossSmoothness != cached_glosssmoothness )
+-				{
+-					pglUniform1fARB( RI->currentshader->u_GlossSmoothness, tr.materials[iTexnum].GlossSmoothness );
+-					cached_glosssmoothness = tr.materials[iTexnum].GlossSmoothness;
+-				}
+-
+-				if( tr.materials[iTexnum].GlossScale != cached_glossscale )
+-				{
+-					pglUniform1fARB( RI->currentshader->u_GlossScale, tr.materials[iTexnum].GlossScale );
+-					cached_glossscale = tr.materials[iTexnum].GlossScale;
+-				}
++				pglUniform1fARB( RI->currentshader->u_GlossSmoothness, tr.materials[iTexnum].GlossSmoothness );
++				cached_glosssmoothness = tr.materials[iTexnum].GlossSmoothness;
+ 			}
+ 
+-			if( RI->currentshader->status & SHADER_USE_EMBOSS )
++			if( tr.materials[iTexnum].GlossScale != cached_glossscale )
+ 			{
+-				if( tr.materials[iTexnum].EmbossScale != cached_embossscale )
+-				{
+-					pglUniform1fARB( RI->currentshader->u_EmbossScale, tr.materials[iTexnum].EmbossScale );
+-					cached_embossscale = tr.materials[iTexnum].EmbossScale;
+-				}
++				pglUniform1fARB( RI->currentshader->u_GlossScale, tr.materials[iTexnum].GlossScale );
++				cached_glossscale = tr.materials[iTexnum].GlossScale;
+ 			}
++		}
+ 
+-			cached_texture = iTexnum;
++		if( RI->currentshader->status & SHADER_USE_EMBOSS &&
++			tr.materials[iTexnum].EmbossScale != cached_embossscale )
++		{
++			pglUniform1fARB( RI->currentshader->u_EmbossScale, tr.materials[iTexnum].EmbossScale );
++			cached_embossscale = tr.materials[iTexnum].EmbossScale;
+ 		}
+ 
+ 		// diffusion - apply custom color to a specific texture
+@@ -6054,8 +6179,12 @@ void CStudioModelRenderer::DrawStudioMeshes( void )
+ 					pglUniform4fARB( RI->currentshader->u_RenderColor, RI->currententity->curstate.rendercolor.r / 255.0f, RI->currententity->curstate.rendercolor.g / 255.0f, RI->currententity->curstate.rendercolor.b / 255.0f, tr.blend );
+ 
+ 				// color mask
+-				if( tr.materials[iTexnum].gl_colormask_id > 0 )
++				if( tr.materials[iTexnum].gl_colormask_id > 0 &&
++					cached_colormask != tr.materials[iTexnum].gl_colormask_id )
++				{
+ 					GL_Bind( GL_TEXTURE5, tr.materials[iTexnum].gl_colormask_id ); // u_ColorMask
++					cached_colormask = tr.materials[iTexnum].gl_colormask_id;
++				}
+ 			}
+ 			else
+ 				R_SetRenderColor( m_pCurrentEntity );
+@@ -6065,11 +6194,14 @@ void CStudioModelRenderer::DrawStudioMeshes( void )
+ 		
+ 		if( RI->currentshader->status & SHADER_USE_CUBEMAPS )
+ 		{
++			const int cubemap_texture = m_pModelInstance->cubemap ?
++				m_pModelInstance->cubemap->texture : tr.blackCubeTexture;
+ 			if( m_pModelInstance->cubemap )
+ 			{
+-				if( cached_cubemap != m_pModelInstance->cubemap )
++				if( cached_cubemap != m_pModelInstance->cubemap ||
++					cached_cubemap_texture != cubemap_texture )
+ 				{
+-					GL_Bind( GL_TEXTURE2, m_pModelInstance->cubemap->texture );
++					GL_Bind( GL_TEXTURE2, cubemap_texture );
+ 					// box mins
+ 					cubemap_params[0] = m_pModelInstance->cubemap->mins;
+ 					// box maxs
+@@ -6078,17 +6210,22 @@ void CStudioModelRenderer::DrawStudioMeshes( void )
+ 					cubemap_params[2] = m_pModelInstance->cubemap->origin;
+ 					pglUniform3fvARB( RI->currentshader->u_Cubemap, 3, &cubemap_params[0][0] );
+ 					cached_cubemap = m_pModelInstance->cubemap;
++					cached_cubemap_texture = cubemap_texture;
+ 				}
+ 				
+ 			}
+ 			else // model doesn't have a cubemap
+ 			{
+-				GL_Bind( GL_TEXTURE2, tr.blackCubeTexture );
+-				cubemap_params[0] = g_vecZero;
+-				cubemap_params[1] = g_vecZero;
+-				cubemap_params[2] = g_vecZero;
+-				pglUniform3fvARB( RI->currentshader->u_Cubemap, 3, &cubemap_params[0][0] );
+-				cached_cubemap = NULL;
++				if( cached_cubemap != NULL || cached_cubemap_texture != cubemap_texture )
++				{
++					GL_Bind( GL_TEXTURE2, cubemap_texture );
++					cubemap_params[0] = g_vecZero;
++					cubemap_params[1] = g_vecZero;
++					cubemap_params[2] = g_vecZero;
++					pglUniform3fvARB( RI->currentshader->u_Cubemap, 3, &cubemap_params[0][0] );
++					cached_cubemap = NULL;
++					cached_cubemap_texture = cubemap_texture;
++				}
+ 			}
+ 
+ 			if( tr.materials[iTexnum].ReflectScale != cached_reflectscale )
+@@ -6114,6 +6251,7 @@ void CStudioModelRenderer::DrawStudioMeshes( void )
+ 
+ 	GL_SelectTexture( glConfig.max_texture_units - 1 ); // force to cleanup all the units
+ 	GL_CleanUpTextureUnits( 0 );
++	InvalidateStudioMaterialCache();
+ 
+ 	GL_DepthMask( GL_TRUE );
+ 	GL_Blend( GL_FALSE );
+@@ -6250,6 +6388,7 @@ void CStudioModelRenderer::DrawStudioMeshesShadow( void )
+ 
+ 	GL_SelectTexture( glConfig.max_texture_units - 1 ); // force to cleanup all the units
+ 	GL_CleanUpTextureUnits( 0 );
++	InvalidateStudioMaterialCache();
+ 
+ 	if( Additive )
+ 		GL_DepthMask( GL_TRUE );
+diff --git a/client/render/r_studio.h b/client/render/r_studio.h
+index 1747aad..517a1a1 100644
+--- a/client/render/r_studio.h
++++ b/client/render/r_studio.h
+@@ -228,6 +228,7 @@ public:
+ 
+ 	void VidInit( void );
+ 	void ResetRenderCache();
++	void InvalidateStudioMaterialCache();
+ 
+ 	// public Interfaces
+ 	virtual int StudioDrawModel( int flags );
+@@ -734,7 +735,10 @@ public:
+ 
+ 	// rendering cache
+ 	int cached_texture;
++	int cached_texture_object;
++	int cached_texture_mode;
+ 	mcubemap_t *cached_cubemap;
++	int cached_cubemap_texture;
+ 	float cached_glossscale;
+ 	float cached_glosssmoothness;
+ 	float cached_embossscale;
+@@ -742,6 +746,11 @@ public:
+ 	Vector2D cached_reflectscale;
+ 	float cached_dynlightscale;
+ 	int cached_normalmap;
++	int cached_aux_texture;
++	int cached_aux_mode;
++	int cached_aux_material;
++	int cached_colormask;
++	unsigned int material_cache_epoch;
+ };
+ 
+ extern CStudioModelRenderer g_StudioRenderer;
+warning: in the working copy of 'client/render/r_shader.cpp', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'client/render/r_shader.h', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'client/render/r_studio.cpp', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'client/render/r_studio.h', LF will be replaced by CRLF the next time Git touches it

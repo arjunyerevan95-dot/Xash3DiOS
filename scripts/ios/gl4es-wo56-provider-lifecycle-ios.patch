@@ -1,0 +1,101 @@
+diff --git a/include/gl4esinit.h b/include/gl4esinit.h
+index 06a3fb46..b14273a0 100644
+--- a/include/gl4esinit.h
++++ b/include/gl4esinit.h
+@@ -22,6 +22,9 @@ void set_getmainfbsize(void (APIENTRY_GL4ES *new_getMainFBSize)(int* width, int*
+ void initialize_gl4es(void);
+ // do this to uninitialize GL4ES if init constructors are disabled.
+ void close_gl4es(void);
++// Read the cached live-context texture-array provider result without issuing GL calls.
++void gl4es_get_texture_array_provider_state(int *native_es_major, int *procedures,
++    int *max_layers, int *glsl300, int *route_available, int *advertised);
+ // wrapped GetProcAddress
+ void* APIENTRY_GL4ES gl4es_GetProcAddress(const char *name);
+ 
+diff --git a/src/glx/hardext.c b/src/glx/hardext.c
+index 14b175d2..ad6eca91 100644
+--- a/src/glx/hardext.c
++++ b/src/glx/hardext.c
+@@ -65,6 +65,32 @@ static int testGLSL(const char* version, int uniformLoc) {
+     return compiled;
+ }
+ 
++static int testGLSL300ES(void) {
++    LOAD_GLES2(glCreateShader);
++    LOAD_GLES2(glShaderSource);
++    LOAD_GLES2(glCompileShader);
++    LOAD_GLES2(glGetShaderiv);
++    LOAD_GLES2(glDeleteShader);
++    LOAD_GLES(glGetError);
++
++    GLuint shad = gles_glCreateShader(GL_VERTEX_SHADER);
++    const char* shadTest =
++        "#version 300 es\n"
++        "layout(location = 0) in vec4 vecPos;\n"
++        "uniform mat4 matMVP;\n"
++        "void main() {\n"
++        " gl_Position = matMVP * vecPos;\n"
++        "}\n";
++    gles_glShaderSource(shad, 1, &shadTest, NULL);
++    gles_glCompileShader(shad);
++    GLint compiled = 0;
++    gles_glGetShaderiv(shad, GL_COMPILE_STATUS, &compiled);
++    gles_glDeleteShader(shad);
++    gles_glGetError();
++
++    return compiled;
++}
++
+ static int testTextureCubeLod() {
+     LOAD_GLES2(glCreateShader);
+     LOAD_GLES2(glShaderSource);
+@@ -356,6 +382,9 @@ void GetHardwareExtensions(int notest)
+         gles_getProcAddress("glTexImage3D") &&
+         gles_getProcAddress("glTexSubImage3D") &&
+         gles_getProcAddress("glTexStorage3D");
++    hardext.texture_array_native_es_major = native_es_major;
++    hardext.texture_array_procs = texture_array_procs ? 1 : 0;
++    hardext.texture_array_route = native_es_major >= 3 && texture_array_procs;
+     hardext.texture_array = 0;
+     hardext.maxarraylayers = 0;
+     if(native_es_major>=3 && texture_array_procs) {
+@@ -487,7 +516,7 @@ void GetHardwareExtensions(int notest)
+     if(hardext.esversion>1) {
+         if(testGLSL("#version 120", 1))
+             hardext.glsl120 = 1;
+-        if(testGLSL("#version 300 es", 0))
++        if(testGLSL300ES())
+             hardext.glsl300es = 1;
+         if(testGLSL("#version 310 es", 1))
+             hardext.glsl310es = 1;
+@@ -538,3 +567,16 @@ void GetHardwareExtensions(int notest)
+     egl_eglTerminate(eglDisplay);
+ #endif
+ }
++
++EXPORT
++void gl4es_get_texture_array_provider_state(int *native_es_major, int *procedures,
++    int *max_layers, int *glsl300, int *route_available, int *advertised)
++{
++    if(native_es_major) *native_es_major = hardext.texture_array_native_es_major;
++    if(procedures) *procedures = hardext.texture_array_procs;
++    if(max_layers) *max_layers = hardext.maxarraylayers;
++    if(glsl300) *glsl300 = hardext.glsl300es ? 1 : 0;
++    if(route_available) *route_available = hardext.texture_array_route;
++    if(advertised) *advertised = hardext.texture_array && hardext.glsl300es &&
++        hardext.maxarraylayers >= 16 && hardext.texture_array_route;
++}
+diff --git a/src/glx/hardext.h b/src/glx/hardext.h
+index 1ed51f6f..2e32cf14 100644
+--- a/src/glx/hardext.h
++++ b/src/glx/hardext.h
+@@ -74,6 +74,9 @@ typedef struct _hardext {
+     int glsl310es;      // does version 300es glsl shader are supported ?
+     int texture_array;  // native GLES3 GL_TEXTURE_2D_ARRAY route is complete
+     int maxarraylayers; // live GL_MAX_ARRAY_TEXTURE_LAYERS
++    int texture_array_native_es_major; // native context version used for array admission
++    int texture_array_procs;           // required native 3-D entry points resolved
++    int texture_array_route;           // compiled GL4ES array route can use those entry points
+ } hardext_t;
+ 
+ EXPORT extern hardext_t hardext;

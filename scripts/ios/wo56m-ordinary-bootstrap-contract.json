@@ -1,0 +1,64 @@
+{
+  "schema": 1,
+  "workOrder": "56M",
+  "outcomeGate": "A",
+  "defaultArguments": "-dev 2 -log -game diffusion -ref gl4es",
+  "forbiddenCombinedDefault": "-dev 2 -log -game diffusion -ref gl4es -gl4es_texture_array_selftest",
+  "argumentOwnership": [
+    {
+      "stage": "locked-source-value",
+      "owner": "IOS_LaunchDialog",
+      "source": "engine/platform/ios/launchdialog.m",
+      "invariant": "ordinaryBootstrapArgs is assigned to the sole disabled launch field"
+    },
+    {
+      "stage": "tokenization",
+      "owner": "IOS_LaunchDialog",
+      "source": "engine/platform/ios/launchdialog.m",
+      "invariant": "the disabled field text is split on spaces into szArgc/szArgv without settings or fallback override"
+    },
+    {
+      "stage": "argument-export",
+      "owner": "IOS_GetArgs",
+      "source": "engine/platform/ios/launchdialog.m",
+      "invariant": "returns the exact szArgc/szArgv created from the locked field"
+    },
+    {
+      "stage": "host-admission",
+      "owner": "main",
+      "source": "engine/common/launcher.c",
+      "invariant": "IOS_LaunchDialog then IOS_GetArgs then Host_Main"
+    }
+  ],
+  "diagnosticDormancy": {
+    "flag": "-gl4es_texture_array_selftest",
+    "automaticDefault": false,
+    "parserOwner": "Host_InitCommon",
+    "dispatchOwners": ["CL_Init", "R_Init", "R_Init_OpenGL"],
+    "harnessOwner": "R_IOSTextureArraySelftest",
+    "terminal": "Sys_Quit(\"iOS texture array selftest complete\")",
+    "retainedMarkers": [
+      "iOS texture array selftest boot: armed",
+      "iOS texture array selftest terminal:"
+    ]
+  },
+  "packageDiscriminator": {
+    "ordinaryString": "exact standalone strings(1) line required in xash",
+    "combinedString": "exact combined strings(1) line forbidden in xash",
+    "flagToken": "retained separately in xash for explicit parser and guards"
+  },
+  "productionAdmissionMarkers": [
+    "iOS production texture array provider:",
+    "iOS production texture array engine:",
+    "iOS production texture array admission:"
+  ],
+  "lockedProductionSha256": {
+    "scripts/ios/wo56k-production-array-admission-contract.json": "ec57137fcc02caecce5deb08e0dc226320f7accf5c6f322729ee786881c1622a",
+    "scripts/ios/gl4es-wo56-production-array-admission-ios.patch": "56b7cea85b2df69193e81a18a8dff933bdc5716b72adee2c0afc7aa500ce8f05",
+    "scripts/ios/diffusion-wo56-production-array-admission-ios.patch": "53ed027bca76bb2415db16b9fc041d8fc7cef81ec0a9b15d1304dc85f7fd86ca",
+    "ref/gl/gl_opengl.c": "45af59be990a89cd46057ac822e6060b783e3e3880618bfb09f03e2bbfba7874",
+    "ref/gl/gl_image.c": "942c1c63375e44a9fa87a24a8b88ea232f305cd963ba0745f1dc8de65ecacfb9",
+    "ref/gl/gl_context.c": "90df60a4508aa194dd56181adc7130158620eabc8da92c0cfe7ab6ecdc459f3f"
+  },
+  "runtimeQualification": "not performed or claimed in Phase M"
+}

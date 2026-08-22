@@ -1,0 +1,637 @@
+diff --git a/client/render/r_backend.cpp b/client/render/r_backend.cpp
+index 135b08b..b537f16 100644
+--- a/client/render/r_backend.cpp
++++ b/client/render/r_backend.cpp
+@@ -332,18 +332,18 @@ int R_AllocFrameBuffer( const int viewport[4] )
+ 	}
+ 
+ 	// create a depth-buffer
+-	pglGenRenderbuffers( 1, &fbo->renderbuffer );
+-	pglBindRenderbuffer( GL_RENDERBUFFER_EXT, fbo->renderbuffer );
+-	pglRenderbufferStorage( GL_RENDERBUFFER_EXT, GL_DEPTH_COMPONENT24, viewport[2], viewport[3] );
+-	pglBindRenderbuffer( GL_RENDERBUFFER_EXT, 0 );
++	WO43_GL_CALL( "R_AllocFrameBuffer/gen-rb", "glGenRenderbuffers", "count=1", pglGenRenderbuffers( 1, &fbo->renderbuffer ) );
++	WO43_GL_CALL( "R_AllocFrameBuffer/bind-rb", "glBindRenderbuffer", va( "target=0x%x rb=%u", GL_RENDERBUFFER_EXT, fbo->renderbuffer ), pglBindRenderbuffer( GL_RENDERBUFFER_EXT, fbo->renderbuffer ) );
++	WO43_GL_CALL( "R_AllocFrameBuffer/storage-rb", "glRenderbufferStorage", va( "target=0x%x format=0x%x width=%d height=%d", GL_RENDERBUFFER_EXT, GL_DEPTH_COMPONENT24, viewport[2], viewport[3] ), pglRenderbufferStorage( GL_RENDERBUFFER_EXT, GL_DEPTH_COMPONENT24, viewport[2], viewport[3] ) );
++	WO43_GL_CALL( "R_AllocFrameBuffer/unbind-rb-zero", "glBindRenderbuffer", va( "target=0x%x rb=0", GL_RENDERBUFFER_EXT ), pglBindRenderbuffer( GL_RENDERBUFFER_EXT, 0 ) );
+ 
+ 	// create frame-buffer
+-	pglGenFramebuffers( 1, &fbo->framebuffer );
+-	pglBindFramebuffer( GL_FRAMEBUFFER_EXT, fbo->framebuffer );
+-	pglFramebufferRenderbuffer( GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, GL_RENDERBUFFER_EXT, fbo->renderbuffer );
+-	pglDrawBuffer( GL_COLOR_ATTACHMENT0_EXT );
+-	pglReadBuffer( GL_COLOR_ATTACHMENT0_EXT );
+-	pglBindFramebuffer( GL_FRAMEBUFFER_EXT, 0 );
++	WO43_GL_CALL( "R_AllocFrameBuffer/gen-fb", "glGenFramebuffers", "count=1", pglGenFramebuffers( 1, &fbo->framebuffer ) );
++	WO43_GL_CALL( "R_AllocFrameBuffer/bind-fb", "glBindFramebuffer", va( "target=0x%x fb=%u", GL_FRAMEBUFFER_EXT, fbo->framebuffer ), pglBindFramebuffer( GL_FRAMEBUFFER_EXT, fbo->framebuffer ) );
++	WO43_GL_CALL( "R_AllocFrameBuffer/attach-depth", "glFramebufferRenderbuffer", va( "target=0x%x attachment=0x%x rb=%u", GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, fbo->renderbuffer ), pglFramebufferRenderbuffer( GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, GL_RENDERBUFFER_EXT, fbo->renderbuffer ) );
++	WO43_GL_CALL( "R_AllocFrameBuffer/draw-buffer", "glDrawBuffer", va( "buffer=0x%x", GL_COLOR_ATTACHMENT0_EXT ), pglDrawBuffer( GL_COLOR_ATTACHMENT0_EXT ) );
++	WO43_GL_CALL( "R_AllocFrameBuffer/read-buffer", "glReadBuffer", va( "buffer=0x%x", GL_COLOR_ATTACHMENT0_EXT ), pglReadBuffer( GL_COLOR_ATTACHMENT0_EXT ) );
++	WO43_GL_CALL( "R_AllocFrameBuffer/unbind-fb-zero", "glBindFramebuffer", va( "target=0x%x fb=0", GL_FRAMEBUFFER_EXT ), pglBindFramebuffer( GL_FRAMEBUFFER_EXT, 0 ) );
+ 	fbo->init = true;
+ 
+ 	return i;
+diff --git a/client/render/r_grass.cpp b/client/render/r_grass.cpp
+index 9bd5d37..c36d763 100644
+--- a/client/render/r_grass.cpp
++++ b/client/render/r_grass.cpp
+@@ -1057,7 +1057,14 @@ void R_ConstructGrass( msurface_t *psurf )
+ 	int total = 0;
+ 
+ 	// already init or not specified?
+-	if( es->grass || !(psurf->flags & SURF_HASGRASS) )
++	if( es->grass )
++	{
++		#if XASH_IOS
++		WO43_FoliageDuplicateAvoided();
++		#endif
++		return;
++	}
++	if( !(psurf->flags & SURF_HASGRASS) )
+ 		return;
+ 
+ #if XASH_IOS
+@@ -1184,6 +1191,9 @@ void R_ConstructGrass( msurface_t *psurf )
+ 
+ 	IOS_GRASS_TRACE( "iOS foliage: t=%.3f build=%d surface=%d stage=construct-end accepted=%d expected=%d elapsed=%.3f\n",
+ 		Sys_DoubleTime(), ios_build, ios_surface, total, es->grasscount, Sys_DoubleTime() - ios_start );
++	#if XASH_IOS
++	WO43_FoliageConstructed( Sys_DoubleTime() - ios_start );
++	#endif
+ 
+ 	// restore normal randomization
+ 	RANDOM_SEED( 0 );
+diff --git a/client/render/r_local.h b/client/render/r_local.h
+index fd191df..255ee4b 100644
+--- a/client/render/r_local.h
++++ b/client/render/r_local.h
+@@ -794,6 +794,26 @@ void R_DrawPostEffects( void );
+ void R_CheckFog( void );
+ bool IsBuildingCubemaps( void );
+ 
++#if XASH_IOS
++void WO43_BeginFrame( unsigned int frame );
++void WO43_EndFrame( void );
++void WO43_GLPhaseFence( const char *site, const char *function, const char *file, int line );
++void WO43_GLCallSite( const char *site, const char *function, const char *file, int line, const char *api, const char *args );
++void WO43_PhaseDuration( const char *phase, double duration );
++void WO43_ShaderLookup( bool hit, double duration );
++void WO43_ShaderTranslate( double duration );
++void WO43_ShaderCompile( double duration );
++void WO43_ShaderLink( double duration );
++void WO43_FoliageConstructed( double duration );
++void WO43_FoliageDuplicateAvoided( void );
++void WO43_RecordSubmission( unsigned int mask, unsigned int count );
++#define WO43_GL_FENCE( site ) WO43_GLPhaseFence( site, __func__, __FILE__, __LINE__ )
++#define WO43_GL_CALL( site, api, args, call ) do { call; WO43_GLCallSite( site, __func__, __FILE__, __LINE__, api, args ); } while( 0 )
++#else
++#define WO43_GL_FENCE( site ) ((void)0)
++#define WO43_GL_CALL( site, api, args, call ) call
++#endif
++
+ //
+ // r_misc.cpp
+ //
+diff --git a/client/render/r_main.cpp b/client/render/r_main.cpp
+index 30d6692..b125d1c 100644
+--- a/client/render/r_main.cpp
++++ b/client/render/r_main.cpp
+@@ -48,6 +48,184 @@ int r_currentMessageNum = 0;
+ Vector PrevViewAngles = g_vecZero;
+ Vector PrevViewOrg = g_vecZero;
+ 
++#if XASH_IOS
++typedef struct wo43_diagnostics_s
++{
++	unsigned int frame;
++	unsigned int phaseErrors;
++	unsigned int staleErrors;
++	unsigned int sceneMask;
++	unsigned int worldSubmissions;
++	unsigned int brushSubmissions;
++	unsigned int studioSubmissions;
++	unsigned int shaderHits;
++	unsigned int shaderMisses;
++	unsigned int shaderTranslations;
++	unsigned int shaderCompiles;
++	unsigned int shaderLinks;
++	unsigned int foliageConstructed;
++	unsigned int foliageDuplicates;
++	double shaderLookupSeconds;
++	double shaderTranslateSeconds;
++	double shaderCompileSeconds;
++	double shaderLinkSeconds;
++	double foliageSeconds;
++	bool active;
++	bool exactErrorAttributed;
++} wo43_diagnostics_t;
++
++static wo43_diagnostics_t wo43;
++
++static void WO43_ReadState( GLint *framebuffer, GLint *renderbuffer, GLuint *program )
++{
++	unsigned int drained = 0;
++	*framebuffer = *renderbuffer = 0;
++	*program = RI->currentshader ? RI->currentshader->handle : 0;
++	pglGetIntegerv( GL_FRAMEBUFFER_BINDING_EXT, framebuffer );
++	pglGetIntegerv( GL_RENDERBUFFER_BINDING_EXT, renderbuffer );
++	while( drained < 8 && pglGetError() != GL_NO_ERROR )
++	{
++		// Do not let diagnostic state queries leak into the audited interval.
++		drained++;
++	}
++}
++
++void WO43_BeginFrame( unsigned int frame )
++{
++	GLenum error;
++	unsigned int drained = 0;
++	unsigned int first = GL_NO_ERROR;
++
++	wo43.frame = frame;
++	wo43.phaseErrors = 0;
++	wo43.sceneMask = 0;
++	wo43.worldSubmissions = 0;
++	wo43.brushSubmissions = 0;
++	wo43.studioSubmissions = 0;
++	wo43.active = frame > 0 && frame <= 12 && !wo43.exactErrorAttributed;
++
++	if( !wo43.active )
++		return;
++
++	while( drained < 32 && ( error = pglGetError() ) != GL_NO_ERROR )
++	{
++		if( drained == 0 ) first = error;
++		drained++;
++	}
++	wo43.staleErrors += drained;
++	ALERT( at_console, "WO43 GL interval begin: frame=%u queue=%s drained=%u first=0x%04x bound=32\n",
++		frame, drained ? "nonempty" : "empty", drained, first );
++}
++
++void WO43_GLPhaseFence( const char *site, const char *function, const char *file, int line )
++{
++	GLenum error;
++	GLint framebuffer, renderbuffer;
++	GLuint program;
++
++	if( !wo43.active || wo43.exactErrorAttributed || wo43.phaseErrors )
++		return;
++
++	error = pglGetError();
++	if( error == GL_NO_ERROR )
++		return;
++
++	WO43_ReadState( &framebuffer, &renderbuffer, &program );
++	wo43.phaseErrors++;
++	ALERT( at_console, "WO43 GL phase transition: frame=%u site=%s function=%s file=%s line=%d first_error=0x%04x fb=%d rb=%d program=%u\n",
++		wo43.frame, site, function, file, line, error, framebuffer, renderbuffer, program );
++}
++
++void WO43_GLCallSite( const char *site, const char *function, const char *file, int line, const char *api, const char *args )
++{
++	GLenum error;
++	GLint framebuffer, renderbuffer;
++	GLuint program;
++
++	if( !wo43.active || wo43.exactErrorAttributed )
++		return;
++
++	error = pglGetError();
++	if( error == GL_NO_ERROR )
++		return;
++
++	WO43_ReadState( &framebuffer, &renderbuffer, &program );
++	wo43.exactErrorAttributed = true;
++	ALERT( at_console, "WO43 GL exact first failure: frame=%u site=%s function=%s file=%s line=%d api=%s args=%s error=0x%04x fb=%d rb=%d program=%u tracer=stopped\n",
++		wo43.frame, site, function, file, line, api, args, error, framebuffer, renderbuffer, program );
++}
++
++void WO43_PhaseDuration( const char *phase, double duration )
++{
++	if( wo43.active && duration > 0.250 )
++		ALERT( at_console, "WO43 init gap: frame=%u phase=%s duration=%.3f threshold=0.250 source=instrumented\n",
++			wo43.frame, phase, duration );
++}
++
++void WO43_ShaderLookup( bool hit, double duration )
++{
++	if( hit ) wo43.shaderHits++;
++	else wo43.shaderMisses++;
++	wo43.shaderLookupSeconds += duration;
++	WO43_PhaseDuration( hit ? "shader-cache-hit" : "shader-cache-miss", duration );
++}
++
++void WO43_ShaderTranslate( double duration )
++{
++	wo43.shaderTranslations++;
++	wo43.shaderTranslateSeconds += duration;
++	WO43_PhaseDuration( "shader-translation", duration );
++}
++
++void WO43_ShaderCompile( double duration )
++{
++	wo43.shaderCompiles++;
++	wo43.shaderCompileSeconds += duration;
++	WO43_PhaseDuration( "shader-compile", duration );
++}
++
++void WO43_ShaderLink( double duration )
++{
++	wo43.shaderLinks++;
++	wo43.shaderLinkSeconds += duration;
++	WO43_PhaseDuration( "shader-link", duration );
++}
++
++void WO43_FoliageConstructed( double duration )
++{
++	wo43.foliageConstructed++;
++	wo43.foliageSeconds += duration;
++	WO43_PhaseDuration( "foliage-construction", duration );
++}
++
++void WO43_FoliageDuplicateAvoided( void )
++{
++	wo43.foliageDuplicates++;
++}
++
++void WO43_RecordSubmission( unsigned int mask, unsigned int count )
++{
++	wo43.sceneMask |= mask;
++	if( mask == 1 ) wo43.worldSubmissions += count;
++	if( mask == 2 ) wo43.brushSubmissions += count;
++	if( mask == 4 ) wo43.studioSubmissions += count;
++}
++
++void WO43_EndFrame( void )
++{
++	CVAR_SET_FLOAT( "wo43_scene_submission", (float)wo43.sceneMask );
++	if( wo43.frame == 0 || wo43.frame > 12 )
++		return;
++	ALERT( at_console, "WO43 init heartbeat: frame=%u scene_mask=0x%x world=%u brush=%u studio=%u shader_hit=%u miss=%u translate=%u/%.3fs compile=%u/%.3fs link=%u/%.3fs foliage_construct=%u/%.3fs duplicate_avoided=%u phase_errors=%u stale_drained=%u exact=%d\n",
++		wo43.frame, wo43.sceneMask, wo43.worldSubmissions, wo43.brushSubmissions,
++		wo43.studioSubmissions, wo43.shaderHits, wo43.shaderMisses,
++		wo43.shaderTranslations, wo43.shaderTranslateSeconds, wo43.shaderCompiles,
++		wo43.shaderCompileSeconds, wo43.shaderLinks, wo43.shaderLinkSeconds,
++		wo43.foliageConstructed, wo43.foliageSeconds, wo43.foliageDuplicates,
++		wo43.phaseErrors, wo43.staleErrors, wo43.exactErrorAttributed );
++}
++#endif
++
+ // some simple helpers to draw a cube in the special way the ambient visualization wants
+ static float* CubeSide(const Vector pos, float size, int vert)
+ {
+@@ -1807,9 +1985,11 @@ void R_RenderScene( void )
+ 	
+ 	if( RP_NORMALPASS() ) // no shadowpass for 3D sky and subviews
+ 		R_RenderShadowmaps();
++	WO43_GL_FENCE( "HUD/R_RenderScene/shadowmaps" );
+ 
+ 	// recursive draw mirrors, portals, etc
+ 	R_RenderSubview(); // diffusion - I moved this here. position before shadowmaps cause the flashlight to flicker if there is a monitor or two in view (and no shadows).
++	WO43_GL_FENCE( "HUD/R_RenderScene/subviews" );
+ 
+ 	R_CheckSkyPortal( tr.sky_camera );
+ 
+@@ -1826,18 +2006,23 @@ void R_RenderScene( void )
+ 	R_SetupFrame();
+ 	R_SetupGL();
+ 	R_Clear( ~0 );
++	WO43_GL_FENCE( "HUD/R_RenderScene/setup-clear" );
+ 
+ 	R_PushDlights();
+ 
+ 	R_CheckFog();
+ 
+ 	R_MarkLeaves();
++	WO43_GL_FENCE( "HUD/R_RenderScene/visibility" );
+ 
+ 	R_DrawWorld();
++	WO43_GL_FENCE( "HUD/R_RenderScene/R_DrawWorld" );
+ 
+ 	R_DrawEntitiesOnList();
++	WO43_GL_FENCE( "HUD/R_RenderScene/entities" );
+ 
+ 	R_DrawCubeMaps(); // diffusioncubemaps
++	WO43_GL_FENCE( "HUD/R_RenderScene/cubemaps" );
+ 
+ 	// these must be before viewmodel
+ 	if( RP_NORMALPASS() )
+@@ -1852,6 +2037,7 @@ void R_RenderScene( void )
+ 	}
+ 
+ 	R_EndGL();
++	WO43_GL_FENCE( "HUD/R_RenderScene/end-gl" );
+ 
+ 	R_DrawPostEffects();
+ }
+@@ -2203,7 +2389,12 @@ the client (e.g. playersetup preview)
+ ===============
+ */
+ int HUD_RenderFrame( const ref_viewpass_t *rvp )
+-{	
++{
++#if XASH_IOS
++	const unsigned int wo43_frame = tr.realframecount + 1;
++	double wo43_phase_start;
++	unsigned int wo43_studio_before;
++#endif
+ 	r_speeds_msg[0] = r_depth_msg[0] = '\0';
+ 	tr.fCustomRendering = false;
+ 
+@@ -2215,7 +2406,12 @@ int HUD_RenderFrame( const ref_viewpass_t *rvp )
+ 	if( FBitSet( rvp->flags, RF_ONLY_CLIENTDRAW ))
+ 		return 0;
+ 
++	#if XASH_IOS
++	WO43_BeginFrame( wo43_frame );
++	#endif
++
+ 	R_SetupRefParams( rvp );
++	WO43_GL_FENCE( "HUD/setup-ref-params" );
+ 
+ 	if( !g_fRenderInitialized )
+ 		return 0;
+@@ -2229,15 +2425,33 @@ int HUD_RenderFrame( const ref_viewpass_t *rvp )
+ 
+ 	memset( tr.visbytes, 0, tr.pvssize );
+ 
++	#if XASH_IOS
++	wo43_phase_start = Sys_DoubleTime();
++	#endif
+ 	GL_LoadAndRebuildCubemaps( RI->params );  // diffusioncubemaps
++	#if XASH_IOS
++	WO43_PhaseDuration( "cubemap-load-rebuild", Sys_DoubleTime() - wo43_phase_start );
++	WO43_GL_FENCE( "HUD/cubemap-load-rebuild" );
++	#endif
+ 
+ 	tr.fCustomRendering = true;
+ 	tr.realframecount++;
+ 
+ 	R_Animatex();
++	WO43_GL_FENCE( "HUD/animatex" );
+ 
+ 	// draw main view
++	#if XASH_IOS
++	wo43_studio_before = r_stats.c_studio_models_drawn;
++	wo43_phase_start = Sys_DoubleTime();
++	#endif
+ 	R_RenderScene();
++	#if XASH_IOS
++	WO43_PhaseDuration( "R_RenderScene", Sys_DoubleTime() - wo43_phase_start );
++	if( r_stats.c_studio_models_drawn > wo43_studio_before )
++		WO43_RecordSubmission( 4, r_stats.c_studio_models_drawn - wo43_studio_before );
++	WO43_GL_FENCE( "HUD/R_RenderScene" );
++	#endif
+ 
+ 	if( CVAR_TO_BOOL( r_show_lightprobes ) )
+ 		DrawLightProbes();
+@@ -2252,6 +2465,7 @@ int HUD_RenderFrame( const ref_viewpass_t *rvp )
+ 	#endif
+ 
+ 	R_RestoreGLState();
++	WO43_GL_FENCE( "HUD/restore-gl-state" );
+ 
+ 	R_RenderDebugSurface ();
+ 
+@@ -2262,14 +2476,20 @@ int HUD_RenderFrame( const ref_viewpass_t *rvp )
+ 		R_DrawLightScissors();
+ 
+ 	R_UnloadFarGrass();
++	WO43_GL_FENCE( "HUD/unload-far-grass" );
+ 
+ 	HUD_PrintStats();
+ 
+ 	gHUD.bShadersCompiled = GL_PrecompileUberShaders( gHUD.shaders_processed, gHUD.shaders_total );
++	WO43_GL_FENCE( "HUD/shader-precompile" );
+ 
+ 	// restore global blur after saving the game
+ 	ui_forcenoblur->value = 0;
+ 
++#if XASH_IOS
++	WO43_EndFrame();
++#endif
++
+ 	return 1;
+ }
+ 
+diff --git a/client/render/r_shader.cpp b/client/render/r_shader.cpp
+index ac0cb89..90ab1e2 100644
+--- a/client/render/r_shader.cpp
++++ b/client/render/r_shader.cpp
+@@ -332,6 +332,9 @@ static void GL_LoadGPUShader( glsl_program_t *shader, const char *name, GLenum s
+ 	GLhandleARB	object;
+ 	CVirtualFS	source;
+ 	GLint		compiled;
++#if XASH_IOS
++	double wo43_stage_start;
++#endif
+ 
+ 	ASSERT( shader != NULL );
+ 
+@@ -349,8 +352,19 @@ static void GL_LoadGPUShader( glsl_program_t *shader, const char *name, GLenum s
+ 	}
+ 
+ 	// load includes, add some directives
++	#if XASH_IOS
++	wo43_stage_start = Sys_DoubleTime();
++	#endif
+ 	if( !GL_ProcessShader( filename, &source, compatible, defines ))
++	{
++		#if XASH_IOS
++		WO43_ShaderTranslate( Sys_DoubleTime() - wo43_stage_start );
++		#endif
+ 		return;
++	}
++	#if XASH_IOS
++	WO43_ShaderTranslate( Sys_DoubleTime() - wo43_stage_start );
++	#endif
+ 
+ 	GLcharARB *buffer = (GLcharARB *)source.GetBuffer();
+ 	int bufferSize = (int)source.GetSize();
+@@ -363,7 +377,13 @@ static void GL_LoadGPUShader( glsl_program_t *shader, const char *name, GLenum s
+ 	pglShaderSourceARB( object, GL_TRUE, (const GLcharARB **)&buffer, &bufferSize );
+ 
+ 	// compile shader
+-	pglCompileShaderARB( object );
++	#if XASH_IOS
++	wo43_stage_start = Sys_DoubleTime();
++	#endif
++	WO43_GL_CALL( "GL_LoadGPUShader/compile", "glCompileShader", va( "shader=%u type=0x%x", object, shaderType ), pglCompileShaderARB( object ) );
++	#if XASH_IOS
++	WO43_ShaderCompile( Sys_DoubleTime() - wo43_stage_start );
++	#endif
+ 
+ 	// check if shader compiled
+ 	pglGetObjectParameterivARB( object, GL_OBJECT_COMPILE_STATUS_ARB, &compiled );
+@@ -390,10 +410,19 @@ static void GL_LoadGPUShader( glsl_program_t *shader, const char *name, GLenum s
+ static void GL_LinkProgram( glsl_program_t *shader )
+ {
+ 	GLint	linked = 0;
++#if XASH_IOS
++	double wo43_stage_start;
++#endif
+ 
+ 	if( !shader ) return;
+ 
+-	pglLinkProgramARB( shader->handle );
++	#if XASH_IOS
++	wo43_stage_start = Sys_DoubleTime();
++	#endif
++	WO43_GL_CALL( "GL_LinkProgram/link", "glLinkProgram", va( "program=%u", shader->handle ), pglLinkProgramARB( shader->handle ) );
++	#if XASH_IOS
++	WO43_ShaderLink( Sys_DoubleTime() - wo43_stage_start );
++	#endif
+ 
+ 	pglGetObjectParameterivARB( shader->handle, GL_OBJECT_LINK_STATUS_ARB, &linked );
+ 	if( !linked ) ALERT( at_error, "%s\n%s shader failed to link\n", GL_PrintInfoLog( shader->handle ), shader->name );
+@@ -563,12 +592,12 @@ void GL_BindShader( glsl_program_t *shader )
+ {
+ 	if( !shader && RI->currentshader )
+ 	{
+-		pglUseProgram( GL_NONE );
++		WO43_GL_CALL( "GL_BindShader/unbind", "glUseProgram", "program=0", pglUseProgram( GL_NONE ) );
+ 		RI->currentshader = NULL;
+ 	}
+ 	else if( shader != RI->currentshader && shader != NULL && shader->handle )
+ 	{
+-		pglUseProgram( shader->handle );
++		WO43_GL_CALL( "GL_BindShader/bind", "glUseProgram", va( "program=%u", shader->handle ), pglUseProgram( shader->handle ) );
+ 		r_stats.num_shader_binds++;
+ 		RI->currentshader = shader;
+ 	}
+@@ -993,6 +1022,9 @@ static glsl_program_t *GL_FindUberShader( const char *glname, const char *option
+ 	const char	*find;
+ 	unsigned int	i, hash;
+ 	glsl_program_t	*prog;
++#if XASH_IOS
++	const double wo43_lookup_start = Sys_DoubleTime();
++#endif
+ 
+ 	if( !GL_Support( R_SHADER_GLSL100_EXT ))
+ 		return NULL;
+@@ -1008,6 +1040,9 @@ static glsl_program_t *GL_FindUberShader( const char *glname, const char *option
+ 		if( !Q_strcmp( prog->name, glname ) && !Q_strcmp( prog->options, options ) )
+ 		{
+ 			prog->status |= SHADER_STATUS_HASHED;
++			#if XASH_IOS
++			WO43_ShaderLookup( true, Sys_DoubleTime() - wo43_lookup_start );
++			#endif
+ 			return prog;
+ 		}
+ 	}
+@@ -1026,6 +1061,10 @@ static glsl_program_t *GL_FindUberShader( const char *glname, const char *option
+ 		glsl_programsHashTable[hash] = prog;
+ 	}
+ 
++	#if XASH_IOS
++	WO43_ShaderLookup( false, Sys_DoubleTime() - wo43_lookup_start );
++	#endif
++
+ 	return prog;
+ }
+ 
+diff --git a/client/render/r_world.cpp b/client/render/r_world.cpp
+index b28c53b..ddb360e 100644
+--- a/client/render/r_world.cpp
++++ b/client/render/r_world.cpp
+@@ -2821,6 +2821,9 @@ void R_DrawBrushList( void )
+ {
+ 	if( !tr.num_draw_surfaces )
+ 		return;
++	#if XASH_IOS
++	const unsigned int wo43_dips_before = r_stats.dip_count;
++	#endif
+ 	
+ 	int	cached_mirror = -1;
+ 	int	cached_lightmap = -1;
+@@ -2840,7 +2843,7 @@ void R_DrawBrushList( void )
+ 	numTempElems = 0;
+ 	endv = 0;
+ 
+-	pglBindVertexArray( world->vertex_array_object );
++	WO43_GL_CALL( "R_DrawBrushList/bind-world-vao", "glBindVertexArray", va( "vao=%u", world->vertex_array_object ), pglBindVertexArray( world->vertex_array_object ) );
+ 	r_stats.c_world_polys += tr.num_draw_surfaces;
+ 
+ 	float cached_glossscale = -1.0f;
+@@ -2913,7 +2916,7 @@ void R_DrawBrushList( void )
+ 		{
+ 			if( numTempElems )
+ 			{
+-				pglDrawRangeElementsEXT( GL_TRIANGLES, startv, endv - 1, numTempElems, GL_UNSIGNED_INT, tempElems );
++				WO43_GL_CALL( "R_DrawBrushList/flush-batch", "glDrawRangeElements", va( "mode=0x%x start=%d end=%d count=%d type=0x%x", GL_TRIANGLES, startv, endv - 1, numTempElems, GL_UNSIGNED_INT ), pglDrawRangeElementsEXT( GL_TRIANGLES, startv, endv - 1, numTempElems, GL_UNSIGNED_INT, tempElems ) );
+ 				r_stats.c_total_tris += (numTempElems / 3);
+ 				r_stats.dip_count++;
+ 				startv = MAX_MAP_ELEMS;
+@@ -2944,9 +2947,9 @@ void R_DrawBrushList( void )
+ 			brush_params[1].w = waveHeight;
+ 
+ 			// write constants
+-			pglUniform1fvARB( RI->currentshader->u_LightStyleValues, MAX_LIGHTSTYLES, &tr.lightstyles[0] );
+-			pglUniformMatrix4fvARB( RI->currentshader->u_ModelMatrix, 1, GL_FALSE, &glm->modelMatrix[0] );
+-			pglUniform4fvARB( RI->currentshader->u_BrushParams, 3, &brush_params[0][0] );
++			WO43_GL_CALL( "R_DrawBrushList/lightstyles", "glUniform1fv", va( "location=%d count=%d", RI->currentshader->u_LightStyleValues, MAX_LIGHTSTYLES ), pglUniform1fvARB( RI->currentshader->u_LightStyleValues, MAX_LIGHTSTYLES, &tr.lightstyles[0] ) );
++			WO43_GL_CALL( "R_DrawBrushList/model-matrix", "glUniformMatrix4fv", va( "location=%d count=1 transpose=0", RI->currentshader->u_ModelMatrix ), pglUniformMatrix4fvARB( RI->currentshader->u_ModelMatrix, 1, GL_FALSE, &glm->modelMatrix[0] ) );
++			WO43_GL_CALL( "R_DrawBrushList/brush-params", "glUniform4fv", va( "location=%d count=3", RI->currentshader->u_BrushParams ), pglUniform4fvARB( RI->currentshader->u_BrushParams, 3, &brush_params[0][0] ) );
+ 
+ 			// reset cache
+ 			cached_texofs[0] = -1.0f;
+@@ -3215,7 +3218,7 @@ void R_DrawBrushList( void )
+ 
+ 	if( numTempElems )
+ 	{
+-		pglDrawRangeElementsEXT( GL_TRIANGLES, startv, endv - 1, numTempElems, GL_UNSIGNED_INT, tempElems );
++		WO43_GL_CALL( "R_DrawBrushList/final-batch", "glDrawRangeElements", va( "mode=0x%x start=%d end=%d count=%d type=0x%x", GL_TRIANGLES, startv, endv - 1, numTempElems, GL_UNSIGNED_INT ), pglDrawRangeElementsEXT( GL_TRIANGLES, startv, endv - 1, numTempElems, GL_UNSIGNED_INT, tempElems ) );
+ 		r_stats.c_total_tris += (numTempElems / 3);
+ 		r_stats.dip_count++;
+ 		numTempElems = 0;
+@@ -3253,6 +3256,11 @@ void R_DrawBrushList( void )
+ 
+ 	// render all decals on world and opaque bmodels
+ 	DrawDecalsBatch();
++	#if XASH_IOS
++	if( r_stats.dip_count > wo43_dips_before )
++		WO43_RecordSubmission( 2, r_stats.dip_count - wo43_dips_before );
++	WO43_GL_FENCE( "HUD/R_RenderScene/R_DrawWorld/R_DrawBrushList" );
++	#endif
+ }
+ 
+ static void R_SetRenderMode( cl_entity_t *e )
+@@ -3844,14 +3852,23 @@ void R_DrawWorld( void )
+ 	IOS_WORLD_TRACE( "before-brush-list" );
+ 	std::sort( tr.draw_surfaces, tr.draw_surfaces + tr.num_draw_surfaces, R_SolidSurfaceCompare );
+ 
++	#if XASH_IOS
++	const bool wo43_world_had_surfaces = tr.num_draw_surfaces > 0;
++	#endif
+ 	R_DrawBrushList();
+ 	IOS_WORLD_TRACE( "after-brush-list" );
++	#if XASH_IOS
++	if( ios_normal_world && wo43_world_had_surfaces )
++		WO43_RecordSubmission( 1, 1 );
++	WO43_GL_FENCE( "HUD/R_RenderScene/R_DrawWorld/brush-list-return" );
++	#endif
+ 
+ 	end = Sys_DoubleTime();
+ 
+ 	r_stats.t_world_draw = end - start;
+ 
+ 	R_DrawSkyBox();
++	WO43_GL_FENCE( "HUD/R_RenderScene/R_DrawWorld/skybox" );
+ 	IOS_WORLD_TRACE( "end" );
+ 
+ #undef IOS_WORLD_TRACE
+diff --git a/client/render/view.cpp b/client/render/view.cpp
+index 054f5b2..c804750 100644
+--- a/client/render/view.cpp
++++ b/client/render/view.cpp
+@@ -382,6 +382,9 @@ void V_Init( void )
+ 	gl_allow_portals = CVAR_REGISTER( "gl_allow_portals", "1", FCVAR_ARCHIVE | FCVAR_CLIENTDLL );
+ 	gl_allow_screens = CVAR_REGISTER( "gl_allow_screens", "1", FCVAR_ARCHIVE | FCVAR_CLIENTDLL );
+ 	gl_renderer = CVAR_REGISTER( "gl_renderer", "1", FCVAR_CLIENTDLL | FCVAR_ARCHIVE );
++	#if XASH_IOS
++	CVAR_REGISTER( "wo43_scene_submission", "0", FCVAR_CLIENTDLL );
++	#endif
+ 	gl_shadows = CVAR_REGISTER( "gl_shadows", "1", FCVAR_CLIENTDLL | FCVAR_ARCHIVE );
+ 	r_allow_3dsky = CVAR_REGISTER( "gl_allow_3dsky", "1", FCVAR_CHEAT );
+ 	r_recursion_depth = CVAR_REGISTER( "gl_recursion_depth", "1", FCVAR_ARCHIVE );

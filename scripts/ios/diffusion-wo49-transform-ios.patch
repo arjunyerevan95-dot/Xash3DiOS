@@ -1,0 +1,221 @@
+
+diff --git a/engine/studio.h b/engine/studio.h
+index 9838ee82..55cb86dc 100644
+--- a/engine/studio.h
++++ b/engine/studio.h
+@@ -690,6 +690,8 @@ typedef struct vbomesh_s
+ 	unsigned int wo49_indexChecksum;
+ 	unsigned int wo49_vertexChecksum;
+ 	unsigned int wo49_positionChecksum;
++	unsigned int wo49_firstIndex;
++	float wo49_firstPosition[3];
+ #endif
+ } vbomesh_t;
+
+diff --git a/client/render/r_studio.h b/client/render/r_studio.h
+index 0d97fdf1..1747aad6 100644
+--- a/client/render/r_studio.h
++++ b/client/render/r_studio.h
+@@ -329,6 +329,8 @@ class CStudioModelRenderer
+ 
+ #if defined( XASH_IOS )
+ 	unsigned long long WO49ProduceTopology( const vbomesh_t *mesh );
++	bool WO49BeginTransform( const gl_studiomesh_t *entry, const vbomesh_t *mesh,
++		int num_bones, bool bones_upload, float foliage_sway_height );
+ #endif
+ 
+ 	inline void DrawMeshFromBuffer( const vbomesh_t *mesh
+
+diff --git a/client/render/r_studio.cpp b/client/render/r_studio.cpp
+index a0357213..215504c7 100644
+--- a/client/render/r_studio.cpp
++++ b/client/render/r_studio.cpp
+@@ -45,6 +45,11 @@ CStudioModelRenderer g_StudioRenderer;
+ #if defined( XASH_IOS )
+ #define WO49_TOPOLOGY_VERSION 1u
+ #define WO49_TOPOLOGY_ATTR_CAP 16u
++#define WO49_TRANSFORM_VERSION 1u
++#define WO49_TRANSFORM_RIGID 0x01u
++#define WO49_TRANSFORM_SWAY 0x02u
++#define WO49_TRANSFORM_VERTEX_LIGHTING 0x04u
++#define WO49_TRANSFORM_BONE_WEIGHTING 0x08u
+ 
+ typedef struct wo49_topology_attr_desc_s
+ {
+@@ -101,11 +106,48 @@ typedef unsigned long long (*wo49_topology_producer_fn)( const wo49_topology_pro
+ typedef void (*wo49_topology_token_fn)( unsigned long long token );
+ typedef void (*wo49_topology_absence_fn)( unsigned long long token, const char *reason );
+ 
++typedef struct wo49_transform_producer_desc_s
++{
++	unsigned int version;
++	unsigned int size;
++	unsigned long long token;
++	unsigned long long frame;
++	unsigned int generation;
++	const char *producer;
++	const char *map;
++	const char *model;
++	unsigned int programIndex;
++	unsigned int programHandle;
++	unsigned int optionsHash;
++	unsigned int flags;
++	unsigned int elementOrdinal;
++	unsigned int localIndex;
++	float localPosition[3];
++	float boneQuaternion[4];
++	float bonePosition[3];
++	float modelview[16];
++	float projection[16];
++	float mvp[16];
++	float clipPosition[4];
++	int boneQuaternionLocation;
++	int bonePositionLocation;
++	unsigned int boneQuaternionCount;
++	unsigned int bonePositionCount;
++	float swayHeight;
++	float realTime;
++} wo49_transform_producer_desc_t;
++
++typedef int (*wo49_transform_begin_fn)( const wo49_transform_producer_desc_t *desc );
++typedef void (*wo49_transform_finish_fn)( unsigned long long token );
++
+ static wo49_topology_producer_fn pWO49TopologyProducer;
+ static wo49_topology_token_fn pWO49TopologyArm;
+ static wo49_topology_token_fn pWO49TopologyFinish;
+ static wo49_topology_absence_fn pWO49TopologyAbsence;
++static wo49_transform_begin_fn pWO49TransformBegin;
++static wo49_transform_finish_fn pWO49TransformFinish;
+ static bool wo49_topology_resolved;
++static bool wo49_transform_claimed;
+ 
+ static unsigned int WO49Checksum( const void *data, size_t bytes )
+ {
+@@ -143,6 +185,8 @@ static void WO49ResolveTopologyAPI( void )
+ 	pWO49TopologyArm = (wo49_topology_token_fn)GL_GetProcAddress( "gl4es_iOSWO49TopologyArm" );
+ 	pWO49TopologyFinish = (wo49_topology_token_fn)GL_GetProcAddress( "gl4es_iOSWO49TopologyFinish" );
+ 	pWO49TopologyAbsence = (wo49_topology_absence_fn)GL_GetProcAddress( "gl4es_iOSWO49TopologyAbsence" );
++	pWO49TransformBegin = (wo49_transform_begin_fn)GL_GetProcAddress( "gl4es_iOSWO49TransformBegin" );
++	pWO49TransformFinish = (wo49_transform_finish_fn)GL_GetProcAddress( "gl4es_iOSWO49TransformFinish" );
+ }
+ 
+ static void WO49AddAttribute( wo49_topology_producer_desc_t *desc, unsigned int index,
+@@ -1147,6 +1191,11 @@ void CStudioModelRenderer::UploadBufferVLight( vbomesh_t *pOut, svert_t *arrayxv
+ 	pOut->wo49_stride = sizeof( svert_v1_t );
+ 	pOut->wo49_vertexChecksum = WO49Checksum( &arraysvert[0], pOut->cacheSize );
+ 	pOut->wo49_positionChecksum = WO49PositionChecksum( &arraysvert[0], sizeof( svert_v1_t ), pOut->numVerts );
++	pOut->wo49_firstIndex = (m_nNumArrayElems > 0) ? m_arrayelems[0] : 0;
++	if( pOut->wo49_firstIndex < (unsigned int)pOut->numVerts )
++		arraysvert[pOut->wo49_firstIndex].vertex.CopyToArray( pOut->wo49_firstPosition );
++	else
++		memset( pOut->wo49_firstPosition, 0, sizeof( pOut->wo49_firstPosition ) );
+ #endif
+ }
+ 
+@@ -5176,6 +5225,75 @@ unsigned long long CStudioModelRenderer::WO49ProduceTopology( const vbomesh_t *m
+ 	WO49DescribeLayout( &desc );
+ 	return pWO49TopologyProducer( &desc );
+ }
++
++bool CStudioModelRenderer::WO49BeginTransform( const gl_studiomesh_t *entry,
++	const vbomesh_t *mesh, int num_bones, bool bones_upload, float foliage_sway_height )
++{
++	if( wo49_transform_claimed || !entry || !mesh || !entry->wo49_token ||
++		!bones_upload || mesh->wo49_layout != 1 || !entry->model || !worldmodel ||
++		Q_stricmp( entry->model->name, "models/bmec/cars/truck_new.mdl" ) ||
++		Q_stricmp( worldmodel->name, "maps/ch1map0.bsp" ) )
++		return false;
++
++	WO49ResolveTopologyAPI();
++	if( !pWO49TransformBegin )
++		return false;
++
++	const glsl_program_t *shader = &glsl_programs[entry->hProgram];
++	const bool rigid = Q_stristr( shader->options, "#define MAXSTUDIOBONES 1" ) != NULL;
++	const bool vertex_lighting = Q_stristr( shader->options, "STUDIO_VERTEX_LIGHTING" ) != NULL;
++	const bool bone_weighting = Q_stristr( shader->options, "STUDIO_BONEWEIGHTING" ) != NULL;
++	const bool sway = Q_stristr( shader->options, "STUDIO_SWAY_FOLIAGE" ) != NULL;
++	if( !rigid || !vertex_lighting || bone_weighting )
++		return false;
++
++	wo49_transform_producer_desc_t desc;
++	memset( &desc, 0, sizeof( desc ) );
++	desc.version = WO49_TRANSFORM_VERSION;
++	desc.size = sizeof( desc );
++	desc.token = entry->wo49_token;
++	desc.frame = tr.realframecount;
++	desc.generation = 1;
++	desc.producer = "CStudioModelRenderer::DrawStudioMeshes";
++	desc.map = worldmodel->name;
++	desc.model = entry->model->name;
++	desc.programIndex = entry->hProgram;
++	desc.programHandle = shader->handle;
++	desc.optionsHash = WO49Checksum( shader->options, Q_strlen( shader->options ) );
++	desc.flags = WO49_TRANSFORM_RIGID | WO49_TRANSFORM_VERTEX_LIGHTING;
++	if( sway ) desc.flags |= WO49_TRANSFORM_SWAY;
++	desc.elementOrdinal = 0;
++	desc.localIndex = mesh->wo49_firstIndex;
++	memcpy( desc.localPosition, mesh->wo49_firstPosition, sizeof( desc.localPosition ) );
++	memcpy( desc.boneQuaternion, &m_pModelInstance->m_studioquat[0][0], sizeof( desc.boneQuaternion ) );
++	memcpy( desc.bonePosition, &m_pModelInstance->m_studiopos[0][0], sizeof( desc.bonePosition ) );
++	RI->modelviewMatrix.CopyToArray( desc.modelview );
++	RI->projectionMatrix.CopyToArray( desc.projection );
++	const matrix4x4 mvp = RI->projectionMatrix.Concat( RI->modelviewMatrix );
++	mvp.CopyToArray( desc.mvp );
++
++	Vector4D local( desc.localPosition[0], desc.localPosition[1], desc.localPosition[2], 1.0f );
++	if( sway && local.z > foliage_sway_height )
++	{
++		local.x += local.z * 0.025f * sinf( local.z + tr.time * 0.25f );
++		local.y += local.z * 0.025f * cosf( local.z + tr.time * 0.25f );
++	}
++	const matrix4x4 bone( m_pModelInstance->m_studiopos[0], m_pModelInstance->m_studioquat[0] );
++	const Vector4D world = bone.VectorTransform( local );
++	const Vector4D clip = mvp.VectorTransform( world );
++	memcpy( desc.clipPosition, &clip[0], sizeof( desc.clipPosition ) );
++	desc.boneQuaternionLocation = shader->u_BoneQuaternion;
++	desc.bonePositionLocation = shader->u_BonePosition;
++	desc.boneQuaternionCount = num_bones;
++	desc.bonePositionCount = num_bones;
++	desc.swayHeight = foliage_sway_height;
++	desc.realTime = tr.time;
++
++	if( !pWO49TransformBegin( &desc ) )
++		return false;
++	wo49_transform_claimed = true;
++	return true;
++}
+ #endif
+ 
+ /*
+@@ -5315,6 +5433,8 @@ void CStudioModelRenderer::DrawMeshFromBuffer( const vbomesh_t *mesh
+ #if defined( XASH_IOS )
+ 	if( wo49_token && pWO49TopologyFinish )
+ 		pWO49TopologyFinish( wo49_token );
++	if( wo49_token && pWO49TransformFinish )
++		pWO49TransformFinish( wo49_token );
+ #endif
+ 
+ 	r_stats.c_total_tris += (mesh->numElems / 3);
+@@ -5781,7 +5901,6 @@ void CStudioModelRenderer::DrawStudioMeshes( void )
+ 			GL_BindShader( &glsl_programs[entry->hProgram] );
+ 
+ 			ASSERT( RI->currentshader != NULL );
+-
+ 			// write constants
+ 			pglUniform4fvARB( RI->currentshader->u_StudioParams, 3, &studio_params[0][0] );
+ 
+@@ -5807,6 +5926,12 @@ void CStudioModelRenderer::DrawStudioMeshes( void )
+ 			cached_model = NULL;
+ 		}
+ 
++#if defined( XASH_IOS )
++		WO49BeginTransform( entry, pMesh, num_bones,
++			cached_entity != m_pCurrentEntity || cached_model != m_pRenderModel,
++			(float)tr.materials[iTexnum].FoliageSwayHeight );
++#endif
++
+ 		if( FBitSet( mat->flags, STUDIO_NF_ADDITIVE ) )
+ 		{
+ 			GL_DepthMask( GL_FALSE );
+

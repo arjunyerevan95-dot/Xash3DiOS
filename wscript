@@ -279,7 +279,10 @@ def configure(conf):
 	elif conf.env.IOS:
 		conf.options.NANOGL           = True
 		conf.options.GLWES            = False # deprecated
-		conf.options.GL4ES            = False # doesn't compile on ios yet
+		# Diffusion's renderer requires the desktop-style OpenGL and GLSL API.
+		# The bundled GL4ES has a static NOEGL path for contexts supplied by SDL,
+		# including iOS, so build it alongside the native GLES renderers.
+		conf.options.GL4ES            = True
 		conf.options.GLES3COMPAT      = True
 		conf.options.GL               = False
 	elif conf.env.MAGX:

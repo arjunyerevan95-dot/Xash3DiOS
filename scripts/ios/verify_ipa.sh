@@ -27,10 +27,341 @@ fi
 INFO_PLIST="$APP_PATH/Info.plist"
 ENGINE_PATH="$APP_PATH/xash"
 SDL_PATH="$APP_PATH/SDL2.framework/SDL2"
+DIFFUSION_CLIENT_PATH="$APP_PATH/bin/client_arm64.dylib"
+DIFFUSION_SERVER_PATH="$APP_PATH/bin/server_arm64.dylib"
+DIFFUSION_MENU_PATH="$APP_PATH/bin/menu_arm64.dylib"
+DIFFUSION_LOCALIZATION_PATH="$APP_PATH/diffusion/resource/gameui_english.txt"
+DIFFUSION_MATHLIB_PATH="$APP_PATH/ios_overrides/diffusion/glsl/mathlib.h"
+DIFFUSION_ALPHA_COVERAGE_PATH="$APP_PATH/ios_overrides/diffusion/glsl/alpha2coverage.h"
+DIFFUSION_SHAFTS_SHADER_PATH="$APP_PATH/ios_overrides/diffusion/glsl/genshafts_fp.glsl"
+GL4ES_RENDERER_PATH="$APP_PATH/libref_gl4es.dylib"
 
-for required_path in "$INFO_PLIST" "$ENGINE_PATH" "$SDL_PATH"; do
+for required_path in \
+	"$INFO_PLIST" \
+	"$ENGINE_PATH" \
+	"$SDL_PATH" \
+	"$DIFFUSION_CLIENT_PATH" \
+	"$DIFFUSION_SERVER_PATH" \
+	"$DIFFUSION_MENU_PATH" \
+	"$DIFFUSION_LOCALIZATION_PATH" \
+	"$DIFFUSION_MATHLIB_PATH" \
+	"$DIFFUSION_ALPHA_COVERAGE_PATH" \
+	"$DIFFUSION_SHAFTS_SHADER_PATH" \
+	"$GL4ES_RENDERER_PATH"; do
 	if [ ! -e "$required_path" ]; then
 		echo "Required bundle item is missing: $required_path" >&2
+		exit 1
+	fi
+done
+
+if ! grep -q 'XASH_MOBILE_GLES' "$DIFFUSION_ALPHA_COVERAGE_PATH"; then
+	echo "Diffusion mobile shader profile is missing from the IPA" >&2
+	exit 1
+fi
+
+DIFFUSION_CLIENT_STRINGS="$VERIFY_ROOT/diffusion-client.strings"
+strings "$DIFFUSION_CLIENT_PATH" > "$DIFFUSION_CLIENT_STRINGS"
+if ! grep -q 'iOS mobile renderer profile: canonical materials, shared animated-model shader layout, on-demand shaders' "$DIFFUSION_CLIENT_STRINGS"; then
+	echo "Diffusion client was built without the iOS renderer profile" >&2
+	exit 1
+fi
+
+for material_marker in \
+	'iOS material-state policy:' \
+	'iOS studio texture cache epoch:' \
+	'iOS studio params exact count:' \
+	'iOS foliage uniform type:' \
+	'iOS material-state terminal:'; do
+	if ! grep -q "$material_marker" "$DIFFUSION_CLIENT_STRINGS"; then
+		echo "Diffusion client is missing material-state marker: $material_marker" >&2
+		exit 1
+	fi
+done
+
+for inactive_sampler_marker in \
+	'iOS inactive sampler policy:' \
+	'iOS inactive sampler rejection:' \
+	'iOS material uniform proof:'; do
+	if ! grep -q "$inactive_sampler_marker" "$DIFFUSION_CLIENT_STRINGS"; then
+		echo "Diffusion client is missing inactive-sampler marker: $inactive_sampler_marker" >&2
+		exit 1
+	fi
+done
+
+DIFFUSION_MENU_STRINGS="$VERIFY_ROOT/diffusion-menu.strings"
+strings "$DIFFUSION_MENU_PATH" > "$DIFFUSION_MENU_STRINGS"
+if ! grep -q 'iOS mobile menu policy: decorative background map disabled; UI callbacks remain active' "$DIFFUSION_MENU_STRINGS"; then
+	echo "Diffusion menu was built without the mobile background-map policy" >&2
+	exit 1
+fi
+
+if ! grep -q 'Diffusion menu action: starting chapter' "$DIFFUSION_MENU_STRINGS"; then
+	echo "Diffusion menu was built without actionable mobile menu diagnostics" >&2
+	exit 1
+fi
+
+GL4ES_RENDERER_STRINGS="$VERIFY_ROOT/gl4es-renderer.strings"
+strings "$GL4ES_RENDERER_PATH" > "$GL4ES_RENDERER_STRINGS"
+
+SDL_STRINGS="$VERIFY_ROOT/sdl.strings"
+ENGINE_STRINGS="$VERIFY_ROOT/engine.strings"
+strings "$SDL_PATH" > "$SDL_STRINGS"
+strings "$ENGINE_PATH" > "$ENGINE_STRINGS"
+
+if ! grep -q 'iOS production texture array provider:' "$GL4ES_RENDERER_STRINGS"; then
+	echo "Renderer is missing the conditional production texture-array provider marker" >&2
+	exit 1
+fi
+
+if ! grep -q 'iOS production texture array engine:' "$GL4ES_RENDERER_STRINGS"; then
+	echo "Engine is missing the production texture-array gate marker" >&2
+	exit 1
+fi
+
+if ! grep -q 'iOS production texture array admission:' "$DIFFUSION_CLIENT_STRINGS"; then
+	echo "Diffusion client is missing the complete production texture-array admission marker" >&2
+	exit 1
+fi
+
+if ! grep -Fxq -- '-dev 2 -log -game diffusion -ref gl4es' "$ENGINE_STRINGS"; then
+	echo "Engine is missing the exact locked ordinary-Diffusion launch arguments" >&2
+	exit 1
+fi
+
+if grep -Fxq -- '-dev 2 -log -game diffusion -ref gl4es -gl4es_texture_array_selftest' "$ENGINE_STRINGS"; then
+	echo "Engine still contains the forbidden combined ordinary-plus-selftest default arguments" >&2
+	exit 1
+fi
+
+PACKAGED_GAME_ASSET=$(find "$APP_PATH" -type f \( \
+	-iname '*.bsp' -o -iname '*.wad' -o -iname '*.pak' -o -iname '*.vpk' -o \
+	-iname '*.mdl' -o -iname '*.spr' -o -iname '*.dem' -o -iname '*.wav' -o \
+	-iname '*.mp3' \) -print -quit)
+if [ -n "$PACKAGED_GAME_ASSET" ]; then
+	echo "Proprietary game asset is packaged in the IPA: $PACKAGED_GAME_ASSET" >&2
+	exit 1
+fi
+
+if ! grep -q 'Native GLES3 core NPOT support enabled' "$GL4ES_RENDERER_STRINGS"; then
+	echo "GL4ES was built without the GLES3 full-NPOT capability fix" >&2
+	exit 1
+fi
+
+if ! grep -q 'compressed texture buffer overrun' "$GL4ES_RENDERER_STRINGS"; then
+	echo "Renderer was built without compressed-texture bounds checks" >&2
+	exit 1
+fi
+
+for uint_marker in \
+	'iOS uint element policy:' \
+	'iOS uint element first use:' \
+	'iOS uint element high index:' \
+	'iOS uint element route summary:'; do
+	if ! grep -q "$uint_marker" "$GL4ES_RENDERER_STRINGS"; then
+		echo "Renderer is missing uint-element invariant marker: $uint_marker" >&2
+		exit 1
+	fi
+done
+
+for trace_marker in \
+	'iOS index trace logger:' \
+	'iOS index trace policy:' \
+	'iOS index trace ownership:' \
+	'iOS index trace ingress:' \
+	'iOS index trace deferred:' \
+	'iOS index trace native:' \
+	'iOS index trace first divergence:' \
+	'iOS index trace summary:'; do
+	if ! grep -q "$trace_marker" "$GL4ES_RENDERER_STRINGS"; then
+		echo "Renderer is missing index-trace marker: $trace_marker" >&2
+		exit 1
+	fi
+done
+
+for topology_marker in \
+	'WO49 topology policy:' \
+	'WO49 topology producer:' \
+	'WO49 topology ingress:' \
+	'WO49 topology route:' \
+	'WO49 topology realized:' \
+	'WO49 topology mismatch:' \
+	'WO49 topology absence:' \
+	'WO49 topology summary:'; do
+	if ! grep -q "$topology_marker" "$GL4ES_RENDERER_STRINGS"; then
+		echo "Renderer is missing WO49 topology marker: $topology_marker" >&2
+		exit 1
+	fi
+done
+
+for topology_api in \
+	'gl4es_iOSWO49TopologyProducer' \
+	'gl4es_iOSWO49TopologyArm' \
+	'gl4es_iOSWO49TopologyFinish' \
+	'gl4es_iOSWO49TopologyAbsence'; do
+	if ! grep -q "$topology_api" "$GL4ES_RENDERER_STRINGS"; then
+		echo "Renderer is missing WO49 topology API: $topology_api" >&2
+		exit 1
+	fi
+done
+
+for transform_marker in \
+	'WO49 transform policy:' \
+	'WO49 transform producer:' \
+	'WO49 transform clip:' \
+	'WO49 transform program:' \
+	'WO49 transform uniform:' \
+	'WO49 transform native:' \
+	'WO49 transform terminal:'; do
+	if ! grep -q "$transform_marker" "$GL4ES_RENDERER_STRINGS"; then
+		echo "Renderer is missing WO49 transform marker: $transform_marker" >&2
+		exit 1
+	fi
+done
+
+for transform_api in \
+	'gl4es_iOSWO49TransformBegin' \
+	'gl4es_iOSWO49TransformFinish'; do
+	if ! grep -q "$transform_api" "$GL4ES_RENDERER_STRINGS"; then
+		echo "Renderer is missing WO49 transform API: $transform_api" >&2
+		exit 1
+	fi
+done
+
+for material_trace_marker in \
+	'WO52 material trace policy:' \
+	'WO52 material trace producer:' \
+	'WO52 material trace shader:' \
+	'WO52 material trace bind:' \
+	'WO52 material trace gl4es:' \
+	'WO52 material trace native:' \
+	'WO52 material trace transition:' \
+	'WO52 material trace terminal:' \
+	'WO52 material trace summary:'; do
+	if ! grep -q "$material_trace_marker" "$GL4ES_RENDERER_STRINGS"; then
+		echo "Renderer is missing WO52 material-trace marker: $material_trace_marker" >&2
+		exit 1
+	fi
+done
+
+for material_trace_api in \
+	'gl4es_iOSWO52MaterialBegin' \
+	'gl4es_iOSWO52MaterialCache' \
+	'gl4es_iOSWO52EngineBind' \
+	'gl4es_iOSWO52MaterialArm' \
+	'gl4es_iOSWO52MaterialFinish' \
+	'gl4es_iOSWO52MaterialTransition'; do
+	if ! grep -q "$material_trace_api" "$GL4ES_RENDERER_STRINGS"; then
+		echo "Renderer is missing WO52 material-trace API: $material_trace_api" >&2
+		exit 1
+	fi
+done
+
+if ! grep -q 'WO49 texture policy: target-source=per-unit route=all-realize_textures' "$GL4ES_RENDERER_STRINGS"; then
+	echo "Renderer is missing the WO49 per-unit texture-realization policy" >&2
+	exit 1
+fi
+
+for texture_array_marker in \
+	'iOS texture array selftest policy:' \
+	'iOS texture array selftest object:' \
+	'iOS texture array selftest upload:' \
+	'iOS texture array selftest shader:' \
+	'iOS texture array selftest sampling-call:' \
+	'iOS texture array selftest sampling-fbo:' \
+	'iOS texture array selftest sampling-contract:' \
+	'iOS texture array selftest sample:' \
+	'iOS texture array selftest lifecycle:' \
+	'iOS texture array selftest terminal:'; do
+	if ! grep -q "$texture_array_marker" "$GL4ES_RENDERER_STRINGS"; then
+		echo "Renderer is missing texture-array selftest marker: $texture_array_marker" >&2
+		exit 1
+	fi
+done
+
+if ! grep -q -- '-gl4es_texture_array_selftest' "$ENGINE_STRINGS"; then
+	echo "Engine is missing the selftest-only launch/termination gate" >&2
+	exit 1
+fi
+
+for selftest_boot_marker in \
+	'iOS texture array selftest boot: armed' \
+	'iOS texture array selftest boot: gameinfo-ready game=diffusion' \
+	'iOS texture array selftest contract: begin' \
+	'iOS texture array selftest contract: item name='; do
+	if ! grep -q "$selftest_boot_marker" "$ENGINE_STRINGS"; then
+		echo "Engine is missing normal-bootstrap selftest marker: $selftest_boot_marker" >&2
+		exit 1
+	fi
+done
+
+for selftest_contract_marker in \
+	'iOS texture array selftest contract: item name=global.refState.desktopBitsPixel source=shared' \
+	'iOS texture array selftest contract: item name=global.refState.drawableSize source=shared' \
+	'iOS texture array selftest contract: complete count=57'; do
+	if ! grep -q "$selftest_contract_marker" "$GL4ES_RENDERER_STRINGS"; then
+		echo "Renderer is missing complete-contract marker: $selftest_contract_marker" >&2
+		exit 1
+	fi
+done
+
+for selftest_renderer_marker in \
+	'iOS texture array selftest boot: renderer-ready' \
+	'iOS texture array selftest boot: dispatched'; do
+	if ! grep -q "$selftest_renderer_marker" "$GL4ES_RENDERER_STRINGS"; then
+		echo "Renderer is missing normal-bootstrap selftest marker: $selftest_renderer_marker" >&2
+		exit 1
+	fi
+done
+
+if ! grep -q 'gl4es_iOSWO49TopologyProducer' "$DIFFUSION_CLIENT_STRINGS"; then
+	echo "Diffusion client is missing the WO49 pre-shader producer bridge" >&2
+	exit 1
+fi
+
+if ! grep -q 'gl4es_iOSWO49TransformBegin' "$DIFFUSION_CLIENT_STRINGS"; then
+	echo "Diffusion client is missing the WO49 transform producer bridge" >&2
+	exit 1
+fi
+
+if ! grep -q 'gl4es_iOSWO52MaterialBegin' "$DIFFUSION_CLIENT_STRINGS"; then
+	echo "Diffusion client is missing the WO52 material producer bridge" >&2
+	exit 1
+fi
+
+if ! grep -q 'gl4es_iOSWO52EngineBind' "$GL4ES_RENDERER_STRINGS"; then
+	echo "Engine is missing the WO52 engine bind bridge" >&2
+	exit 1
+fi
+
+for bridge_marker in \
+	'iOS direct drawable policy:' \
+	'iOS direct drawable register:' \
+	'iOS direct drawable logical-zero:' \
+	'iOS direct drawable present:' \
+	'iOS direct drawable lifecycle:' \
+	'iOS direct drawable proof:'; do
+	if ! grep -q "$bridge_marker" "$GL4ES_RENDERER_STRINGS"; then
+		echo "Renderer is missing direct-drawable proof marker: $bridge_marker" >&2
+		exit 1
+	fi
+done
+
+SDL_NM="$VERIFY_ROOT/sdl.nm"
+nm -g "$SDL_PATH" > "$SDL_NM"
+
+if ! grep -q '_SDL_XASH_IOSSetDirectDrawableCallback' "$SDL_NM"; then
+	echo "SDL does not export direct-drawable lifecycle registration" >&2
+	exit 1
+fi
+
+for diagnostic_strings in \
+	"$ENGINE_STRINGS" \
+	"$SDL_STRINGS" \
+	"$GL4ES_RENDERER_STRINGS" \
+	"$DIFFUSION_CLIENT_STRINGS" \
+	"$DIFFUSION_MENU_STRINGS"; do
+	if grep -Eqi 'WO43|iOS liveness|sentinel_bars|normal-scene proof|native presentation:|iOS main-FBO audit|iOS drawable bridge (source|attempt|restore|proof):' "$diagnostic_strings"; then
+		echo "Obsolete sentinel/transfer/main-FBO diagnostics remain in $(basename "$diagnostic_strings")" >&2
 		exit 1
 	fi
 done
@@ -39,9 +370,22 @@ plutil -lint "$INFO_PLIST"
 
 MINIMUM_OS=$(/usr/libexec/PlistBuddy -c 'Print :MinimumOSVersion' "$INFO_PLIST")
 FILE_SHARING=$(/usr/libexec/PlistBuddy -c 'Print :UIFileSharingEnabled' "$INFO_PLIST")
+BUNDLE_VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$INFO_PLIST")
 
 if [ "$FILE_SHARING" != "true" ]; then
 	echo "UIFileSharingEnabled must remain enabled for user-supplied game data" >&2
+	exit 1
+fi
+
+case "$BUNDLE_VERSION" in
+	''|*[!0-9]*)
+		echo "CFBundleVersion must be a positive integer, got: $BUNDLE_VERSION" >&2
+		exit 1
+		;;
+esac
+
+if [ "$BUNDLE_VERSION" -le 1 ]; then
+	echo "CFBundleVersion must increase beyond the legacy value 1" >&2
 	exit 1
 fi
 
@@ -85,8 +429,8 @@ if [ "$MACHO_COUNT" -lt 3 ]; then
 	exit 1
 fi
 
-if [ "$DYLIB_COUNT" -lt 2 ]; then
-	echo "Expected portable HLSDK client and server dylibs; found $DYLIB_COUNT" >&2
+if [ "$DYLIB_COUNT" -lt 10 ]; then
+	echo "Expected engine, Half-Life, and Diffusion dylibs; found $DYLIB_COUNT" >&2
 	exit 1
 fi
 
@@ -94,6 +438,7 @@ codesign -dv "$APP_PATH" >/dev/null 2>&1
 
 echo "Verified: $IPA_PATH"
 echo "Application: $(basename "$APP_PATH")"
+echo "Bundle version: $BUNDLE_VERSION"
 echo "Minimum iOS: $MINIMUM_OS"
 echo "Mach-O files: $MACHO_COUNT"
 echo "Game dylibs: $DYLIB_COUNT"

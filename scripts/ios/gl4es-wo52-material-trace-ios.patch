@@ -1,0 +1,1044 @@
+diff --git a/src/gl/drawing.c b/src/gl/drawing.c
+index 8cfc076d..2a8948cb 100644
+--- a/src/gl/drawing.c
++++ b/src/gl/drawing.c
+@@ -32,6 +32,18 @@ static void ios_wo49_attach_list(renderlist_t *list, unsigned long long token,
+     list->ios_wo49_vertex_counts[slot] = vertex_count;
+ }
+ 
++static void ios_wo52_attach_list(renderlist_t *list, unsigned long long token)
++{
++    if(!list || !token)
++        return;
++    if(list->ios_wo52_token_count >= IOS_WO52_MATERIAL_LIST_CAP) {
++        list->ios_wo52_route_overflow = 1;
++        ios_wo52_material_route_loss(token, "renderlist-token-cap");
++        return;
++    }
++    list->ios_wo52_tokens[list->ios_wo52_token_count++] = token;
++}
++
+ static GLboolean is_cache_compatible(GLsizei count) {
+     #define T2(AA, A, B) \
+     if(glstate->vao->AA!=glstate->vao->B.enabled) return GL_FALSE; \
+@@ -610,6 +622,8 @@ void APIENTRY_GL4ES gl4es_glDrawRangeElements(GLenum mode, GLuint start, GLuint
+     unsigned long long ios_wo49_token = ios_wo49_topology_ingress("glDrawRangeElements",
+         mode, count, type, indices, (const GLuint *)resolved_element_indices(indices),
+         start, end, 0, compiling||intercept, intercept);
++    unsigned long long ios_wo52_token = ios_wo52_material_ingress(
++        "glDrawRangeElements", compiling||intercept, intercept);
+     if(type==GL_UNSIGNED_INT) {
+         trace_uint_element_route("range", IOS_UINT_ROUTE_RANGE, (const GLuint*)resolved_element_indices(indices), count, compiling||intercept);
+         if(compiling)
+@@ -649,6 +663,8 @@ void APIENTRY_GL4ES gl4es_glDrawRangeElements(GLenum mode, GLuint start, GLuint
+                         glstate->list.active->indices + ios_trace_offset, count,
+                         start, end - start + 1, 1, wo49_positions, wo49_stride);
+                 }
++                ios_wo52_attach_list(glstate->list.active, ios_wo52_token);
++                ios_wo52_material_route(ios_wo52_token, "deferred-renderlist-append");
+                 release_element_indices(sindices, iindices, owned_indices, old_index);
+                 NewStage(glstate->list.active, STAGE_POSTDRAW);
+                 return;
+@@ -665,6 +681,8 @@ void APIENTRY_GL4ES gl4es_glDrawRangeElements(GLenum mode, GLuint start, GLuint
+         list->ios_index_trace_offset = 0;
+         list->ios_index_trace_count = ios_trace_id ? count : 0;
+         ios_wo49_attach_list(list, ios_wo49_token, 0, count, 0, end - start + 1);
++        ios_wo52_attach_list(list, ios_wo52_token);
++        ios_wo52_material_route(ios_wo52_token, "deferred-renderlist");
+         ios_wo49_topology_route(ios_wo49_token, "deferred", list->indices,
+             count, start, end - start + 1, 0, list->vert, list->vert_stride);
+         //end_renderlist(list);
+@@ -686,6 +704,8 @@ void APIENTRY_GL4ES gl4es_glDrawRangeElements(GLenum mode, GLuint start, GLuint
+         list->ios_index_trace_offset = 0;
+         list->ios_index_trace_count = ios_trace_id ? count : 0;
+         ios_wo49_attach_list(list, ios_wo49_token, 0, count, 0, end - start + 1);
++        ios_wo52_attach_list(list, ios_wo52_token);
++        ios_wo52_material_route(ios_wo52_token, "intercept-renderlist");
+         ios_wo49_topology_route(ios_wo49_token, "intercept", list->indices,
+             count, start, end - start + 1, 0, list->vert, list->vert_stride);
+         list = end_renderlist(list);
+@@ -699,6 +719,7 @@ void APIENTRY_GL4ES gl4es_glDrawRangeElements(GLenum mode, GLuint start, GLuint
+         ios_wo49_topology_route(ios_wo49_token, "direct", iindices, count,
+             start, end - start + 1, 0, NULL, 0);
+         ios_wo49_topology_set_active(ios_wo49_token);
++        ios_wo52_material_set_active(ios_wo52_token);
+         glDrawElementsCommon(mode, 0, count, end+1, sindices, iindices, 1);
+         release_element_indices(sindices, iindices, owned_indices, old_index);
+     }
+@@ -751,6 +772,8 @@ void APIENTRY_GL4ES gl4es_glDrawElements(GLenum mode, GLsizei count, GLenum type
+     unsigned long long ios_wo49_token = ios_wo49_topology_ingress("glDrawElements",
+         mode, count, type, indices, (const GLuint *)resolved_element_indices(indices),
+         0, 0, 0, compiling||intercept, intercept);
++    unsigned long long ios_wo52_token = ios_wo52_material_ingress(
++        "glDrawElements", compiling||intercept, intercept);
+     if(type==GL_UNSIGNED_INT) {
+         trace_uint_element_route("ordinary", IOS_UINT_ROUTE_ORDINARY, (const GLuint*)resolved_element_indices(indices), count, compiling||intercept);
+         if(compiling)
+@@ -790,6 +813,8 @@ void APIENTRY_GL4ES gl4es_glDrawElements(GLenum mode, GLsizei count, GLenum type
+                     glstate->list.active->indices + ios_trace_offset, count,
+                     min, max - min + 1, 1, wo49_positions, wo49_stride);
+             }
++            ios_wo52_attach_list(glstate->list.active, ios_wo52_token);
++            ios_wo52_material_route(ios_wo52_token, "deferred-renderlist-append");
+             release_element_indices(sindices, iindices, owned_indices, old_index);
+             NewStage(glstate->list.active, STAGE_POSTDRAW);
+             return;
+@@ -805,6 +830,8 @@ void APIENTRY_GL4ES gl4es_glDrawElements(GLenum mode, GLsizei count, GLenum type
+         list->ios_index_trace_offset = 0;
+         list->ios_index_trace_count = ios_trace_id ? count : 0;
+         ios_wo49_attach_list(list, ios_wo49_token, 0, count, 0, max - min + 1);
++        ios_wo52_attach_list(list, ios_wo52_token);
++        ios_wo52_material_route(ios_wo52_token, "deferred-renderlist");
+         ios_wo49_topology_route(ios_wo49_token, "deferred", list->indices,
+             count, min, max - min + 1, 0, list->vert, list->vert_stride);
+         //end_renderlist(list);
+@@ -827,6 +854,8 @@ void APIENTRY_GL4ES gl4es_glDrawElements(GLenum mode, GLsizei count, GLenum type
+         list->ios_index_trace_offset = 0;
+         list->ios_index_trace_count = ios_trace_id ? count : 0;
+         ios_wo49_attach_list(list, ios_wo49_token, 0, count, 0, max - min + 1);
++        ios_wo52_attach_list(list, ios_wo52_token);
++        ios_wo52_material_route(ios_wo52_token, "intercept-renderlist");
+         ios_wo49_topology_route(ios_wo49_token, "intercept", list->indices,
+             count, min, max - min + 1, 0, list->vert, list->vert_stride);
+         list = end_renderlist(list);
+@@ -839,6 +868,7 @@ void APIENTRY_GL4ES gl4es_glDrawElements(GLenum mode, GLsizei count, GLenum type
+         ios_wo49_topology_route(ios_wo49_token, "direct", iindices, count,
+             0, 0, 0, NULL, 0);
+         ios_wo49_topology_set_active(ios_wo49_token);
++        ios_wo52_material_set_active(ios_wo52_token);
+         glDrawElementsCommon(mode, 0, count, 0, sindices, iindices, 1);
+         release_element_indices(sindices, iindices, owned_indices, old_index);
+     }
+diff --git a/src/gl/fpe.c b/src/gl/fpe.c
+index 80d42e20..903f55d3 100644
+--- a/src/gl/fpe.c
++++ b/src/gl/fpe.c
+@@ -832,6 +832,7 @@ void APIENTRY_GL4ES fpe_glDrawElements(GLenum mode, GLsizei count, GLenum type,
+     realize_bufferIndex();
+     ios_wo49_transform_before_draw("fpe_glDrawElements", mode, count, type);
+     ios_wo49_topology_realized("fpe_glDrawElements", mode, count, type, indices);
++    ios_wo52_material_native("fpe_glDrawElements");
+     gles_glDrawElements(mode, count, type, indices);
+     if(use_vbo)
+         wantBufferIndex(0);
+diff --git a/src/gl/gl_lookup.c b/src/gl/gl_lookup.c
+index 232acae3..f609f36d 100644
+--- a/src/gl/gl_lookup.c
++++ b/src/gl/gl_lookup.c
+@@ -43,6 +43,12 @@ void* APIENTRY_GL4ES gl4es_GetProcAddress(const char *name) {
+     MAP("gl4es_iOSWO49TopologyAbsence", gl4es_wo49_topology_absence);
+     MAP("gl4es_iOSWO49TransformBegin", gl4es_wo49_transform_begin);
+     MAP("gl4es_iOSWO49TransformFinish", gl4es_wo49_transform_finish);
++    MAP("gl4es_iOSWO52MaterialBegin", gl4es_wo52_material_begin);
++    MAP("gl4es_iOSWO52MaterialCache", gl4es_wo52_material_cache);
++    MAP("gl4es_iOSWO52EngineBind", gl4es_wo52_engine_bind);
++    MAP("gl4es_iOSWO52MaterialArm", gl4es_wo52_material_arm);
++    MAP("gl4es_iOSWO52MaterialFinish", gl4es_wo52_material_finish);
++    MAP("gl4es_iOSWO52MaterialTransition", gl4es_wo52_material_transition);
+     // generated gles wrappers
+     #include "glesfuncs.inc"
+ 
+diff --git a/src/gl/indextrace.c b/src/gl/indextrace.c
+index 2af26a66..483c3585 100644
+--- a/src/gl/indextrace.c
++++ b/src/gl/indextrace.c
+@@ -6,6 +6,7 @@
+ #include "matrix.h"
+ #include "program.h"
+ #include "shader.h"
++#include "texture.h"
+ #include "../glx/hardext.h"
+ #include "../../include/gl4esinit.h"
+ 
+@@ -234,6 +235,284 @@ static ios_wo49_transform_trace_t ios_wo49_transform;
+ static void ios_wo49_summary_if_due(unsigned long long frame, int force);
+ static void ios_wo49_transform_terminal(const char *fallback_missing);
+ 
++typedef struct {
++    int seen;
++    unsigned int target;
++    unsigned int engine_object;
++    unsigned int requested_logical;
++    unsigned int before_logical;
++    unsigned int before_index;
++    unsigned int before_target;
++    unsigned int after_logical;
++    unsigned int after_index;
++    unsigned int after_target;
++    int issued;
++} ios_wo52_engine_bind_t;
++
++typedef struct {
++    int seen;
++    unsigned int target;
++    unsigned int logical;
++    unsigned int native;
++    int equal;
++} ios_wo52_gl4es_bind_t;
++
++typedef struct {
++    unsigned long long token;
++    ios_wo52_material_producer_desc_t producer;
++    ios_wo52_material_cache_desc_t cache;
++    char map[64];
++    char model[96];
++    char material[96];
++    char source[96];
++    char ingress[32];
++    char route[24];
++    char missing[48];
++    ios_wo52_engine_bind_t engine[IOS_WO52_MATERIAL_UNIT_CAP];
++    ios_wo52_gl4es_bind_t gl4es[IOS_WO52_MATERIAL_UNIT_CAP];
++    unsigned int stage_mask;
++    int finished;
++    int terminal;
++} ios_wo52_material_record_t;
++
++typedef struct {
++    unsigned long long tokens[IOS_WO52_MATERIAL_LIST_CAP];
++    unsigned int count;
++    char route[24];
++} ios_wo52_material_replay_t;
++
++static ios_wo52_material_record_t ios_wo52_material_records[IOS_WO52_MATERIAL_TOKEN_CAP];
++static unsigned int ios_wo52_material_count;
++static unsigned int ios_wo52_material_overflow;
++static unsigned long long ios_wo52_material_next_token;
++static unsigned long long ios_wo52_material_pending;
++static unsigned long long ios_wo52_material_active;
++static ios_wo52_material_replay_t ios_wo52_material_replay;
++static unsigned int ios_wo52_material_terminal_count;
++static unsigned int ios_wo52_material_incomplete_count;
++static int ios_wo52_material_policy_emitted;
++
++static void ios_wo49_emit(const char *format, ...);
++
++static ios_wo52_material_record_t *ios_wo52_material_find(unsigned long long token)
++{
++    for(unsigned int i = 0; i < ios_wo52_material_count; ++i)
++        if(ios_wo52_material_records[i].token == token)
++            return &ios_wo52_material_records[i];
++    return NULL;
++}
++
++static int ios_wo52_material_unit_slot(const ios_wo52_material_record_t *record,
++    unsigned int unit)
++{
++    for(unsigned int i = 0; i < record->producer.unitCount; ++i)
++        if(record->producer.units[i].unit == unit)
++            return (int)i;
++    return -1;
++}
++
++static const char *ios_wo52_material_mode_name(int mode)
++{
++    switch(mode) {
++        case -1: return "invalid";
++        case 0: return "base";
++        case 1: return "white";
++        case 2: return "colormap";
++        case 3: return "monitor";
++        case 4: return "fallback";
++        case 5: return "animated";
++        case 6: return "drone";
++        case 7: return "interior";
++        case 8: return "blend";
++        default: return "unknown";
++    }
++}
++
++static const ios_wo52_material_cache_unit_t *ios_wo52_material_cache_unit(
++    const ios_wo52_material_record_t *record, unsigned int unit)
++{
++    for(unsigned int i = 0; i < record->cache.unitCount; ++i)
++        if(record->cache.units[i].unit == unit)
++            return &record->cache.units[i];
++    return NULL;
++}
++
++static uniform_t *ios_wo52_material_uniform(program_t *program,
++    const char *name)
++{
++    khint_t k;
++    size_t length;
++    if(!program || !program->uniform || !name)
++        return NULL;
++    length = strlen(name);
++    for(k = kh_begin(program->uniform); k != kh_end(program->uniform); ++k) {
++        uniform_t *uniform;
++        if(!kh_exist(program->uniform, k))
++            continue;
++        uniform = kh_value(program->uniform, k);
++        if(uniform && uniform->name && !strncmp(uniform->name, name, length) &&
++           (uniform->name[length] == '\0' || uniform->name[length] == '['))
++            return uniform;
++    }
++    return NULL;
++}
++
++static uniform_t *ios_wo52_material_uniform_location(program_t *program,
++    GLint location)
++{
++    khint_t k;
++    if(!program || !program->uniform || location < 0)
++        return NULL;
++    k = kh_get(uniformlist, program->uniform, location);
++    return k == kh_end(program->uniform) ? NULL : kh_value(program->uniform, k);
++}
++
++static void ios_wo52_material_summary(void)
++{
++    ios_wo49_emit(
++        "WO52 material trace summary: selected=%u cap=256 terminal=%u incomplete=%u overflow=%u pending=%u active=%llu replay=%u records_per_stage<=1 sink=engine-console mutation=none error_queue=untouched",
++        ios_wo52_material_count, ios_wo52_material_terminal_count,
++        ios_wo52_material_incomplete_count, ios_wo52_material_overflow,
++        ios_wo52_material_pending ? 1u : 0u, ios_wo52_material_active,
++        ios_wo52_material_replay.count);
++}
++
++static void ios_wo52_material_terminal(ios_wo52_material_record_t *record,
++    const char *result, const char *field)
++{
++    if(!record || record->terminal)
++        return;
++    record->terminal = 1;
++    if(ios_wo52_material_pending == record->token)
++        ios_wo52_material_pending = 0;
++    if(ios_wo52_material_active == record->token)
++        ios_wo52_material_active = 0;
++    ++ios_wo52_material_terminal_count;
++    if(strcmp(result, "incomplete/overflow") == 0)
++        ++ios_wo52_material_incomplete_count;
++    ios_wo49_emit(
++        "WO52 material trace terminal: token=%llu result=%s first_field=%s stages=0x%02x route=%s terminal=1 mutation=none error_queue=untouched",
++        record->token, result, field ? field : "none", record->stage_mask,
++        record->route[0] ? record->route : "unknown");
++    ios_wo52_material_summary();
++}
++
++static void ios_wo52_material_classify_native(ios_wo52_material_record_t *record)
++{
++    if(!(record->stage_mask & 0x04u)) {
++        ios_wo52_material_terminal(record, "incomplete/overflow", "bind-stage");
++        return;
++    }
++    if(!(record->stage_mask & 0x08u)) {
++        ios_wo52_material_terminal(record, "incomplete/overflow", "gl4es-route-stage");
++        return;
++    }
++    for(unsigned int i = 0; i < record->producer.unitCount; ++i) {
++        const ios_wo52_material_unit_desc_t *p = &record->producer.units[i];
++        const ios_wo52_material_cache_unit_t *c =
++            ios_wo52_material_cache_unit(record, p->unit);
++        GLuint expected_logical = p->mode == IOS_WO52_MODE_COLORMAP &&
++            record->engine[i].seen ? record->engine[i].after_logical :
++            p->logicalObject;
++        if(!p->ready || !p->engineObject || !p->logicalObject || !p->width || !p->height) {
++            ios_wo52_material_terminal(record, "producer/material selection mismatch",
++                "producer-object-readiness");
++            return;
++        }
++        if(c && c->requestedObject == (int)p->engineObject &&
++           c->afterObject != c->requestedObject) {
++            ios_wo52_material_terminal(record, "bind/cache skip mismatch",
++                "diffusion-cache-after-object");
++            return;
++        }
++        if(p->mode != IOS_WO52_MODE_COLORMAP && record->engine[i].seen &&
++           record->engine[i].after_index != p->engineObject) {
++            ios_wo52_material_terminal(record, "bind/cache skip mismatch",
++                "engine-cache-after-index");
++            return;
++        }
++        if(record->gl4es[i].seen &&
++           record->gl4es[i].logical != expected_logical) {
++            ios_wo52_material_terminal(record,
++                "GL4ES logical-to-native realization mismatch", "gl4es-bind-logical");
++            return;
++        }
++        if(p->unit < MAX_TEX) {
++            GLuint itarget = what_target(p->target);
++            gltexture_t *logical = glstate->texture.bound[p->unit][itarget];
++            int native_match = p->target == GL_TEXTURE_CUBE_MAP ?
++                (record->gl4es[i].seen &&
++                 logical && logical->glname == record->gl4es[i].native) :
++                (logical && logical->glname == glstate->actual_tex2d[p->unit]);
++            if(!logical || logical->texture != expected_logical || !native_match) {
++                ios_wo52_material_terminal(record,
++                    "GL4ES logical-to-native realization mismatch",
++                    !logical || logical->texture != expected_logical ?
++                    "logical-object" : "native-binding");
++                return;
++            }
++        }
++    }
++    program_t *program = glstate->gleshard->glprogram;
++    if(!program || glstate->glsl->program != record->producer.logicalProgram) {
++        ios_wo52_material_terminal(record, "sampler/program routing mismatch",
++            !program ? "native-program" : "logical-program");
++        return;
++    }
++    for(unsigned int i = 0; i < record->producer.unitCount; ++i) {
++        const ios_wo52_material_unit_desc_t *p = &record->producer.units[i];
++        if(p->samplerLocation < 0)
++            continue;
++        int found = -1;
++        if(program) {
++            for(int j = 0; j < MAX_TEX && program->texunits[j].type; ++j)
++                if(program->texunits[j].req_tu == (int)p->unit) {
++                    found = j;
++                    break;
++                }
++        }
++        uniform_t *sampler = found >= 0 ?
++            ios_wo52_material_uniform_location(program, program->texunits[found].id) : NULL;
++        GLenum expected_type = p->target == GL_TEXTURE_CUBE_MAP ?
++            GL_SAMPLER_CUBE : GL_SAMPLER_2D;
++        if(found < 0 || !sampler || sampler->type != expected_type ||
++           sampler->size != 1 || GetUniformi(program, sampler->id) != p->samplerValue) {
++            ios_wo52_material_terminal(record, "sampler/program routing mismatch",
++                found < 0 ? "reflected-sampler-unit" :
++                (!sampler ? "sampler-reflection" :
++                (sampler->type != expected_type ? "sampler-type" :
++                (sampler->size != 1 ? "sampler-extent" : "sampler-value"))));
++            return;
++        }
++    }
++    uniform_t *render_color = ios_wo52_material_uniform(program, "u_RenderColor");
++    if(record->producer.renderColorLocation >= 0 &&
++       (!render_color || render_color->type != GL_FLOAT_VEC4 ||
++        render_color->size != 1 || render_color->cache_size < 4 * (int)sizeof(GLfloat) ||
++        memcmp((char *)program->cache.cache + render_color->cache_offs,
++            record->producer.renderColor, 4 * sizeof(GLfloat)))) {
++        ios_wo52_material_terminal(record,
++            "texture/sampler chain matches but captured color/material/shader state differs",
++            "u_RenderColor");
++        return;
++    }
++    uniform_t *mesh_params = ios_wo52_material_uniform(program, "u_MeshParams");
++    if(record->producer.meshParamsLocation >= 0 &&
++       (!mesh_params || mesh_params->type != GL_FLOAT_VEC3 ||
++        mesh_params->size < 3 || mesh_params->cache_size < 9 * (int)sizeof(GLfloat) ||
++        memcmp((char *)program->cache.cache + mesh_params->cache_offs +
++            6 * sizeof(GLfloat), record->producer.meshParams,
++            3 * sizeof(GLfloat)))) {
++        ios_wo52_material_terminal(record,
++            "texture/sampler chain matches but captured color/material/shader state differs",
++            "u_MeshParams[2]");
++        return;
++    }
++    ios_wo52_material_terminal(record,
++        "texture/sampler chain matches but captured color/material/shader state differs",
++        "texture-sampler-chain");
++}
++
+ static const char *ios_index_family_name(unsigned int family)
+ {
+     switch(family) {
+@@ -1765,3 +2044,364 @@ static void ios_wo49_summary_if_due(unsigned long long frame, int force)
+         "WO49 topology summary: tokens=%u cap=4 realized=%u mismatched=%u absent=%u terminal=1 stages=[%s] first_mismatch_per_token=bounded records_per_stage<=1 mutation=none",
+         ios_wo49_record_count, realized, mismatched, absent, tokens);
+ }
++
++unsigned long long APIENTRY_GL4ES gl4es_wo52_material_begin(
++    const ios_wo52_material_producer_desc_t *desc)
++{
++    ios_wo52_material_record_t *record;
++    char units[1536] = "";
++    size_t used = 0;
++    if(!desc || desc->version != IOS_WO52_MATERIAL_VERSION ||
++       desc->size != sizeof(*desc) || !desc->meshIdentity ||
++       !desc->model || !desc->materialName || !desc->unitCount ||
++       desc->unitCount > IOS_WO52_MATERIAL_UNIT_CAP)
++        return 0;
++    for(unsigned int i = 0; i < ios_wo52_material_count; ++i) {
++        const ios_wo52_material_record_t *existing = &ios_wo52_material_records[i];
++        if(existing->producer.generation == desc->generation &&
++           existing->producer.entity == desc->entity &&
++           existing->producer.skin == desc->skin &&
++           existing->producer.bodypart == desc->bodypart &&
++           existing->producer.mesh == desc->mesh &&
++           existing->producer.material == desc->material &&
++           existing->producer.lightpass == desc->lightpass &&
++           existing->producer.meshIdentity == desc->meshIdentity &&
++           strcmp(existing->model, desc->model) == 0)
++            return 0;
++    }
++    if(ios_wo52_material_count >= IOS_WO52_MATERIAL_TOKEN_CAP) {
++        ++ios_wo52_material_overflow;
++        if(ios_wo52_material_overflow == 1)
++            ios_wo49_emit("WO52 material trace summary: selected=256 cap=256 terminal=%u incomplete=%u overflow=1 selection=closed",
++                ios_wo52_material_terminal_count, ios_wo52_material_incomplete_count);
++        return 0;
++    }
++    record = &ios_wo52_material_records[ios_wo52_material_count++];
++    memset(record, 0, sizeof(*record));
++    record->token = ++ios_wo52_material_next_token;
++    record->producer = *desc;
++    snprintf(record->map, sizeof(record->map), "%s", desc->map ? desc->map : "<none>");
++    snprintf(record->model, sizeof(record->model), "%s", desc->model);
++    snprintf(record->material, sizeof(record->material), "%s", desc->materialName);
++    snprintf(record->source, sizeof(record->source), "%s",
++        desc->sourceName ? desc->sourceName : "<none>");
++    record->producer.map = record->map;
++    record->producer.model = record->model;
++    record->producer.materialName = record->material;
++    record->producer.sourceName = record->source;
++    record->stage_mask = 0x03u;
++    if(!ios_wo52_material_policy_emitted) {
++        ios_wo52_material_policy_emitted = 1;
++        ios_wo49_emit("WO52 material trace policy: identities<=256 key=generation+entity+model+skin+bodypart+mesh+material first-draw+first-post-transition stages=producer+shader+bind+gl4es+native+transition+terminal direct+deferred+renderlist+replay sink=engine-console fixed-storage=1 state_restore=not-required native-shadow=post-realization error_queue=untouched repair=none");
++    }
++    for(unsigned int i = 0; i < desc->unitCount; ++i) {
++        const ios_wo52_material_unit_desc_t *u = &desc->units[i];
++        ios_wo49_append(units, sizeof(units), &used,
++            "%su%u:t0x%04x:engine%u:logical%u:%ux%u:f0x%04x:flags0x%x:mode%d:ready%d:loc%d:value%d",
++            i ? "," : "", u->unit, u->target, u->engineObject,
++            u->logicalObject, u->width, u->height, u->format,
++            u->resourceFlags, u->mode, u->ready, u->samplerLocation,
++            u->samplerValue);
++    }
++    ios_wo49_emit(
++        "WO52 material trace producer: token=%llu frame=%llu generation=%u map=%s entity=%u model_handle=%u model=%s skin=%u bodypart=%d mesh=%d mesh_identity=0x%llx material_slot=%d material_name=%s source=%s flags=0x%x gl_diffuse_id=%d selected_mode=%s selected_object=%u fallback=%d animation_id=%d monitor=%d drone=%d normal=%d cube=%d interior=%d blend=%d mask=%d cache_epoch=%u lightpass=%u units=[%s]",
++        record->token, desc->frame, desc->generation, record->map,
++        desc->entity, desc->modelHandle, record->model, desc->skin,
++        desc->bodypart, desc->mesh,
++        desc->meshIdentity, desc->material, record->material, record->source,
++        desc->materialFlags, desc->diffuseObject,
++        ios_wo52_material_mode_name(desc->units[0].mode),
++        desc->units[0].engineObject, desc->fallbackObject, desc->animationId,
++        desc->monitorObject, desc->droneObject, desc->normalObject,
++        desc->cubemapObject, desc->interiorObject, desc->blendObject,
++        desc->maskObject, desc->cacheEpoch, desc->lightpass, units);
++    ios_wo49_emit(
++        "WO52 material trace shader: token=%llu shader_index=%u logical_program=%u options_hash=%08x status=0x%x u_ColorMap_location=%d u_RenderColor_location=%d u_MeshParams_location=%d u_StudioLighting_location=%d render_color=[%.6g,%.6g,%.6g,%.6g] mesh_params=[%.6g,%.6g,%.6g,%.6g] fullbright=%u additive=%u vertex_lighting=%u",
++        record->token, desc->shaderIndex, desc->logicalProgram,
++        desc->optionsHash, desc->shaderStatus, desc->colorMapLocation,
++        desc->renderColorLocation, desc->meshParamsLocation,
++        desc->studioLightingLocation, desc->renderColor[0], desc->renderColor[1],
++        desc->renderColor[2], desc->renderColor[3], desc->meshParams[0],
++        desc->meshParams[1], desc->meshParams[2], desc->meshParams[3],
++        desc->fullbright, desc->additive, desc->vertexLighting);
++    ios_wo52_material_pending = record->token;
++    return record->token;
++}
++
++void APIENTRY_GL4ES gl4es_wo52_engine_bind(unsigned int unit,
++    unsigned int target, unsigned int engineObject, unsigned int requestedLogical,
++    unsigned int beforeLogical, unsigned int beforeIndex, unsigned int beforeTarget,
++    unsigned int afterLogical, unsigned int afterIndex, unsigned int afterTarget,
++    int issued)
++{
++    ios_wo52_material_record_t *record = ios_wo52_material_find(ios_wo52_material_pending);
++    int slot;
++    if(!record || (slot = ios_wo52_material_unit_slot(record, unit)) < 0)
++        return;
++    ios_wo52_engine_bind_t *b = &record->engine[slot];
++    b->seen = 1;
++    b->target = target;
++    b->engine_object = engineObject;
++    b->requested_logical = requestedLogical;
++    b->before_logical = beforeLogical;
++    b->before_index = beforeIndex;
++    b->before_target = beforeTarget;
++    b->after_logical = afterLogical;
++    b->after_index = afterIndex;
++    b->after_target = afterTarget;
++    b->issued = issued;
++}
++
++void ios_wo52_material_gl4es_bind(unsigned int unit, unsigned int target,
++    unsigned int logicalObject, unsigned int nativeObject, int equal)
++{
++    ios_wo52_material_record_t *record = ios_wo52_material_find(ios_wo52_material_pending);
++    int slot;
++    if(!record || (slot = ios_wo52_material_unit_slot(record, unit)) < 0)
++        return;
++    record->gl4es[slot].seen = 1;
++    record->gl4es[slot].target = target;
++    record->gl4es[slot].logical = logicalObject;
++    record->gl4es[slot].native = nativeObject;
++    record->gl4es[slot].equal = equal;
++}
++
++void APIENTRY_GL4ES gl4es_wo52_material_cache(
++    const ios_wo52_material_cache_desc_t *desc)
++{
++    ios_wo52_material_record_t *record;
++    char units[2048] = "";
++    size_t used = 0;
++    if(!desc || desc->version != IOS_WO52_MATERIAL_VERSION ||
++       desc->size != sizeof(*desc) ||
++       !(record = ios_wo52_material_find(desc->token)))
++        return;
++    record->cache = *desc;
++    record->cache.unitCount = desc->unitCount > IOS_WO52_MATERIAL_UNIT_CAP ?
++        IOS_WO52_MATERIAL_UNIT_CAP : desc->unitCount;
++    record->stage_mask |= 0x04u;
++    for(unsigned int i = 0; i < record->cache.unitCount; ++i) {
++        const ios_wo52_material_cache_unit_t *c = &record->cache.units[i];
++        int slot = ios_wo52_material_unit_slot(record, c->unit);
++        const ios_wo52_engine_bind_t empty_engine = {0};
++        const ios_wo52_gl4es_bind_t empty_gl4es = {0};
++        const ios_wo52_engine_bind_t *e = slot >= 0 ?
++            &record->engine[slot] : &empty_engine;
++        const ios_wo52_gl4es_bind_t *g = slot >= 0 ?
++            &record->gl4es[slot] : &empty_gl4es;
++        ios_wo49_append(units, sizeof(units), &used,
++            "%su%u:req%d:diff_before%d/m%d:diff_after%d/m%d:issued%d:engine_seen%d/before%u/%u/t0x%x:after%u/%u/t0x%x:inner_issued%d:gl4es_seen%d/logical%u/native%u/equal%d",
++            i ? "," : "", c->unit, c->requestedObject, c->beforeObject,
++            c->beforeMode, c->afterObject, c->afterMode, c->issued,
++            e->seen, e->before_index, e->before_logical, e->before_target,
++            e->after_index, e->after_logical, e->after_target, e->issued,
++            g->seen, g->logical, g->native, g->equal);
++    }
++    ios_wo49_emit("WO52 material trace bind: token=%llu cache_epoch=%u units=[%s]",
++        record->token, desc->cacheEpoch, units);
++}
++
++void APIENTRY_GL4ES gl4es_wo52_material_arm(unsigned long long token)
++{
++    if(ios_wo52_material_find(token))
++        ios_wo52_material_pending = token;
++}
++
++unsigned long long ios_wo52_material_ingress(const char *function,
++    int deferred, int intercept)
++{
++    unsigned long long token = ios_wo52_material_pending;
++    ios_wo52_material_record_t *record = ios_wo52_material_find(token);
++    if(!record)
++        return 0;
++    ios_wo52_material_pending = 0;
++    snprintf(record->ingress, sizeof(record->ingress), "%s", function ? function : "unknown");
++    snprintf(record->route, sizeof(record->route), "%s",
++        intercept ? "intercept-renderlist" : (deferred ? "deferred-renderlist" : "direct"));
++    record->stage_mask |= 0x08u;
++    char units[1536] = "";
++    size_t used = 0;
++    for(unsigned int i = 0; i < record->producer.unitCount; ++i) {
++        const ios_wo52_material_unit_desc_t *p = &record->producer.units[i];
++        GLuint itarget = what_target(p->target);
++        gltexture_t *tex = p->unit < MAX_TEX ? glstate->texture.bound[p->unit][itarget] : NULL;
++        ios_wo49_append(units, sizeof(units), &used,
++            "%su%u:target0x%04x:logical%u:glname%u:enabled0x%x:actual%u",
++            i ? "," : "", p->unit, p->target, tex ? tex->texture : 0,
++            tex ? tex->glname : 0,
++            p->unit < MAX_TEX ? glstate->enable.texture[p->unit] : 0,
++            p->unit < MAX_TEX ? glstate->actual_tex2d[p->unit] : 0);
++    }
++    ios_wo49_emit(
++        "WO52 material trace gl4es: token=%llu ingress=%s route=%s deferred=%d intercept=%d bound_changed=%d logical_program=%u units=[%s]",
++        token, record->ingress, record->route, deferred, intercept,
++        glstate->bound_changed, glstate->glsl->program, units);
++    return token;
++}
++
++void ios_wo52_material_route(unsigned long long token, const char *route)
++{
++    ios_wo52_material_record_t *record = ios_wo52_material_find(token);
++    if(record && route)
++        snprintf(record->route, sizeof(record->route), "%s", route);
++}
++
++void ios_wo52_material_set_active(unsigned long long token)
++{
++    ios_wo52_material_active = token;
++}
++
++void ios_wo52_material_set_replay(const unsigned long long *tokens,
++    unsigned int count, const char *route)
++{
++    memset(&ios_wo52_material_replay, 0, sizeof(ios_wo52_material_replay));
++    if(!tokens)
++        return;
++    ios_wo52_material_replay.count = count > IOS_WO52_MATERIAL_LIST_CAP ?
++        IOS_WO52_MATERIAL_LIST_CAP : count;
++    memcpy(ios_wo52_material_replay.tokens, tokens,
++        ios_wo52_material_replay.count * sizeof(tokens[0]));
++    snprintf(ios_wo52_material_replay.route, sizeof(ios_wo52_material_replay.route),
++        "%s", route ? route : "replay");
++}
++
++void ios_wo52_material_route_loss(unsigned long long token, const char *reason)
++{
++    ios_wo52_material_record_t *record = ios_wo52_material_find(token);
++    if(!record)
++        return;
++    snprintf(record->missing, sizeof(record->missing), "%s", reason ? reason : "route-loss");
++    ios_wo52_material_terminal(record, "incomplete/overflow", record->missing);
++}
++
++static void ios_wo52_material_native_one(ios_wo52_material_record_t *record,
++    const char *function, const char *route)
++{
++    char units[2304] = "";
++    size_t used = 0;
++    program_t *program = glstate->gleshard->glprogram;
++    if(!record || record->terminal)
++        return;
++    if(route)
++        snprintf(record->route, sizeof(record->route), "%s", route);
++    record->stage_mask |= 0x10u;
++    for(unsigned int i = 0; i < record->producer.unitCount; ++i) {
++        const ios_wo52_material_unit_desc_t *p = &record->producer.units[i];
++        GLuint itarget = what_target(p->target);
++        gltexture_t *tex = p->unit < MAX_TEX ? glstate->texture.bound[p->unit][itarget] : NULL;
++        GLuint native_binding = p->target == GL_TEXTURE_CUBE_MAP ?
++            record->gl4es[i].native :
++            (p->unit < MAX_TEX ? glstate->actual_tex2d[p->unit] : 0);
++        const char *binding_name = p->target == GL_TEXTURE_CUBE_MAP ?
++            "GL_TEXTURE_BINDING_CUBE_MAP" : "GL_TEXTURE_BINDING_2D";
++        glsampler_t *sampler = tex ?
++            (glstate->samplers.sampler[p->unit] ? glstate->samplers.sampler[p->unit] : &tex->sampler) : NULL;
++        int reflected = 0, sampler_unit = -1, sampler_actual = -1;
++        int sampler_location = -1, sampler_extent = 0, sampler_value = -1;
++        GLenum sampler_type = 0;
++        const char *sampler_name = "<none>";
++        if(program) {
++            for(int j = 0; j < MAX_TEX && program->texunits[j].type; ++j) {
++                if(program->texunits[j].req_tu == (int)p->unit) {
++                    reflected = 1;
++                    sampler_unit = program->texunits[j].req_tu;
++                    sampler_actual = program->texunits[j].act_tu;
++                    sampler_name = GetUniformName(program, program->texunits[j].id);
++                    uniform_t *uniform = ios_wo52_material_uniform_location(
++                        program, program->texunits[j].id);
++                    if(uniform) {
++                        sampler_location = uniform->id;
++                        sampler_type = uniform->type;
++                        sampler_extent = uniform->size;
++                        sampler_value = GetUniformi(program, uniform->id);
++                    }
++                    break;
++                }
++            }
++        }
++        ios_wo49_append(units, sizeof(units), &used,
++            "%su%u:logical%u:glname%u:%s=%u:binding_source=%s:level0=%dx%d/internal0x%04x/format0x%04x:valid%d:min0x%04x:mag0x%04x:wrap0x%04x/0x%04x:mipmap_done%d:reflected%d:sampler=%s:type0x%04x:extent%d:native_location%d:value%d:req%d:act%d",
++            i ? "," : "", p->unit, tex ? tex->texture : 0,
++            tex ? tex->glname : 0, binding_name, native_binding,
++            p->target == GL_TEXTURE_CUBE_MAP ?
++                "gl4es-immediate-bind-observation" : "gl4es-native-shadow",
++            tex ? tex->width : 0, tex ? tex->height : 0,
++            tex ? tex->internalformat : 0, tex ? tex->format : 0,
++            tex ? tex->valid : 0, sampler ? sampler->min_filter : 0,
++            sampler ? sampler->mag_filter : 0, sampler ? sampler->wrap_s : 0,
++            sampler ? sampler->wrap_t : 0, tex ? tex->mipmap_done : 0,
++            reflected, sampler_name ? sampler_name : "<none>", sampler_type,
++            sampler_extent, sampler_location, sampler_value, sampler_unit,
++            sampler_actual);
++    }
++    uniform_t *render_color = ios_wo52_material_uniform(program, "u_RenderColor");
++    uniform_t *mesh_params = ios_wo52_material_uniform(program, "u_MeshParams");
++    uniform_t *studio_lighting = ios_wo52_material_uniform(program, "u_StudioLighting");
++    GLfloat native_color[4] = {0};
++    GLfloat native_mesh_params[3] = {0};
++    if(render_color && render_color->cache_size >= 4 * (int)sizeof(GLfloat))
++        memcpy(native_color, (char *)program->cache.cache + render_color->cache_offs,
++            sizeof(native_color));
++    if(mesh_params && mesh_params->cache_size >= 9 * (int)sizeof(GLfloat))
++        memcpy(native_mesh_params, (char *)program->cache.cache +
++            mesh_params->cache_offs + 6 * sizeof(GLfloat), sizeof(native_mesh_params));
++    uint32_t lighting_hash = studio_lighting && studio_lighting->cache_size > 0 ?
++        ios_wo49_bytes_checksum((char *)program->cache.cache +
++            studio_lighting->cache_offs, studio_lighting->cache_size) : 0;
++    ios_wo49_emit(
++        "WO52 material trace native: token=%llu function=%s route=%s immediately_pre_native_draw=1 post_realize_textures=1 post_program_realization=1 native_active_unit=%u native_program=%u logical_program=%u logical_program_match=%d units=[%s] render_color=type0x%04x/extent%d/value[%.6g,%.6g,%.6g,%.6g]/match%d mesh_params2=type0x%04x/extent%d/value[%.6g,%.6g,%.6g]/match%d studio_lighting=type0x%04x/extent%d/hash%08x state_restored=not-mutated error_queue=untouched",
++        record->token, function ? function : "unknown", record->route,
++        glstate->gleshard->active, glstate->gleshard->program,
++        glstate->glsl->program,
++        glstate->glsl->program == record->producer.logicalProgram, units,
++        render_color ? render_color->type : 0, render_color ? render_color->size : 0,
++        native_color[0], native_color[1], native_color[2], native_color[3],
++        render_color && !memcmp(native_color, record->producer.renderColor,
++            sizeof(native_color)), mesh_params ? mesh_params->type : 0,
++        mesh_params ? mesh_params->size : 0, native_mesh_params[0],
++        native_mesh_params[1], native_mesh_params[2],
++        mesh_params && !memcmp(native_mesh_params, record->producer.meshParams,
++            sizeof(native_mesh_params)), studio_lighting ? studio_lighting->type : 0,
++        studio_lighting ? studio_lighting->size : 0, lighting_hash);
++    ios_wo52_material_classify_native(record);
++}
++
++void ios_wo52_material_native(const char *function)
++{
++    if(ios_wo52_material_active) {
++        ios_wo52_material_native_one(
++            ios_wo52_material_find(ios_wo52_material_active), function, "direct");
++        ios_wo52_material_active = 0;
++    }
++    for(unsigned int i = 0; i < ios_wo52_material_replay.count; ++i)
++        ios_wo52_material_native_one(
++            ios_wo52_material_find(ios_wo52_material_replay.tokens[i]), function,
++            ios_wo52_material_replay.route);
++    memset(&ios_wo52_material_replay, 0, sizeof(ios_wo52_material_replay));
++}
++
++void APIENTRY_GL4ES gl4es_wo52_material_finish(unsigned long long token)
++{
++    ios_wo52_material_record_t *record = ios_wo52_material_find(token);
++    if(!record)
++        return;
++    record->finished = 1;
++    if(!record->terminal && strcmp(record->route, "direct") == 0)
++        ios_wo52_material_terminal(record, "incomplete/overflow", "immediate-native-stage");
++}
++
++void APIENTRY_GL4ES gl4es_wo52_material_transition(const char *event,
++    unsigned int generation, unsigned long long frame, const char *map)
++{
++    ios_wo49_emit(
++        "WO52 material trace transition: event=%s generation=%u frame=%llu map=%s selected=%u terminal=%u",
++        event ? event : "unknown", generation, frame, map ? map : "<none>",
++        ios_wo52_material_count, ios_wo52_material_terminal_count);
++    for(unsigned int i = 0; i < ios_wo52_material_count; ++i) {
++        ios_wo52_material_record_t *record = &ios_wo52_material_records[i];
++        if(!record->terminal && record->producer.generation < generation)
++            ios_wo52_material_terminal(record, "incomplete/overflow",
++                record->stage_mask & 0x08u ? "post-transition-native-stage" :
++                "post-transition-route-stage");
++    }
++}
+diff --git a/src/gl/indextrace.h b/src/gl/indextrace.h
+index 7f603195..05ec9c0e 100644
+--- a/src/gl/indextrace.h
++++ b/src/gl/indextrace.h
+@@ -12,6 +12,94 @@
+ #define IOS_WO49_TRANSFORM_VERTEX_LIGHTING 0x04u
+ #define IOS_WO49_TRANSFORM_BONE_WEIGHTING 0x08u
+ 
++#define IOS_WO52_MATERIAL_VERSION 1u
++#define IOS_WO52_MODE_COLORMAP 2
++#define IOS_WO52_MATERIAL_TOKEN_CAP 256u
++#define IOS_WO52_MATERIAL_UNIT_CAP 6u
++#ifndef IOS_WO52_MATERIAL_LIST_CAP
++#define IOS_WO52_MATERIAL_LIST_CAP 32u
++#endif
++
++typedef struct ios_wo52_material_unit_desc_s {
++    unsigned int unit;
++    unsigned int target;
++    unsigned int engineObject;
++    unsigned int logicalObject;
++    unsigned int width;
++    unsigned int height;
++    unsigned int format;
++    unsigned int resourceFlags;
++    int mode;
++    int ready;
++    int samplerLocation;
++    int samplerValue;
++} ios_wo52_material_unit_desc_t;
++
++typedef struct ios_wo52_material_producer_desc_s {
++    unsigned int version;
++    unsigned int size;
++    unsigned long long frame;
++    unsigned int generation;
++    unsigned int entity;
++    unsigned int modelHandle;
++    unsigned int skin;
++    int bodypart;
++    int mesh;
++    int material;
++    int diffuseObject;
++    int fallbackObject;
++    int animationId;
++    int monitorObject;
++    int droneObject;
++    int normalObject;
++    int cubemapObject;
++    int interiorObject;
++    int blendObject;
++    int maskObject;
++    unsigned long long meshIdentity;
++    unsigned int cacheEpoch;
++    unsigned int lightpass;
++    const char *map;
++    const char *model;
++    const char *materialName;
++    const char *sourceName;
++    unsigned int materialFlags;
++    unsigned int shaderIndex;
++    unsigned int logicalProgram;
++    unsigned int optionsHash;
++    unsigned int shaderStatus;
++    int colorMapLocation;
++    int renderColorLocation;
++    int meshParamsLocation;
++    int studioLightingLocation;
++    float renderColor[4];
++    float meshParams[4];
++    unsigned int fullbright;
++    unsigned int additive;
++    unsigned int vertexLighting;
++    unsigned int unitCount;
++    ios_wo52_material_unit_desc_t units[IOS_WO52_MATERIAL_UNIT_CAP];
++} ios_wo52_material_producer_desc_t;
++
++typedef struct ios_wo52_material_cache_unit_s {
++    unsigned int unit;
++    int requestedObject;
++    int beforeObject;
++    int afterObject;
++    int beforeMode;
++    int afterMode;
++    int issued;
++} ios_wo52_material_cache_unit_t;
++
++typedef struct ios_wo52_material_cache_desc_s {
++    unsigned int version;
++    unsigned int size;
++    unsigned long long token;
++    unsigned int cacheEpoch;
++    unsigned int unitCount;
++    ios_wo52_material_cache_unit_t units[IOS_WO52_MATERIAL_UNIT_CAP];
++} ios_wo52_material_cache_desc_t;
++
+ typedef struct ios_wo49_topology_attr_desc_s {
+     unsigned int index;
+     unsigned int enabled;
+@@ -136,4 +224,28 @@ void ios_wo49_transform_program_realized(void *program);
+ void ios_wo49_transform_before_draw(const char *function, GLenum mode,
+     GLsizei count, GLenum type);
+ 
++unsigned long long APIENTRY_GL4ES gl4es_wo52_material_begin(
++    const ios_wo52_material_producer_desc_t *desc);
++void APIENTRY_GL4ES gl4es_wo52_material_cache(
++    const ios_wo52_material_cache_desc_t *desc);
++void APIENTRY_GL4ES gl4es_wo52_engine_bind(unsigned int unit,
++    unsigned int target, unsigned int engineObject, unsigned int requestedLogical,
++    unsigned int beforeLogical, unsigned int beforeIndex, unsigned int beforeTarget,
++    unsigned int afterLogical, unsigned int afterIndex, unsigned int afterTarget,
++    int issued);
++void ios_wo52_material_gl4es_bind(unsigned int unit, unsigned int target,
++    unsigned int logicalObject, unsigned int nativeObject, int equal);
++void APIENTRY_GL4ES gl4es_wo52_material_arm(unsigned long long token);
++void APIENTRY_GL4ES gl4es_wo52_material_finish(unsigned long long token);
++void APIENTRY_GL4ES gl4es_wo52_material_transition(const char *event,
++    unsigned int generation, unsigned long long frame, const char *map);
++unsigned long long ios_wo52_material_ingress(const char *function,
++    int deferred, int intercept);
++void ios_wo52_material_route(unsigned long long token, const char *route);
++void ios_wo52_material_set_active(unsigned long long token);
++void ios_wo52_material_set_replay(const unsigned long long *tokens,
++    unsigned int count, const char *route);
++void ios_wo52_material_native(const char *function);
++void ios_wo52_material_route_loss(unsigned long long token, const char *reason);
++
+ #endif
+diff --git a/src/gl/list.c b/src/gl/list.c
+index 4c2bdf5d..8ecd5b79 100644
+--- a/src/gl/list.c
++++ b/src/gl/list.c
+@@ -569,6 +569,16 @@ void append_renderlist(renderlist_t *a, renderlist_t *b) {
+                 a->ios_wo49_vertex_counts[slot], 1, positions, stride);
+         }
+     }
++    for(unsigned int i = 0; i < b->ios_wo52_token_count; ++i) {
++        if(a->ios_wo52_token_count >= IOS_WO52_MATERIAL_LIST_CAP) {
++            a->ios_wo52_route_overflow = 1;
++            ios_wo52_material_route_loss(b->ios_wo52_tokens[i],
++                "renderlist-merge-token-cap");
++            continue;
++        }
++        a->ios_wo52_tokens[a->ios_wo52_token_count++] = b->ios_wo52_tokens[i];
++        ios_wo52_material_route(b->ios_wo52_tokens[i], "renderlist-merged-replay");
++    }
+     // lenghts
+     a->len += b->len;
+     if(a->mode_inits) list_add_modeinit(a, b->mode);
+diff --git a/src/gl/list.h b/src/gl/list.h
+index b7a0ef31..9f8b8cfa 100644
+--- a/src/gl/list.h
++++ b/src/gl/list.h
+@@ -8,6 +8,11 @@
+ #include "attributes.h"
+ #include "gles.h"
+ 
++/* Shared with indextrace.h, but list.h must be self-contained. */
++#ifndef IOS_WO52_MATERIAL_LIST_CAP
++#define IOS_WO52_MATERIAL_LIST_CAP 32u
++#endif
++
+ typedef enum {
+ 	STAGE_NONE = 0,
+ 	STAGE_PUSH,
+@@ -241,6 +246,12 @@ typedef struct _renderlist_t {
+     unsigned int ios_wo49_token_count;
+     unsigned long long ios_wo49_vbo_bytes;
+ 
++    // Work Order 52 diagnostics only. Fixed slots correlate sampled studio
++    // material identities through render-list merge and replay.
++    unsigned long long ios_wo52_tokens[IOS_WO52_MATERIAL_LIST_CAP];
++    unsigned int ios_wo52_token_count;
++    unsigned int ios_wo52_route_overflow;
++
+     int         instanceCount;
+     
+     khash_t(material) *material;
+diff --git a/src/gl/listdraw.c b/src/gl/listdraw.c
+index eb12b60e..4b6489b9 100644
+--- a/src/gl/listdraw.c
++++ b/src/gl/listdraw.c
+@@ -772,6 +772,9 @@ void draw_renderlist(renderlist_t *list) {
+             if (glstate->render_mode == GL_SELECT) {
+                 for(unsigned int wo49_i = 0; wo49_i < list->ios_wo49_token_count; ++wo49_i)
+                     gl4es_wo49_topology_absence(list->ios_wo49_tokens[wo49_i], "selection-render-mode");
++                for(unsigned int wo52_i = 0; wo52_i < list->ios_wo52_token_count; ++wo52_i)
++                    ios_wo52_material_route_loss(list->ios_wo52_tokens[wo52_i],
++                        "selection-render-mode");
+                 vertexattrib_t vtx = {0};
+                 vtx.pointer = list->vert;
+                 vtx.type = GL_FLOAT;
+@@ -798,6 +801,9 @@ void draw_renderlist(renderlist_t *list) {
+                     {
+                         for(unsigned int wo49_i = 0; wo49_i < list->ios_wo49_token_count; ++wo49_i)
+                             gl4es_wo49_topology_absence(list->ios_wo49_tokens[wo49_i], "polygon-line-transform");
++                        for(unsigned int wo52_i = 0; wo52_i < list->ios_wo52_token_count; ++wo52_i)
++                            ios_wo52_material_route_loss(list->ios_wo52_tokens[wo52_i],
++                                "polygon-line-transform");
+                         gles_glDrawElements(mode, list->ind_line, index_type, index_data);
+                     }
+                     free(index_fallback);
+@@ -837,6 +843,11 @@ void draw_renderlist(renderlist_t *list) {
+                             list->ios_wo49_vbo_bytes,
+                             (unsigned long long)list->ilen *
+                                 ((index_type == GL_UNSIGNED_INT) ? sizeof(GLuint) : sizeof(GLushort)));
++                    if(prepared && list->ios_wo52_token_count)
++                        ios_wo52_material_set_replay(list->ios_wo52_tokens,
++                            list->ios_wo52_token_count, "renderlist-replay");
++                    if(prepared)
++                        ios_wo52_material_native("glDrawElements(renderlist)");
+                     if(prepared && list->instanceCount==1)
+                         gles_glDrawElements(mode, list->ilen, index_type, vbo_indices?NULL:index_data);
+                     else if(prepared) {
+diff --git a/src/gl/texture_params.c b/src/gl/texture_params.c
+index 527f8491..354388cb 100644
+--- a/src/gl/texture_params.c
++++ b/src/gl/texture_params.c
+@@ -11,6 +11,7 @@
+ #include "framebuffers.h"
+ #include "gles.h"
+ #include "init.h"
++#include "indextrace.h"
+ #include "loader.h"
+ #include "matrix.h"
+ #include "pixel.h"
+@@ -188,8 +189,14 @@ void APIENTRY_GL4ES gl4es_glBindTexture(GLenum target, GLuint texture) {
+         const GLuint itarget = what_target(target);
+ 
+         tex = gl4es_getTexture(target, texture);
+-        if (glstate->texture.bound[glstate->texture.active][itarget] == tex)
++        if (glstate->texture.bound[glstate->texture.active][itarget] == tex) {
++            ios_wo52_material_gl4es_bind(glstate->texture.active, target,
++                texture, tex ? tex->glname : 0, 1);
+             return;
++        }
++
++        ios_wo52_material_gl4es_bind(glstate->texture.active, target,
++            texture, tex ? tex->glname : 0, 0);
+         
+         FLUSH_BEGINEND;
+         tex_changed = glstate->texture.active+1;

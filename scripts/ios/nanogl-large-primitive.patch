@@ -1,0 +1,59 @@
+diff --git a/nanoWrap.c b/nanoWrap.c
+--- a/nanoWrap.c
++++ b/nanoWrap.c
+@@ -220,3 +220,12 @@
+-static VertexAttrib vertexattribs[60000];
+-
+-static GLushort     indexArray[50000];
++// A GoldSrc studio triangle command stores its vertex count in a signed short.
++// The largest legal strip or fan therefore contains 32768 vertices and expands
++// to 3 * (32768 - 2) indices. Keep enough headroom for one complete primitive:
++// glEnd cannot flush halfway through a strip without preserving its topology.
++#define NANOGL_MAX_IMMEDIATE_VERTS   32768
++#define NANOGL_MAX_IMMEDIATE_INDICES (3 * (NANOGL_MAX_IMMEDIATE_VERTS - 2))
++#define NANOGL_VERTEX_CAPACITY       (2 * NANOGL_MAX_IMMEDIATE_VERTS)
++#define NANOGL_INDEX_CAPACITY        (2 * NANOGL_MAX_IMMEDIATE_INDICES)
++
++static VertexAttrib vertexattribs[NANOGL_VERTEX_CAPACITY];
++
++static GLushort     indexArray[NANOGL_INDEX_CAPACITY];
+@@ -578,3 +587,6 @@
+-	if( ptrVertexAttribArray - vertexattribs > ( sizeof( vertexattribs ) / sizeof( vertexattribs[0] )) - 4096
+-	    || ptrIndexArray - indexArray > ( sizeof( indexArray ) / sizeof( indexArray[0] )) - 4096 )
++	// Flush while there is still room for the largest possible next primitive.
++	// The old fixed 4096-element margin allowed large studio strips to overwrite
++	// both buffers before this post-glEnd check ran.
++	if( ptrVertexAttribArray - vertexattribs >= NANOGL_VERTEX_CAPACITY - NANOGL_MAX_IMMEDIATE_VERTS
++	    || ptrIndexArray - indexArray >= NANOGL_INDEX_CAPACITY - NANOGL_MAX_IMMEDIATE_INDICES )
+-		FlushOnStateChange( );
++		FlushOnStateChange( );
+diff --git a/tests/test_batch.c b/tests/test_batch.c
+--- a/tests/test_batch.c
++++ b/tests/test_batch.c
+@@ -8 +8 @@
+-#define MAX_INDICES 64
++#define MAX_INDICES 100000
+@@ -206,0 +207,21 @@
++
++static int Test_MaxStudioStrip( void )
++{
++	static const GLushort expect_first[] = {0, 1, 2, 2, 1, 3};
++	static const GLushort expect_last[] = {32766, 32765, 32767};
++	const int count = 3 * (32768 - 2);
++
++	numdraws = 0;
++	pglBegin( GL_TRIANGLE_STRIP );
++	EmitVertices( 32768 );
++	pglEnd();
++	nanoGL_Flush();
++
++	if( numdraws != 1 || draws[0].mode != GL_TRIANGLES || draws[0].count != count )
++		return 1;
++	if( memcmp( draws[0].indices, expect_first, sizeof( expect_first )))
++		return 1;
++	if( memcmp( &draws[0].indices[count - 3], expect_last, sizeof( expect_last )))
++		return 1;
++	return 0;
++}
+@@ -228,0 +250 @@
++	RUN_TEST( Test_MaxStudioStrip );

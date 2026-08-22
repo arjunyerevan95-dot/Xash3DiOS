@@ -1,0 +1,20 @@
+diff --git a/src/gl/texture_params.c b/src/gl/texture_params.c
+index 96e07205..527f8491 100644
+--- a/src/gl/texture_params.c
++++ b/src/gl/texture_params.c
+@@ -859,9 +859,14 @@ void realize_textures(int drawing) {
+ #else
+     DBG(printf("realize_textures(%d), glstate->bound_changed=%d, glstate->enable.texture[0]=%X glsate->actual_tex2d[0]=%u\n", drawing, glstate->bound_changed, glstate->enable.texture[0], glstate->actual_tex2d[0]);)
+ #endif
++    static int ios_wo49_texture_policy_logged = 0;
++    if(!ios_wo49_texture_policy_logged) {
++        LOGD("WO49 texture policy: target-source=per-unit route=all-realize_textures\n");
++        ios_wo49_texture_policy_logged = 1;
++    }
+     for (int i=0; i<glstate->bound_changed; i++) {
+         // get highest priority texture unit
+-        int tmp = glstate->enable.texture[glstate->texture.active];
++        int tmp = glstate->enable.texture[i];
+         int tgt = ENABLED_TEX2D; // default to TEX2D
+         if(IS_TEX3D(tmp))
+             tgt = ENABLED_TEX3D;

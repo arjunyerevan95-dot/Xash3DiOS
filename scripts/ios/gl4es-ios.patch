@@ -1,0 +1,48 @@
+diff --git a/src/gl/directstate.c b/src/gl/directstate.c
+--- a/src/gl/directstate.c
++++ b/src/gl/directstate.c
+@@ -369 +369,7 @@ void APIENTRY_GL4ES gl4es_glEnableClientStateIndexed(GLenum array, GLuint index)
+-AliasDecl(void,gl4es_glEnableClientStatei,(GLenum array, GLuint index),gl4es_glEnableClientStateIndexed);
++#if defined(__APPLE__)
++void APIENTRY_GL4ES gl4es_glEnableClientStatei(GLenum array, GLuint index) {
++    gl4es_glEnableClientStateIndexed(array, index);
++}
++#else
++AliasDecl(void,gl4es_glEnableClientStatei,(GLenum array, GLuint index),gl4es_glEnableClientStateIndexed);
++#endif
+@@ -383 +389,7 @@ void APIENTRY_GL4ES gl4es_glDisableClientStateIndexed(GLenum array, GLuint index)
+-AliasDecl(void,gl4es_glDisableClientStatei,(GLenum array, GLuint index),gl4es_glDisableClientStateIndexed);
++#if defined(__APPLE__)
++void APIENTRY_GL4ES gl4es_glDisableClientStatei(GLenum array, GLuint index) {
++    gl4es_glDisableClientStateIndexed(array, index);
++}
++#else
++AliasDecl(void,gl4es_glDisableClientStatei,(GLenum array, GLuint index),gl4es_glDisableClientStateIndexed);
++#endif
+diff --git a/src/gl/texgen.c b/src/gl/texgen.c
+--- a/src/gl/texgen.c
++++ b/src/gl/texgen.c
+@@ -255 +255 @@ void eye_loop_dual(const GLfloat *verts, const GLfloat *param1, const GLfloat* par
+-    glGetFloatv(GL_MODELVIEW_MATRIX, InvModelview);
++    gl4es_glGetFloatv(GL_MODELVIEW_MATRIX, InvModelview);
+diff --git a/src/gl/stencil.c b/src/gl/stencil.c
+--- a/src/gl/stencil.c
++++ b/src/gl/stencil.c
+@@ -81 +81 @@ void APIENTRY_GL4ES gl4es_glStencilFuncSeparate(GLenum face, GLenum func, GLint r
+-        glStencilFunc(func, ref, mask);
++        gl4es_glStencilFunc(func, ref, mask);
+@@ -135 +135 @@ void APIENTRY_GL4ES gl4es_glStencilOpSeparate(GLenum face, GLenum sfail, GLenum z
+-        glStencilOp(sfail, zfail, zpass);
++        gl4es_glStencilOp(sfail, zfail, zpass);
+diff --git a/src/glx/hardext.c b/src/glx/hardext.c
+--- a/src/glx/hardext.c
++++ b/src/glx/hardext.c
+@@ -271,0 +272 @@ void GetHardwareExtensions(int notest)
++    const char *Version = (const char *) gles_glGetString(GL_VERSION);
+@@ -276,0 +278,6 @@ void GetHardwareExtensions(int notest)
++    // Full NPOT texture support is core in OpenGL ES 3.0, so ES3 drivers do
++    // not need to repeat GL_OES_texture_npot in their extension strings.
++    if(Version && strstr(Version, "OpenGL ES 3.")) {
++        hardext.npot = 3;
++        SHUT_LOGD("Native GLES3 core NPOT support enabled\n");
++    }

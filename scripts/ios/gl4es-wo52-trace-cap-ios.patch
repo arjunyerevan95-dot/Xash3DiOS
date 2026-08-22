@@ -1,0 +1,43 @@
+diff --git a/src/gl/indextrace.c b/src/gl/indextrace.c
+index 793db102..23e4df34 100644
+--- a/src/gl/indextrace.c
++++ b/src/gl/indextrace.c
+@@ -370,6 +370,6 @@ static void ios_wo52_material_summary(void)
+ {
+     ios_wo49_emit(
+-        "WO52 material trace summary: selected=%u cap=256 terminal=%u incomplete=%u overflow=%u pending=%u active=%llu replay=%u records_per_stage<=1 sink=engine-console mutation=none error_queue=untouched",
++        "WO52 material trace summary: selected=%u cap=16 terminal=%u incomplete=%u overflow=%u pending=%u active=%llu replay=%u records_per_stage<=1 sink=engine-console mutation=none error_queue=untouched",
+         ios_wo52_material_count, ios_wo52_material_terminal_count,
+         ios_wo52_material_incomplete_count, ios_wo52_material_overflow,
+         ios_wo52_material_pending ? 1u : 0u, ios_wo52_material_active,
+@@ -2072,7 +2072,7 @@ unsigned long long APIENTRY_GL4ES gl4es_wo52_material_begin(
+     if(ios_wo52_material_count >= IOS_WO52_MATERIAL_TOKEN_CAP) {
+         ++ios_wo52_material_overflow;
+         if(ios_wo52_material_overflow == 1)
+-            ios_wo49_emit("WO52 material trace summary: selected=256 cap=256 terminal=%u incomplete=%u overflow=1 selection=closed",
++            ios_wo49_emit("WO52 material trace summary: selected=16 cap=16 terminal=%u incomplete=%u overflow=1 selection=closed",
+                 ios_wo52_material_terminal_count, ios_wo52_material_incomplete_count);
+         return 0;
+     }
+@@ -2092,7 +2092,7 @@ unsigned long long APIENTRY_GL4ES gl4es_wo52_material_begin(
+     record->stage_mask = 0x03u;
+     if(!ios_wo52_material_policy_emitted) {
+         ios_wo52_material_policy_emitted = 1;
+-        ios_wo49_emit("WO52 material trace policy: identities<=256 key=generation+entity+model+skin+bodypart+mesh+material first-draw+first-post-transition stages=producer+shader+bind+gl4es+native+transition+terminal direct+deferred+renderlist+replay sink=engine-console fixed-storage=1 state_restore=not-required native-shadow=post-realization error_queue=untouched repair=none");
++        ios_wo49_emit("WO52 material trace policy: identities<=16 key=generation+entity+model+skin+bodypart+mesh+material first-draw+first-post-transition stages=producer+shader+bind+gl4es+native+transition+terminal direct+deferred+renderlist+replay sink=engine-console fixed-storage=1 state_restore=not-required native-shadow=post-realization error_queue=untouched repair=inactive-sampler-alias");
+     }
+     for(unsigned int i = 0; i < desc->unitCount; ++i) {
+         const ios_wo52_material_unit_desc_t *u = &desc->units[i];
+diff --git a/src/gl/indextrace.h b/src/gl/indextrace.h
+index 1721cf2e..f697b3fb 100644
+--- a/src/gl/indextrace.h
++++ b/src/gl/indextrace.h
+@@ -14,7 +14,7 @@ extern "C" {
+ 
+ #define IOS_WO52_MATERIAL_VERSION 1u
+ #define IOS_WO52_MODE_COLORMAP 2
+-#define IOS_WO52_MATERIAL_TOKEN_CAP 256u
++#define IOS_WO52_MATERIAL_TOKEN_CAP 16u
+ #define IOS_WO52_MATERIAL_UNIT_CAP 6u
+ #ifndef IOS_WO52_MATERIAL_LIST_CAP
+ #define IOS_WO52_MATERIAL_LIST_CAP 32u

@@ -178,7 +178,6 @@ void Mod_Init( void )
 	com_studiocache = Mem_AllocPool( "Studio Cache" );
 	Cvar_RegisterVariable( &mod_studiocache );
 	Cvar_RegisterVariable( &r_wadtextures );
-	Cvar_RegisterVariable( &r_showhull );
 	Cvar_RegisterVariable( &r_allow_wad3_luma );
 
 	Cmd_AddCommand( "mapstats", Mod_PrintWorldStats_f, "show stats for currently loaded map" );

@@ -5,6 +5,22 @@
 #include "gl4es/include/gl4eshint.h"
 #endif // XASH_GL4ES
 
+#if XASH_IOS && XASH_GL4ES
+void R_IOSDirectDrawableContextCreated( void );
+void R_IOSDirectDrawableContextDestroying( void );
+
+static int ios_index_trace_log_busy;
+
+static void APIENTRY R_IOSIndexTraceLog( const char *line )
+{
+	if( !line || ios_index_trace_log_busy )
+		return;
+	ios_index_trace_log_busy = 1;
+	gEngfuncs.Con_Printf( "%s\n", line );
+	ios_index_trace_log_busy = 0;
+}
+#endif
+
 CVAR_DEFINE( gl_extensions, "gl_allow_extensions", "1", FCVAR_GLCONFIG|FCVAR_READ_ONLY, "allow gl_extensions" );
 CVAR_DEFINE( gl_texture_anisotropy, "gl_anisotropy", "8", FCVAR_GLCONFIG, "textures anisotropic filter" );
 CVAR_DEFINE_AUTO( gl_texture_lodbias, "0.0", FCVAR_GLCONFIG, "LOD bias for mipmapped textures (perfomance|quality)" );
@@ -205,6 +221,14 @@ static const dllfunc_t texture3dextfuncs[] MAYBE_UNUSED =
 { GL_CALL( glTexImage3D ) },
 { GL_CALL( glTexSubImage3D ) },
 { GL_CALL( glCopyTexSubImage3D ) },
+};
+
+static const dllfunc_t texturearrayfuncs[] MAYBE_UNUSED =
+{
+{ GL_CALL( glTexImage3D ) },
+{ GL_CALL( glTexSubImage3D ) },
+{ GL_CALL( glCompressedTexImage3DARB ) },
+{ GL_CALL( glCompressedTexSubImage3DARB ) },
 };
 
 static const dllfunc_t texturecompressionfuncs[] MAYBE_UNUSED =
@@ -898,8 +922,29 @@ static void GL_InitExtensionsBigGL( void )
 	}
 
 	// 2d texture array support
-	if( GL_CheckExtension( "GL_EXT_texture_array", texture3dextfuncs, ARRAYSIZE( texture3dextfuncs ), "gl_texture_2d_array", GL_TEXTURE_ARRAY_EXT, 0 ))
+	#if XASH_IOS && XASH_GL4ES
+	{
+		int native_es_major = 0, procedures = 0, max_layers = 0;
+		int glsl300 = 0, route_available = 0, advertised = 0;
+		gl4es_get_texture_array_provider_state( &native_es_major, &procedures,
+			&max_layers, &glsl300, &route_available, &advertised );
+		gEngfuncs.Con_Printf( "iOS production texture array provider: native_es_major=%d procedures=%d max_layers=%d minimum=16 glsl300=%d route=%d advertised=%d source=live-context\n",
+			native_es_major, procedures, max_layers, glsl300, route_available, advertised );
+	}
+	#endif
+	if( GL_CheckExtension( "GL_EXT_texture_array", texturearrayfuncs, ARRAYSIZE( texturearrayfuncs ), "gl_texture_2d_array", GL_TEXTURE_ARRAY_EXT, 0 ))
+	{
 		pglGetIntegerv( GL_MAX_ARRAY_TEXTURE_LAYERS_EXT, &glConfig.max_2d_texture_layers );
+		if( glConfig.max_2d_texture_layers < 16 )
+		{
+			GL_SetExtension( GL_TEXTURE_ARRAY_EXT, false );
+			glConfig.max_2d_texture_layers = 0;
+		}
+	}
+	#if XASH_IOS && XASH_GL4ES
+	gEngfuncs.Con_Printf( "iOS production texture array engine: procedures=4 max_layers=%d minimum=16 enabled=%d\n",
+		glConfig.max_2d_texture_layers, GL_Support( GL_TEXTURE_ARRAY_EXT ) ? 1 : 0 );
+	#endif
 
 	// cubemaps support
 	if( GL_CheckExtension( "GL_ARB_texture_cube_map", NULL, 0, "gl_texture_cubemap", GL_TEXTURE_CUBEMAP_EXT, 0 ))
@@ -1264,6 +1309,11 @@ qboolean R_Init( void )
 		return false;
 	}
 
+#if XASH_IOS && XASH_GL4ES
+	if( gEngfuncs.Sys_CheckParm( "-gl4es_texture_array_selftest" ))
+		return true;
+#endif
+
 	// see R_ProcessEntData for tr.entities initialization
 	tr.world = (struct world_static_s *)ENGINE_GET_PARM( PARM_GET_WORLD_PTR );
 	tr.palette = (color24 *)ENGINE_GET_PARM( PARM_GET_PALETTE_PTR );
@@ -1296,7 +1346,12 @@ void R_Shutdown( void )
 		return;
 
 	GL_RemoveCommands();
+#if XASH_IOS && XASH_GL4ES
+	if( !gEngfuncs.Sys_CheckParm( "-gl4es_texture_array_selftest" ))
+		R_ShutdownImages();
+#else
 	R_ShutdownImages();
+#endif
 #if !XASH_GLES && !XASH_GL_STATIC
 	GL2_ShimShutdown();
 #endif
@@ -1304,6 +1359,10 @@ void R_Shutdown( void )
 	Mem_FreePool( &r_temppool );
 
 #if XASH_GL4ES
+#if XASH_IOS
+	set_index_trace_logger( NULL );
+	R_IOSDirectDrawableContextDestroying();
+#endif
 	close_gl4es();
 #endif // XASH_GL4ES
 
@@ -1376,7 +1435,13 @@ void GL_SetupAttributes( int safegl )
 #elif XASH_GL4ES
 	gEngfuncs.GL_SetAttribute( REF_GL_CONTEXT_PROFILE_MASK, REF_GL_CONTEXT_PROFILE_ES );
 	gEngfuncs.GL_SetAttribute( REF_GL_CONTEXT_EGL, 1 );
+#if XASH_IOS
+	// Diffusion uses GLSL ES 3 features. GL4ES remains the compatibility
+	// layer, but needs an ES 3 backing context for its converted shaders.
+	gEngfuncs.GL_SetAttribute( REF_GL_CONTEXT_MAJOR_VERSION, 3 );
+#else
 	gEngfuncs.GL_SetAttribute( REF_GL_CONTEXT_MAJOR_VERSION, 2 );
+#endif
 	gEngfuncs.GL_SetAttribute( REF_GL_CONTEXT_MINOR_VERSION, 0 );
 #else // GL1.x
 	if( gEngfuncs.Sys_CheckParm( "-glcore" ))
@@ -1478,6 +1543,11 @@ void GL_SetupAttributes( int safegl )
 			samples = 0; // don't use, because invalid parameter is passed
 		}
 
+#if XASH_IOS && XASH_GL4ES
+		/* SDL's CAEAGLLayer view FBO is the one presented drawable. */
+		samples = 0;
+#endif
+
 		if( samples )
 		{
 			gEngfuncs.GL_SetAttribute( REF_GL_MULTISAMPLEBUFFERS, 1 );
@@ -1542,10 +1612,44 @@ void GL_OnContextCreated( void )
 	wes_init( "" );
 #endif // XASH_WES
 
+#if XASH_IOS && XASH_GL4ES
+	if( gEngfuncs.Sys_CheckParm( "-gl4es_texture_array_selftest" ))
+	{
+		if( !gpGlobals || gpGlobals->desktopBitsPixel <= 0 )
+		{
+			gEngfuncs.Con_Printf( "iOS texture array selftest contract: missing name=global.refState.desktopBitsPixel reason=invalid\n" );
+			gEngfuncs.Con_Printf( "iOS texture array selftest terminal: FAIL failures=1 diffusion_started=0\n" );
+			gEngfuncs.Host_Error( "iOS texture array selftest renderer contract failed\n" );
+			return;
+		}
+		gEngfuncs.Con_Printf( "iOS texture array selftest contract: item name=global.refState.desktopBitsPixel source=shared\n" );
+
+		if( gpGlobals->width <= 0 || gpGlobals->height <= 0 )
+		{
+			gEngfuncs.Con_Printf( "iOS texture array selftest contract: missing name=global.refState.drawableSize reason=invalid\n" );
+			gEngfuncs.Con_Printf( "iOS texture array selftest terminal: FAIL failures=1 diffusion_started=0\n" );
+			gEngfuncs.Host_Error( "iOS texture array selftest renderer contract failed\n" );
+			return;
+		}
+		gEngfuncs.Con_Printf( "iOS texture array selftest contract: item name=global.refState.drawableSize source=shared\n" );
+		gEngfuncs.Con_Printf( "iOS texture array selftest contract: complete count=57\n" );
+	}
+#endif
+
 #if XASH_GL4ES
 	set_getprocaddress( GL4ES_GetProcAddress );
 	set_getmainfbsize( GL4ES_GetMainFBSize );
 	initialize_gl4es();
+#if XASH_IOS
+	R_IOSDirectDrawableContextCreated();
+	set_index_trace_logger( R_IOSIndexTraceLog );
+	if( gEngfuncs.Sys_CheckParm( "-gl4es_texture_array_selftest" ))
+	{
+		gEngfuncs.Con_Printf( "iOS texture array selftest boot: renderer-ready\n" );
+		gEngfuncs.Con_Printf( "iOS texture array selftest boot: dispatched\n" );
+		R_IOSTextureArraySelftest();
+	}
+#endif
 
 	// merge glBegin/glEnd in beams and console
 	pglHint( GL_BEGINEND_HINT_GL4ES, 1 );

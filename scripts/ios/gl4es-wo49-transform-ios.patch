@@ -1,0 +1,814 @@
+
+diff --git a/src/gl/indextrace.h b/src/gl/indextrace.h
+index 11768b37..7f603195 100644
+--- a/src/gl/indextrace.h
++++ b/src/gl/indextrace.h
+@@ -6,6 +6,11 @@
+ #define IOS_WO49_TOPOLOGY_VERSION 1u
+ #define IOS_WO49_TOPOLOGY_TOKEN_CAP 4u
+ #define IOS_WO49_TOPOLOGY_ATTR_CAP 16u
++#define IOS_WO49_TRANSFORM_VERSION 1u
++#define IOS_WO49_TRANSFORM_RIGID 0x01u
++#define IOS_WO49_TRANSFORM_SWAY 0x02u
++#define IOS_WO49_TRANSFORM_VERTEX_LIGHTING 0x04u
++#define IOS_WO49_TRANSFORM_BONE_WEIGHTING 0x08u
+ 
+ typedef struct ios_wo49_topology_attr_desc_s {
+     unsigned int index;
+@@ -56,6 +61,36 @@ typedef struct ios_wo49_topology_producer_desc_s {
+     ios_wo49_topology_attr_desc_t attrs[IOS_WO49_TOPOLOGY_ATTR_CAP];
+ } ios_wo49_topology_producer_desc_t;
+ 
++typedef struct ios_wo49_transform_producer_desc_s {
++    unsigned int version;
++    unsigned int size;
++    unsigned long long token;
++    unsigned long long frame;
++    unsigned int generation;
++    const char *producer;
++    const char *map;
++    const char *model;
++    unsigned int programIndex;
++    unsigned int programHandle;
++    unsigned int optionsHash;
++    unsigned int flags;
++    unsigned int elementOrdinal;
++    unsigned int localIndex;
++    float localPosition[3];
++    float boneQuaternion[4];
++    float bonePosition[3];
++    float modelview[16];
++    float projection[16];
++    float mvp[16];
++    float clipPosition[4];
++    int boneQuaternionLocation;
++    int bonePositionLocation;
++    unsigned int boneQuaternionCount;
++    unsigned int bonePositionCount;
++    float swayHeight;
++    float realTime;
++} ios_wo49_transform_producer_desc_t;
++
+ unsigned long long ios_index_trace_ingress(const char *function, GLenum mode,
+     GLsizei count, GLenum type, const void *caller_indices, const GLuint *resolved,
+     GLuint start, GLuint end, GLint basevertex, int deferred, int intercept);
+@@ -88,4 +123,17 @@ void ios_wo49_topology_set_replay(const unsigned long long *tokens,
+ void ios_wo49_topology_realized(const char *function, GLenum mode, GLsizei count,
+     GLenum type, const void *indices);
+ 
++int APIENTRY_GL4ES gl4es_wo49_transform_begin(
++    const ios_wo49_transform_producer_desc_t *desc);
++void APIENTRY_GL4ES gl4es_wo49_transform_finish(unsigned long long token);
++void ios_wo49_transform_application_uniform(void *program, GLint location,
++    const char *entry, int width, int count, const void *value, int integer_value);
++void ios_wo49_transform_cache_uniform(void *program, GLint location,
++    int width, int count, const void *value);
++void ios_wo49_transform_native_uniform(void *program, GLint location,
++    const char *entry, int width, int count, const void *value);
++void ios_wo49_transform_program_realized(void *program);
++void ios_wo49_transform_before_draw(const char *function, GLenum mode,
++    GLsizei count, GLenum type);
++
+ #endif
+
+diff --git a/src/gl/indextrace.c b/src/gl/indextrace.c
+index 2286b847..2af26a66 100644
+--- a/src/gl/indextrace.c
++++ b/src/gl/indextrace.c
+@@ -3,7 +3,9 @@
+ #include "buffers.h"
+ #include "gl4es.h"
+ #include "glstate.h"
++#include "matrix.h"
+ #include "program.h"
++#include "shader.h"
+ #include "../glx/hardext.h"
+ #include "../../include/gl4esinit.h"
+ 
+@@ -155,7 +157,82 @@ static ios_wo49_replay_t ios_wo49_replay;
+ static int ios_wo49_policy_emitted;
+ static int ios_wo49_summary_emitted;
+ 
++enum {
++    IOS_WO49_TRANSFORM_MVP = 0,
++    IOS_WO49_TRANSFORM_MODELVIEW,
++    IOS_WO49_TRANSFORM_BONE_QUATERNION,
++    IOS_WO49_TRANSFORM_BONE_POSITION,
++    IOS_WO49_TRANSFORM_SWAY_HEIGHT,
++    IOS_WO49_TRANSFORM_UNIFORM_CAP
++};
++
++typedef struct {
++    const char *name;
++    unsigned int value_bytes;
++    unsigned int expected_hash;
++    unsigned int app_hash;
++    unsigned int cache_hash;
++    unsigned int native_hash;
++    unsigned int wrong_bound_hash;
++    GLint application_location;
++    GLint gl4es_location;
++    GLint native_location;
++    GLenum reflected_type;
++    GLint reflected_extent;
++    GLuint native_program;
++    GLuint wrong_bound_program;
++    int required;
++    int reflected;
++    int app_seen;
++    int app_integer;
++    int app_width;
++    int app_count;
++    int cache_seen;
++    int cache_width;
++    int cache_count;
++    int native_seen;
++    int native_width;
++    int native_count;
++    int wrong_bound_seen;
++    char app_entry[24];
++    char native_entry[32];
++    unsigned char app_value[64];
++    unsigned char cache_value[64];
++    unsigned char native_value[64];
++} ios_wo49_transform_uniform_t;
++
++typedef struct {
++    int claimed;
++    int armed;
++    int program_seen;
++    int before_draw_seen;
++    int terminal_emitted;
++    int source_mismatch;
++    int source_mismatch_component;
++    char source_mismatch_field[32];
++    ios_wo49_transform_producer_desc_t producer;
++    char producer_name[64];
++    char map[64];
++    char model[96];
++    unsigned int producer_mv_hash;
++    unsigned int producer_projection_hash;
++    unsigned int producer_mvp_hash;
++    unsigned int source_mv_hash;
++    unsigned int source_projection_hash;
++    unsigned int source_mvp_hash;
++    unsigned int logical_shader_hash;
++    unsigned int native_shader_hash;
++    GLuint logical_program;
++    GLuint native_program;
++    int rigid_branch_present;
++    int position_branch_present;
++    ios_wo49_transform_uniform_t uniform[IOS_WO49_TRANSFORM_UNIFORM_CAP];
++} ios_wo49_transform_trace_t;
++
++static ios_wo49_transform_trace_t ios_wo49_transform;
++
+ static void ios_wo49_summary_if_due(unsigned long long frame, int force);
++static void ios_wo49_transform_terminal(const char *fallback_missing);
+ 
+ static const char *ios_index_family_name(unsigned int family)
+ {
+@@ -310,6 +387,514 @@ static uint32_t ios_wo49_bytes_checksum(const void *data, size_t size)
+     return hash;
+ }
+ 
++static int ios_wo49_transform_target(const char *name)
++{
++    if(!name) return -1;
++    if(!strncmp(name, "_gl4es_ModelViewProjectionMatrix",
++        strlen("_gl4es_ModelViewProjectionMatrix")) ||
++       !strncmp(name, "gl_ModelViewProjectionMatrix",
++        strlen("gl_ModelViewProjectionMatrix")))
++        return IOS_WO49_TRANSFORM_MVP;
++    if(!strncmp(name, "_gl4es_ModelViewMatrix",
++        strlen("_gl4es_ModelViewMatrix")) ||
++       !strncmp(name, "gl_ModelViewMatrix",
++        strlen("gl_ModelViewMatrix")))
++        return IOS_WO49_TRANSFORM_MODELVIEW;
++    if(!strncmp(name, "u_BoneQuaternion", strlen("u_BoneQuaternion")))
++        return IOS_WO49_TRANSFORM_BONE_QUATERNION;
++    if(!strncmp(name, "u_BonePosition", strlen("u_BonePosition")))
++        return IOS_WO49_TRANSFORM_BONE_POSITION;
++    if(!strncmp(name, "u_FoliageSwayHeight", strlen("u_FoliageSwayHeight")))
++        return IOS_WO49_TRANSFORM_SWAY_HEIGHT;
++    return -1;
++}
++
++static GLenum ios_wo49_transform_expected_type(int target)
++{
++    switch(target) {
++        case IOS_WO49_TRANSFORM_MVP:
++        case IOS_WO49_TRANSFORM_MODELVIEW: return GL_FLOAT_MAT4;
++        case IOS_WO49_TRANSFORM_BONE_QUATERNION: return GL_FLOAT_VEC4;
++        case IOS_WO49_TRANSFORM_BONE_POSITION: return GL_FLOAT_VEC3;
++        case IOS_WO49_TRANSFORM_SWAY_HEIGHT: return GL_FLOAT;
++        default: return 0;
++    }
++}
++
++static int ios_wo49_transform_expected_width(int target)
++{
++    switch(target) {
++        case IOS_WO49_TRANSFORM_MVP:
++        case IOS_WO49_TRANSFORM_MODELVIEW: return 16;
++        case IOS_WO49_TRANSFORM_BONE_QUATERNION: return 4;
++        case IOS_WO49_TRANSFORM_BONE_POSITION: return 3;
++        case IOS_WO49_TRANSFORM_SWAY_HEIGHT: return 1;
++        default: return 0;
++    }
++}
++
++static int ios_wo49_transform_expected_count(int target)
++{
++    switch(target) {
++        case IOS_WO49_TRANSFORM_BONE_QUATERNION:
++            return (int)ios_wo49_transform.producer.boneQuaternionCount;
++        case IOS_WO49_TRANSFORM_BONE_POSITION:
++            return (int)ios_wo49_transform.producer.bonePositionCount;
++        default: return 1;
++    }
++}
++
++static uniform_t *ios_wo49_transform_find_uniform(program_t *program,
++    GLint location)
++{
++    khint_t k;
++    if(!program || !program->uniform || location < 0)
++        return NULL;
++    k = kh_get(uniformlist, program->uniform, location);
++    return k == kh_end(program->uniform) ? NULL : kh_value(program->uniform, k);
++}
++
++static const void *ios_wo49_transform_expected_value(int target)
++{
++    switch(target) {
++        case IOS_WO49_TRANSFORM_MVP: return ios_wo49_transform.producer.mvp;
++        case IOS_WO49_TRANSFORM_MODELVIEW: return ios_wo49_transform.producer.modelview;
++        case IOS_WO49_TRANSFORM_BONE_QUATERNION: return ios_wo49_transform.producer.boneQuaternion;
++        case IOS_WO49_TRANSFORM_BONE_POSITION: return ios_wo49_transform.producer.bonePosition;
++        case IOS_WO49_TRANSFORM_SWAY_HEIGHT: return &ios_wo49_transform.producer.swayHeight;
++        default: return NULL;
++    }
++}
++
++static int ios_wo49_transform_first_component(const void *expected,
++    const void *actual, unsigned int bytes)
++{
++    const unsigned char *a = (const unsigned char *)expected;
++    const unsigned char *b = (const unsigned char *)actual;
++    if(!a || !b) return -1;
++    for(unsigned int i = 0; i + sizeof(GLfloat) <= bytes; i += sizeof(GLfloat))
++        if(memcmp(a + i, b + i, sizeof(GLfloat)))
++            return (int)(i / sizeof(GLfloat));
++    return -1;
++}
++
++static void ios_wo49_transform_reflect(program_t *program, GLint location,
++    uniform_t *uniform)
++{
++    int target;
++    ios_wo49_transform_uniform_t *record;
++    if(!uniform || (target = ios_wo49_transform_target(uniform->name)) < 0)
++        return;
++    record = &ios_wo49_transform.uniform[target];
++    if(!record->required)
++        return;
++    record->reflected = 1;
++    record->gl4es_location = location;
++    record->native_location = uniform->id;
++    record->reflected_type = uniform->type;
++    record->reflected_extent = uniform->size;
++    record->native_program = program ? program->id : 0;
++}
++
++static void ios_wo49_transform_copy_value(unsigned char *destination,
++    const void *value, unsigned int bytes)
++{
++    if(!destination || !value || !bytes || bytes > 64u)
++        return;
++    memcpy(destination, value, bytes);
++}
++
++static void ios_wo49_transform_emit_uniforms(void)
++{
++    for(int i = 0; i < IOS_WO49_TRANSFORM_UNIFORM_CAP; ++i) {
++        ios_wo49_transform_uniform_t *u = &ios_wo49_transform.uniform[i];
++        if(!u->required) continue;
++        ios_wo49_emit(
++            "WO49 transform uniform: token=%llu name=%s required=1 reflected=%d type=0x%04x extent=%d app_location=%d gl4es_location=%d native_location=%d expected_hash=%08x app_entry=%s app_integer=%d app_width=%d app_count=%d app_hash=%08x cache_seen=%d cache_width=%d cache_count=%d cache_hash=%08x native_entry=%s native_width=%d native_count=%d native_hash=%08x native_program=%u wrong_bound=%d wrong_bound_program=%u wrong_bound_hash=%08x",
++            ios_wo49_transform.producer.token, u->name, u->reflected,
++            u->reflected_type, u->reflected_extent, u->application_location,
++            u->gl4es_location, u->native_location, u->expected_hash,
++            u->app_entry[0] ? u->app_entry : "missing", u->app_integer,
++            u->app_width, u->app_count, u->app_hash, u->cache_seen,
++            u->cache_width, u->cache_count, u->cache_hash,
++            u->native_entry[0] ? u->native_entry : "missing", u->native_width,
++            u->native_count, u->native_hash, u->native_program, u->wrong_bound_seen,
++            u->wrong_bound_program, u->wrong_bound_hash);
++    }
++}
++
++static void ios_wo49_transform_terminal(const char *fallback_missing)
++{
++    const char *result = "full-application-to-native-transform-match";
++    const char *field = "none";
++    const char *reason = "all-required-fields-match";
++    int component = -1;
++    if(!ios_wo49_transform.claimed || ios_wo49_transform.terminal_emitted)
++        return;
++
++    if(ios_wo49_transform.source_mismatch) {
++        result = "application-source-transform-mismatch";
++        field = ios_wo49_transform.source_mismatch_field;
++        reason = "Diffusion-value-versus-GL4ES-matrix-state";
++        component = ios_wo49_transform.source_mismatch_component;
++    } else if(!ios_wo49_transform.armed) {
++        result = "incomplete/absent-evidence";
++        field = "token-arm";
++        reason = fallback_missing ? fallback_missing : "token-not-armed";
++    } else if(!ios_wo49_transform.program_seen) {
++        result = "incomplete/absent-evidence";
++        field = "realized-program";
++        reason = fallback_missing ? fallback_missing : "program-not-realized";
++    } else {
++        for(int i = 0; i < IOS_WO49_TRANSFORM_UNIFORM_CAP; ++i) {
++            ios_wo49_transform_uniform_t *u = &ios_wo49_transform.uniform[i];
++            const void *expected = ios_wo49_transform_expected_value(i);
++            if(!u->required) continue;
++            if(!u->reflected) {
++                result = "incomplete/absent-evidence"; field = u->name;
++                reason = "reflection-missing"; break;
++            }
++            if(u->reflected_type != ios_wo49_transform_expected_type(i) ||
++               u->reflected_extent < ios_wo49_transform_expected_count(i)) {
++                result = "GL4ES-reflection/cache-mismatch"; field = u->name;
++                reason = u->reflected_type != ios_wo49_transform_expected_type(i) ?
++                    "reflection-type" : "reflection-extent";
++                break;
++            }
++            if(!u->app_seen) {
++                result = "incomplete/absent-evidence"; field = u->name;
++                reason = "application-upload-missing"; break;
++            }
++            if(u->app_integer ||
++               u->app_width != ios_wo49_transform_expected_width(i) ||
++               u->app_count != ios_wo49_transform_expected_count(i) ||
++               u->app_hash != u->expected_hash) {
++                result = "application-source-transform-mismatch"; field = u->name;
++                reason = u->app_integer ? "application-entry-type" :
++                    u->app_width != ios_wo49_transform_expected_width(i) ?
++                    "application-width" :
++                    u->app_count != ios_wo49_transform_expected_count(i) ?
++                    "application-count" : "application-value";
++                component = ios_wo49_transform_first_component(expected,
++                    u->app_value, u->value_bytes);
++                break;
++            }
++            if(!u->cache_seen) {
++                result = "incomplete/absent-evidence"; field = u->name;
++                reason = "GL4ES-cache-missing"; break;
++            }
++            if(u->cache_width != u->app_width || u->cache_count != u->app_count ||
++               u->cache_hash != u->app_hash) {
++                result = "GL4ES-reflection/cache-mismatch"; field = u->name;
++                reason = u->cache_width != u->app_width ? "cache-width" :
++                    u->cache_count != u->app_count ? "cache-count" : "cache-value";
++                component = ios_wo49_transform_first_component(u->app_value,
++                    u->cache_value, u->value_bytes);
++                break;
++            }
++            if(!u->native_seen && u->wrong_bound_seen) {
++                result = "GL4ES-native-forward-mismatch"; field = u->name;
++                reason = "upload-before-selected-program-realization";
++                component = ios_wo49_transform_first_component(u->cache_value,
++                    u->app_value, u->value_bytes);
++                break;
++            }
++            if(!u->native_seen) {
++                result = "incomplete/absent-evidence"; field = u->name;
++                reason = "native-upload-missing"; break;
++            }
++            if(u->native_width != u->cache_width ||
++               u->native_count != u->cache_count ||
++               u->native_hash != u->cache_hash) {
++                result = "GL4ES-native-forward-mismatch"; field = u->name;
++                reason = u->native_width != u->cache_width ? "native-width" :
++                    u->native_count != u->cache_count ? "native-count" : "native-value";
++                component = ios_wo49_transform_first_component(u->cache_value,
++                    u->native_value, u->value_bytes);
++                break;
++            }
++        }
++    }
++
++    ios_wo49_transform_emit_uniforms();
++    ios_wo49_transform.terminal_emitted = 1;
++    ios_wo49_emit(
++        "WO49 transform terminal: token=%llu result=%s first_field=%s first_component=%d reason=%s terminal=1 tokens=1 programs=1 draws=1 frames=1 mutation=none error_queue=untouched",
++        ios_wo49_transform.producer.token, result, field, component, reason);
++}
++
++int APIENTRY_GL4ES gl4es_wo49_transform_begin(
++    const ios_wo49_transform_producer_desc_t *desc)
++{
++    GLfloat stack_mvp[16];
++    const char *logical_source;
++    if(!desc || ios_wo49_transform.claimed ||
++       desc->version != IOS_WO49_TRANSFORM_VERSION ||
++       desc->size != sizeof(*desc) || !desc->token ||
++       !(desc->flags & IOS_WO49_TRANSFORM_RIGID) ||
++       !(desc->flags & IOS_WO49_TRANSFORM_VERTEX_LIGHTING) ||
++       (desc->flags & IOS_WO49_TRANSFORM_BONE_WEIGHTING))
++        return 0;
++
++    memset(&ios_wo49_transform, 0, sizeof(ios_wo49_transform));
++    ios_wo49_transform.claimed = 1;
++    ios_wo49_transform.producer = *desc;
++    snprintf(ios_wo49_transform.producer_name,
++        sizeof(ios_wo49_transform.producer_name), "%s",
++        desc->producer ? desc->producer : "<none>");
++    snprintf(ios_wo49_transform.map, sizeof(ios_wo49_transform.map), "%s",
++        desc->map ? desc->map : "<none>");
++    snprintf(ios_wo49_transform.model, sizeof(ios_wo49_transform.model), "%s",
++        desc->model ? desc->model : "<none>");
++    ios_wo49_transform.producer.producer = ios_wo49_transform.producer_name;
++    ios_wo49_transform.producer.map = ios_wo49_transform.map;
++    ios_wo49_transform.producer.model = ios_wo49_transform.model;
++
++    ios_wo49_transform.uniform[IOS_WO49_TRANSFORM_MVP].name = "MVP";
++    ios_wo49_transform.uniform[IOS_WO49_TRANSFORM_MVP].value_bytes = 64;
++    ios_wo49_transform.uniform[IOS_WO49_TRANSFORM_MODELVIEW].name = "modelview";
++    ios_wo49_transform.uniform[IOS_WO49_TRANSFORM_MODELVIEW].value_bytes = 64;
++    ios_wo49_transform.uniform[IOS_WO49_TRANSFORM_BONE_QUATERNION].name = "u_BoneQuaternion[0]";
++    ios_wo49_transform.uniform[IOS_WO49_TRANSFORM_BONE_QUATERNION].value_bytes = 16;
++    ios_wo49_transform.uniform[IOS_WO49_TRANSFORM_BONE_POSITION].name = "u_BonePosition[0]";
++    ios_wo49_transform.uniform[IOS_WO49_TRANSFORM_BONE_POSITION].value_bytes = 12;
++    ios_wo49_transform.uniform[IOS_WO49_TRANSFORM_SWAY_HEIGHT].name = "u_FoliageSwayHeight";
++    ios_wo49_transform.uniform[IOS_WO49_TRANSFORM_SWAY_HEIGHT].value_bytes = 4;
++    for(int i = 0; i < IOS_WO49_TRANSFORM_UNIFORM_CAP; ++i) {
++        ios_wo49_transform_uniform_t *u = &ios_wo49_transform.uniform[i];
++        u->required = i != IOS_WO49_TRANSFORM_SWAY_HEIGHT ||
++            (desc->flags & IOS_WO49_TRANSFORM_SWAY);
++        u->application_location = -1;
++        u->gl4es_location = -1;
++        u->native_location = -1;
++        if(u->required)
++            u->expected_hash = ios_wo49_bytes_checksum(
++                ios_wo49_transform_expected_value(i), u->value_bytes);
++    }
++    ios_wo49_transform.uniform[IOS_WO49_TRANSFORM_BONE_QUATERNION].application_location =
++        desc->boneQuaternionLocation;
++    ios_wo49_transform.uniform[IOS_WO49_TRANSFORM_BONE_POSITION].application_location =
++        desc->bonePositionLocation;
++    for(int i = IOS_WO49_TRANSFORM_MVP; i <= IOS_WO49_TRANSFORM_MODELVIEW; ++i) {
++        ios_wo49_transform_uniform_t *u = &ios_wo49_transform.uniform[i];
++        u->app_seen = 1;
++        u->app_width = 16;
++        u->app_count = 1;
++        u->app_hash = u->expected_hash;
++        snprintf(u->app_entry, sizeof(u->app_entry), "glLoadMatrixf");
++        ios_wo49_transform_copy_value(u->app_value,
++            ios_wo49_transform_expected_value(i), u->value_bytes);
++    }
++
++    ios_wo49_transform.producer_mv_hash = ios_wo49_bytes_checksum(desc->modelview, 64);
++    ios_wo49_transform.producer_projection_hash = ios_wo49_bytes_checksum(desc->projection, 64);
++    ios_wo49_transform.producer_mvp_hash = ios_wo49_bytes_checksum(desc->mvp, 64);
++    ios_wo49_transform.source_mv_hash = ios_wo49_bytes_checksum(getMVMat(), 64);
++    ios_wo49_transform.source_projection_hash = ios_wo49_bytes_checksum(getPMat(), 64);
++    matrix_mul(getPMat(), getMVMat(), stack_mvp);
++    ios_wo49_transform.source_mvp_hash = ios_wo49_bytes_checksum(stack_mvp, 64);
++    if(ios_wo49_transform.source_mv_hash != ios_wo49_transform.producer_mv_hash) {
++        ios_wo49_transform.source_mismatch = 1;
++        snprintf(ios_wo49_transform.source_mismatch_field,
++            sizeof(ios_wo49_transform.source_mismatch_field), "modelview");
++        ios_wo49_transform.source_mismatch_component =
++            ios_wo49_transform_first_component(desc->modelview, getMVMat(), 64);
++    } else if(ios_wo49_transform.source_projection_hash !=
++        ios_wo49_transform.producer_projection_hash) {
++        ios_wo49_transform.source_mismatch = 1;
++        snprintf(ios_wo49_transform.source_mismatch_field,
++            sizeof(ios_wo49_transform.source_mismatch_field), "projection");
++        ios_wo49_transform.source_mismatch_component =
++            ios_wo49_transform_first_component(desc->projection, getPMat(), 64);
++    } else if(ios_wo49_transform.source_mvp_hash != ios_wo49_transform.producer_mvp_hash) {
++        ios_wo49_transform.source_mismatch = 1;
++        snprintf(ios_wo49_transform.source_mismatch_field,
++            sizeof(ios_wo49_transform.source_mismatch_field), "MVP");
++        ios_wo49_transform.source_mismatch_component =
++            ios_wo49_transform_first_component(desc->mvp, stack_mvp, 64);
++    }
++
++    ios_wo49_transform.logical_program = glstate->glsl->glprogram ?
++        glstate->glsl->glprogram->id : 0;
++    logical_source = glstate->glsl->glprogram && glstate->glsl->glprogram->last_vert ?
++        (glstate->glsl->glprogram->last_vert->converted ?
++            glstate->glsl->glprogram->last_vert->converted :
++            glstate->glsl->glprogram->last_vert->source) : NULL;
++    ios_wo49_transform.logical_shader_hash = ios_wo49_bytes_checksum(
++        logical_source, logical_source ? strlen(logical_source) : 0);
++
++    ios_wo49_emit("WO49 transform policy: tokens=1 programs=1 draws=1 frames=1 selection=first-rigid-vertexlit-truck_new-ch1map0 storage=fixed required=MVP+modelview+boneQuaternion0+bonePosition0 sway=conditional terminal=all-required-fields mutation=none error_queue=untouched");
++    ios_wo49_emit(
++        "WO49 transform producer: token=%llu frame=%llu generation=%u producer=%s map=%s model=%s program_index=%u program_handle=%u options_hash=%08x rigid=1 vertexlit=1 sway=%d element_ordinal=%u local_index=%u local_position=[%.9g,%.9g,%.9g] bone_quaternion0=[%.9g,%.9g,%.9g,%.9g] bone_position0=[%.9g,%.9g,%.9g] app_mv_hash=%08x app_projection_hash=%08x app_mvp_hash=%08x gl4es_mv_hash=%08x gl4es_projection_hash=%08x gl4es_mvp_hash=%08x",
++        desc->token, desc->frame, desc->generation, ios_wo49_transform.producer_name,
++        ios_wo49_transform.map, ios_wo49_transform.model, desc->programIndex,
++        desc->programHandle, desc->optionsHash,
++        (desc->flags & IOS_WO49_TRANSFORM_SWAY) ? 1 : 0,
++        desc->elementOrdinal, desc->localIndex, desc->localPosition[0],
++        desc->localPosition[1], desc->localPosition[2], desc->boneQuaternion[0],
++        desc->boneQuaternion[1], desc->boneQuaternion[2], desc->boneQuaternion[3],
++        desc->bonePosition[0], desc->bonePosition[1], desc->bonePosition[2],
++        ios_wo49_transform.producer_mv_hash,
++        ios_wo49_transform.producer_projection_hash,
++        ios_wo49_transform.producer_mvp_hash,
++        ios_wo49_transform.source_mv_hash,
++        ios_wo49_transform.source_projection_hash,
++        ios_wo49_transform.source_mvp_hash);
++    ios_wo49_emit(
++        "WO49 transform clip: token=%llu semantics=rigid-bone0%s-then-MVP sway_height=%.9g realtime=%.9g clip=[%.9g,%.9g,%.9g,%.9g]",
++        desc->token, (desc->flags & IOS_WO49_TRANSFORM_SWAY) ? "+conditional-sway" : "",
++        desc->swayHeight, desc->realTime, desc->clipPosition[0],
++        desc->clipPosition[1], desc->clipPosition[2], desc->clipPosition[3]);
++    return 1;
++}
++
++void APIENTRY_GL4ES gl4es_wo49_transform_finish(unsigned long long token)
++{
++    if(ios_wo49_transform.claimed && !ios_wo49_transform.terminal_emitted &&
++       ios_wo49_transform.producer.token == token)
++        ios_wo49_transform_terminal("immediately-pre-native-draw-record-missing");
++}
++
++void ios_wo49_transform_application_uniform(void *opaque_program, GLint location,
++    const char *entry, int width, int count, const void *value, int integer_value)
++{
++    program_t *program = (program_t *)opaque_program;
++    uniform_t *uniform;
++    ios_wo49_transform_uniform_t *record;
++    int target;
++    if(!ios_wo49_transform.claimed || !program ||
++       program->id != ios_wo49_transform.logical_program ||
++       !(uniform = ios_wo49_transform_find_uniform(program, location)) ||
++       (target = ios_wo49_transform_target(uniform->name)) < 0)
++        return;
++    record = &ios_wo49_transform.uniform[target];
++    if(!record->required) return;
++    ios_wo49_transform_reflect(program, location, uniform);
++    record->app_seen = 1;
++    record->app_integer = integer_value;
++    record->app_width = width;
++    record->app_count = count;
++    record->app_hash = ios_wo49_bytes_checksum(value, record->value_bytes);
++    snprintf(record->app_entry, sizeof(record->app_entry), "%s", entry ? entry : "unknown");
++    ios_wo49_transform_copy_value(record->app_value, value, record->value_bytes);
++}
++
++void ios_wo49_transform_cache_uniform(void *opaque_program, GLint location,
++    int width, int count, const void *value)
++{
++    program_t *program = (program_t *)opaque_program;
++    uniform_t *uniform;
++    ios_wo49_transform_uniform_t *record;
++    int target;
++    if(!ios_wo49_transform.claimed || !program ||
++       !(uniform = ios_wo49_transform_find_uniform(program, location)) ||
++       (target = ios_wo49_transform_target(uniform->name)) < 0)
++        return;
++    record = &ios_wo49_transform.uniform[target];
++    if(!record->required) return;
++    ios_wo49_transform_reflect(program, location, uniform);
++    record->cache_seen = 1;
++    record->cache_width = width;
++    record->cache_count = count;
++    record->cache_hash = ios_wo49_bytes_checksum(value, record->value_bytes);
++    ios_wo49_transform_copy_value(record->cache_value, value, record->value_bytes);
++}
++
++void ios_wo49_transform_native_uniform(void *opaque_program, GLint location,
++    const char *entry, int width, int count, const void *value)
++{
++    program_t *program = (program_t *)opaque_program;
++    uniform_t *uniform;
++    ios_wo49_transform_uniform_t *record;
++    int target;
++    unsigned int hash;
++    if(!ios_wo49_transform.claimed || !program ||
++       !(uniform = ios_wo49_transform_find_uniform(program, location)) ||
++       (target = ios_wo49_transform_target(uniform->name)) < 0)
++        return;
++    record = &ios_wo49_transform.uniform[target];
++    if(!record->required) return;
++    hash = ios_wo49_bytes_checksum(value, record->value_bytes);
++    if(glstate->gleshard->program == program->id &&
++       glstate->gleshard->glprogram == program) {
++        record->native_seen = 1;
++        record->native_width = width;
++        record->native_count = count;
++        record->native_hash = hash;
++        record->native_program = program->id;
++        snprintf(record->native_entry, sizeof(record->native_entry), "%s",
++            entry ? entry : "unknown");
++        ios_wo49_transform_copy_value(record->native_value, value,
++            record->value_bytes);
++    } else {
++        record->wrong_bound_seen = 1;
++        record->wrong_bound_program = glstate->gleshard->program;
++        record->wrong_bound_hash = hash;
++    }
++}
++
++void ios_wo49_transform_program_realized(void *opaque_program)
++{
++    program_t *program = (program_t *)opaque_program;
++    const char *source;
++    uniform_t *uniform;
++    khint_t k;
++    if(!ios_wo49_transform.claimed || !ios_wo49_transform.armed ||
++       ios_wo49_transform.program_seen || !program)
++        return;
++    ios_wo49_transform.program_seen = 1;
++    ios_wo49_transform.native_program = program->id;
++    source = program->last_vert ? (program->last_vert->converted ?
++        program->last_vert->converted : program->last_vert->source) : NULL;
++    ios_wo49_transform.native_shader_hash = ios_wo49_bytes_checksum(
++        source, source ? strlen(source) : 0);
++    ios_wo49_transform.rigid_branch_present = source &&
++        strstr(source, "u_BoneQuaternion[0]") &&
++        strstr(source, "u_BonePosition[0]");
++    ios_wo49_transform.position_branch_present = source &&
++        (strstr(source, "_gl4es_ModelViewProjectionMatrix") ||
++         strstr(source, "gl_ModelViewProjectionMatrix")) &&
++        strstr(source, "worldpos");
++    kh_foreach(program->uniform, k, uniform,
++        ios_wo49_transform_reflect(program, (GLint)k, uniform);
++    )
++    ios_wo49_emit(
++        "WO49 transform program: token=%llu logical_program=%u realized_program=%u options_hash=%08x logical_vertex_hash=%08x converted_vertex_hash=%08x option_set=MAXSTUDIOBONES1+STUDIO_VERTEX_LIGHTING%s gl_position_branch=rigid-bone0%s-then-MVP rigid_branch_present=%d position_branch_present=%d",
++        ios_wo49_transform.producer.token, ios_wo49_transform.logical_program,
++        program->id, ios_wo49_transform.producer.optionsHash,
++        ios_wo49_transform.logical_shader_hash,
++        ios_wo49_transform.native_shader_hash,
++        (ios_wo49_transform.producer.flags & IOS_WO49_TRANSFORM_SWAY) ?
++            "+STUDIO_SWAY_FOLIAGE" : "",
++        (ios_wo49_transform.producer.flags & IOS_WO49_TRANSFORM_SWAY) ?
++            "+conditional-sway" : "",
++        ios_wo49_transform.rigid_branch_present,
++        ios_wo49_transform.position_branch_present);
++}
++
++void ios_wo49_transform_before_draw(const char *function, GLenum mode,
++    GLsizei count, GLenum type)
++{
++    if(!ios_wo49_transform.claimed || ios_wo49_transform.terminal_emitted ||
++       ios_wo49_active_token != ios_wo49_transform.producer.token)
++        return;
++    ios_wo49_transform.before_draw_seen = 1;
++    ios_wo49_emit(
++        "WO49 transform native: token=%llu function=%s mode=0x%04x count=%d type=0x%04x realized_program=%u expected_program=%u mv_location=%d mv_hash=%08x mvp_location=%d mvp_hash=%08x bone_quaternion_location=%d bone_quaternion_hash=%08x bone_position_location=%d bone_position_hash=%08x immediately_pre_native_draw=1",
++        ios_wo49_transform.producer.token, function ? function : "<none>",
++        mode, count, type, glstate->gleshard->program,
++        ios_wo49_transform.native_program,
++        ios_wo49_transform.uniform[IOS_WO49_TRANSFORM_MODELVIEW].native_location,
++        ios_wo49_transform.uniform[IOS_WO49_TRANSFORM_MODELVIEW].native_hash,
++        ios_wo49_transform.uniform[IOS_WO49_TRANSFORM_MVP].native_location,
++        ios_wo49_transform.uniform[IOS_WO49_TRANSFORM_MVP].native_hash,
++        ios_wo49_transform.uniform[IOS_WO49_TRANSFORM_BONE_QUATERNION].native_location,
++        ios_wo49_transform.uniform[IOS_WO49_TRANSFORM_BONE_QUATERNION].native_hash,
++        ios_wo49_transform.uniform[IOS_WO49_TRANSFORM_BONE_POSITION].native_location,
++        ios_wo49_transform.uniform[IOS_WO49_TRANSFORM_BONE_POSITION].native_hash);
++    ios_wo49_transform_terminal(NULL);
++}
++
+ static void ios_wo49_capture_logical_attr(ios_wo49_attr_state_t *out,
+     unsigned int index, GLuint maximum)
+ {
+@@ -668,6 +1253,9 @@ void APIENTRY_GL4ES gl4es_wo49_topology_arm(unsigned long long token)
+     ios_wo49_record_t *record = ios_wo49_find(token);
+     if(!record || record->stage != 1 || record->absence_emitted)
+         return;
++    if(ios_wo49_transform.claimed &&
++       ios_wo49_transform.producer.token == token)
++        ios_wo49_transform.armed = 1;
+     ios_wo49_pending_token = token;
+ }
+
+diff --git a/src/gl/uniform.c b/src/gl/uniform.c
+index 98b56148..82be6cad 100644
+--- a/src/gl/uniform.c
++++ b/src/gl/uniform.c
+@@ -5,6 +5,7 @@
+ #include "glstate.h"
+ #include "loader.h"
+ #include "matvec.h"
++#include "indextrace.h"
+ 
+ //#define DEBUG
+ #ifdef DEBUG
+@@ -187,16 +188,24 @@ void GoUniformfv(program_t *glprogram, GLint location, int size, int count, cons
+     // ok, check the value in the cache
+     int rsize = sizeof(GLfloat)*size*count;
+     if (memcmp((char*)glprogram->cache.cache + m->cache_offs, value, rsize)==0) {
++        ios_wo49_transform_cache_uniform(glprogram, location, size, count,
++            (char*)glprogram->cache.cache + m->cache_offs);
+         noerrorShim();
+         return; // nothing to do, same value already there
+     }
+     // update uniform
+     memcpy((char*)glprogram->cache.cache + m->cache_offs, value, rsize);
++    ios_wo49_transform_cache_uniform(glprogram, location, size, count,
++        (char*)glprogram->cache.cache + m->cache_offs);
+     LOAD_GLES2(glUniform1fv);
+     LOAD_GLES2(glUniform2fv);
+     LOAD_GLES2(glUniform3fv);
+     LOAD_GLES2(glUniform4fv);
+     if(gles_glUniform1fv) {
++        ios_wo49_transform_native_uniform(glprogram, location,
++            size == 1 ? "glUniform1fv" : size == 2 ? "glUniform2fv" :
++            size == 3 ? "glUniform3fv" : "glUniform4fv",
++            size, count, value);
+         switch (size) {
+             case 1: gles_glUniform1fv(m->id, count, value); break;
+             case 2: gles_glUniform2fv(m->id, count, value); break;
+@@ -297,6 +306,8 @@ void APIENTRY_GL4ES gl4es_glUniform1i(GLint location, GLint v0) {
+     GLuint program = glstate->glsl->program;
+     CHECK_PROGRAM(void, program);
+     APPLY_PROGRAM(program, glprogram);
++    ios_wo49_transform_application_uniform(glprogram, location,
++        "glUniform1i", 1, 1, &v0, 1);
+     GoUniformiv(glprogram, location, 1, 1, &v0);
+ }
+ void APIENTRY_GL4ES gl4es_glUniform2i(GLint location, GLint v0, GLint v1) {
+@@ -349,6 +360,8 @@ void APIENTRY_GL4ES gl4es_glUniform3fv(GLint location, GLsizei count, const GLfl
+     GLuint program = glstate->glsl->program; 
+     CHECK_PROGRAM(void, program);
+     APPLY_PROGRAM(program, glprogram);
++    ios_wo49_transform_application_uniform(glprogram, location,
++        "glUniform3fv", 3, count, value, 0);
+     GoUniformfv(glprogram, location, 3, count, value);
+ }
+ void APIENTRY_GL4ES gl4es_glUniform4fv(GLint location, GLsizei count, const GLfloat *value) {
+@@ -357,6 +370,8 @@ void APIENTRY_GL4ES gl4es_glUniform4fv(GLint location, GLsizei count, const GLfl
+     GLuint program = glstate->glsl->program; 
+     CHECK_PROGRAM(void, program);
+     APPLY_PROGRAM(program, glprogram);
++    ios_wo49_transform_application_uniform(glprogram, location,
++        "glUniform4fv", 4, count, value, 0);
+     GoUniformfv(glprogram, location, 4, count, value);
+ }
+ void APIENTRY_GL4ES gl4es_glUniform1iv(GLint location, GLsizei count, const GLint *value) {
+@@ -685,13 +700,19 @@ void GoUniformMatrix4fv(program_t *glprogram, GLint location, GLsizei count, GLb
+     // ok, check the value in the cache
+     int rsize = sizeof(GLfloat)*4*4*count;
+     if (memcmp((char*)glprogram->cache.cache + m->cache_offs, v, rsize)==0) {
++        ios_wo49_transform_cache_uniform(glprogram, location, 16, count,
++            (char*)glprogram->cache.cache + m->cache_offs);
+         noerrorShim();
+         return; // nothing to do, same value already there
+     }
+     // update uniform
+     memcpy((char*)glprogram->cache.cache + m->cache_offs, v, rsize);
++    ios_wo49_transform_cache_uniform(glprogram, location, 16, count,
++        (char*)glprogram->cache.cache + m->cache_offs);
+     LOAD_GLES2(glUniformMatrix4fv);
+     if (gles_glUniformMatrix4fv) {
++        ios_wo49_transform_native_uniform(glprogram, location,
++            "glUniformMatrix4fv", 16, count, v);
+         gles_glUniformMatrix4fv(m->id, count, GL_FALSE, v);
+         errorGL();
+     } else {
+
+diff --git a/src/gl/fpe.c b/src/gl/fpe.c
+index 939250ef..80d42e20 100644
+--- a/src/gl/fpe.c
++++ b/src/gl/fpe.c
+@@ -830,6 +830,7 @@ void APIENTRY_GL4ES fpe_glDrawElements(GLenum mode, GLsizei count, GLenum type,
+         DBG(printf("Using VBO %d for indices\n", glstate->vao->elements->real_buffer);)
+     }
+     realize_bufferIndex();
++    ios_wo49_transform_before_draw("fpe_glDrawElements", mode, count, type);
+     ios_wo49_topology_realized("fpe_glDrawElements", mode, count, type, indices);
+     gles_glDrawElements(mode, count, type, indices);
+     if(use_vbo)
+@@ -1119,6 +1120,7 @@ void realize_glenv(int ispoint, int first, int count, GLenum type, const void* i
+               DBG(printf("Use GLSL program %d\n", glstate->gleshard->program);)
+             }
+         }
++        ios_wo49_transform_program_realized(glprogram);
+         // synchronize uniforms with parent!
+         if(glprogram != glstate->glsl->glprogram)
+             fpe_SyncUniforms(&glstate->glsl->glprogram->cache, glprogram);
+
+diff --git a/src/gl/gl_lookup.c b/src/gl/gl_lookup.c
+index 84e76eb5..232acae3 100644
+--- a/src/gl/gl_lookup.c
++++ b/src/gl/gl_lookup.c
+@@ -41,6 +41,8 @@ void* APIENTRY_GL4ES gl4es_GetProcAddress(const char *name) {
+     MAP("gl4es_iOSWO49TopologyArm", gl4es_wo49_topology_arm);
+     MAP("gl4es_iOSWO49TopologyFinish", gl4es_wo49_topology_finish);
+     MAP("gl4es_iOSWO49TopologyAbsence", gl4es_wo49_topology_absence);
++    MAP("gl4es_iOSWO49TransformBegin", gl4es_wo49_transform_begin);
++    MAP("gl4es_iOSWO49TransformFinish", gl4es_wo49_transform_finish);
+     // generated gles wrappers
+     #include "glesfuncs.inc"
+

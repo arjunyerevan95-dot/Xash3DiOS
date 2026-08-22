@@ -1,0 +1,349 @@
+diff --git a/glsl/alpha2coverage.h b/glsl/alpha2coverage.h
+--- a/glsl/alpha2coverage.h
++++ b/glsl/alpha2coverage.h
+@@ -17,0 +18,8 @@ GNU General Public License for more details.
++#if defined( XASH_MOBILE_GLES )
++float AlphaRescaling(sampler2D tex, in vec2 texCoords, in float alpha)
++{
++    // textureSize() is unavailable in GL4ES' ES 1.00 shader target. Retain
++    // alpha testing while omitting only the mip-aware coverage refinement.
++    return alpha;
++}
++#else
+@@ -40,2 +48,3 @@ float AlphaRescaling(sampler2D tex, in vec2 texCoords, in float alpha)
+-    return alpha * (1.0 + CalcMipLevel(tex, texCoords * textureSize(tex, 0)) * mipScale);
+-}
+\ No newline at end of file
++    return alpha * (1.0 + CalcMipLevel(tex, texCoords * vec2(textureSize(tex, 0))) * mipScale);
++}
++#endif
+diff --git a/glsl/bilateralblur_fp.glsl b/glsl/bilateralblur_fp.glsl
+--- a/glsl/bilateralblur_fp.glsl
++++ b/glsl/bilateralblur_fp.glsl
+@@ -59 +59 @@ void main( void )
+-	for ( float r = 1; r <= KERNEL_RADIUS; ++r )
++	for ( float r = 1.0; r <= KERNEL_RADIUS; ++r )
+@@ -65 +65 @@ void main( void )
+-	for ( float r = 1; r <= KERNEL_RADIUS; ++r )
++	for ( float r = 1.0; r <= KERNEL_RADIUS; ++r )
+diff --git a/glsl/bmodeldlight_vp.glsl b/glsl/bmodeldlight_vp.glsl
+--- a/glsl/bmodeldlight_vp.glsl
++++ b/glsl/bmodeldlight_vp.glsl
+@@ -54 +54 @@ void main( void )
+-	if( u_WaveHeight > 0.0f )
++	if( u_WaveHeight > 0.0 )
+diff --git a/glsl/bmodeldlight_fp.glsl b/glsl/bmodeldlight_fp.glsl
+--- a/glsl/bmodeldlight_fp.glsl
++++ b/glsl/bmodeldlight_fp.glsl
+@@ -271 +271 @@ void main( void )
+-	const float u_zFar = -4096; // for consistency
++	const float u_zFar = -4096.0; // for consistency
+diff --git a/glsl/bmodelsolid_vp.glsl b/glsl/bmodelsolid_vp.glsl
+--- a/glsl/bmodelsolid_vp.glsl
++++ b/glsl/bmodelsolid_vp.glsl
+@@ -61 +61 @@ void main( void )
+-	if( u_WaveHeight > 0.0f )
++	if( u_WaveHeight > 0.0 )
+diff --git a/glsl/bmodelsolid_fp.glsl b/glsl/bmodelsolid_fp.glsl
+--- a/glsl/bmodelsolid_fp.glsl
++++ b/glsl/bmodelsolid_fp.glsl
+@@ -298 +298 @@ void main( void )
+-		diffuse = InteriorMapping( diffuse, var_TexDiffuse, N, 0, var_ViewVec, var_Position ); // u_realtime is currently not used
++		diffuse = InteriorMapping( diffuse, var_TexDiffuse, N, 0.0, var_ViewVec, var_Position ); // u_realtime is currently not used
+@@ -307 +307 @@ void main( void )
+-	const float u_zFar = -4096; // for consistency
++	const float u_zFar = -4096.0; // for consistency
+diff --git a/glsl/drawshafts_fp.glsl b/glsl/drawshafts_fp.glsl
+--- a/glsl/drawshafts_fp.glsl
++++ b/glsl/drawshafts_fp.glsl
+@@ -92 +92 @@ void main( void )
+-	accum /= 28;
++	accum /= 28.0;
+diff --git a/glsl/drawssao_fp.glsl b/glsl/drawssao_fp.glsl
+--- a/glsl/drawssao_fp.glsl
++++ b/glsl/drawssao_fp.glsl
+@@ -23 +23 @@ void main( void )
+-    if( bool( u_GenericCondition == 0.0f )) // normal mode
++    if( bool( u_GenericCondition == 0.0 )) // normal mode
+diff --git a/glsl/dronescreen_fp.glsl b/glsl/dronescreen_fp.glsl
+--- a/glsl/dronescreen_fp.glsl
++++ b/glsl/dronescreen_fp.glsl
+@@ -60 +60 @@ void main( void )
+-    float on = floor(float(int(gl_FragCoord.y + (u_RealTime * r * 1000.)) % int(ival + (line_intensity * u_OutAmount * 0.5f))) / ival);
++    float on = floor(float(int(gl_FragCoord.y + (u_RealTime * r * 1000.)) % int(ival + (line_intensity * u_OutAmount * 0.5))) / ival);
+diff --git a/glsl/enhance_fp.glsl b/glsl/enhance_fp.glsl
+--- a/glsl/enhance_fp.glsl
++++ b/glsl/enhance_fp.glsl
+@@ -19 +19 @@ void main( void )
+-	const float Saturation = 0.55f;
++	const float Saturation = 0.55;
+diff --git a/glsl/gaussblur_fp.glsl b/glsl/gaussblur_fp.glsl
+--- a/glsl/gaussblur_fp.glsl
++++ b/glsl/gaussblur_fp.glsl
+@@ -28 +28 @@ void main( void )
+-	if( bool(BlurX > 0.0f ) )
++	if( bool(BlurX > 0.0 ) )
+diff --git a/glsl/generate_luminance_fp.glsl b/glsl/generate_luminance_fp.glsl
+--- a/glsl/generate_luminance_fp.glsl
++++ b/glsl/generate_luminance_fp.glsl
+@@ -27 +27 @@ float GetLogLuminance( vec3 color )
+-	return lum / ( 1 + lum );
++	return lum / ( 1.0 + lum );
+@@ -38,2 +38,2 @@ void main()
+-	samples[1] = GetLogLuminance( weight * texture2D( u_ScreenMap, var_TexCoord + vec2( pixelOffset.x, 0 )).xyz );
+-	samples[2] = GetLogLuminance( weight * texture2D( u_ScreenMap, var_TexCoord + vec2( 0, pixelOffset.y )).xyz );
++	samples[1] = GetLogLuminance( weight * texture2D( u_ScreenMap, var_TexCoord + vec2( pixelOffset.x, 0.0 )).xyz );
++	samples[2] = GetLogLuminance( weight * texture2D( u_ScreenMap, var_TexCoord + vec2( 0.0, pixelOffset.y )).xyz );
+diff --git a/glsl/genhbao_fp.glsl b/glsl/genhbao_fp.glsl
+--- a/glsl/genhbao_fp.glsl
++++ b/glsl/genhbao_fp.glsl
+@@ -21,3 +21,3 @@ varying vec2        var_TexCoord;
+-vec2 AORes = ScreenRes * 0.5;
+-vec2 InvAORes = 1.0 / AORes;
+-vec2 NoiseScale = AORes * 0.25;
++#define AORes ( ScreenRes * 0.5 )
++#define InvAORes ( 1.0 / AORes )
++#define NoiseScale ( AORes * 0.25 )
+@@ -27 +27 @@ const float R = 4.0;
+-const float R2 = R * R * R * 2;
++const float R2 = R * R * R * 2.0;
+@@ -107 +107 @@ void ComputeSteps( inout vec2 stepSizeUv, inout float numSteps, float rayRadiusP
+-	numSteps = min( NumSamples, rayRadiusPix );
++	numSteps = min( float( NumSamples ), rayRadiusPix );
+@@ -110 +110 @@ void ComputeSteps( inout vec2 stepSizeUv, inout float numSteps, float rayRadiusP
+-	float stepSizePix = rayRadiusPix / (numSteps + 1);
++	float stepSizePix = rayRadiusPix / (numSteps + 1.0);
+@@ -118 +118 @@ void ComputeSteps( inout vec2 stepSizeUv, inout float numSteps, float rayRadiusP
+-		numSteps = max( numSteps, 1 );
++		numSteps = max( numSteps, 1.0 );
+@@ -128 +128 @@ float HorizonOcclusion( vec2 deltaUV, vec3 P, vec3 dPdu, vec3 dPdv, float randst
+-	float ao = 0;
++	float ao = 0.0;
+@@ -146 +146 @@ float HorizonOcclusion( vec2 deltaUV, vec3 P, vec3 dPdu, vec3 dPdv, float randst
+-	for( float s = 1; s <= numSamples; ++s )
++	for( float s = 1.0; s <= numSamples; ++s )
+@@ -178 +178 @@ void main( void )
+-	float numDirections = NumDirections;
++	float numDirections = float( NumDirections );
+@@ -184,4 +184,4 @@ void main( void )
+-	Pr = GetViewPos( var_TexCoord + vec2( InvAORes.x, 0 ) );
+-	Pl = GetViewPos( var_TexCoord + vec2( -InvAORes.x, 0 ) );
+-	Pt = GetViewPos( var_TexCoord + vec2( 0, InvAORes.y ) );
+-	Pb = GetViewPos( var_TexCoord + vec2( 0, -InvAORes.y ) );
++	Pr = GetViewPos( var_TexCoord + vec2( InvAORes.x, 0.0 ) );
++	Pl = GetViewPos( var_TexCoord + vec2( -InvAORes.x, 0.0 ) );
++	Pt = GetViewPos( var_TexCoord + vec2( 0.0, InvAORes.y ) );
++	Pb = GetViewPos( var_TexCoord + vec2( 0.0, -InvAORes.y ) );
+@@ -215 +215 @@ void main( void )
+-		for( float d = 0; d < numDirections; ++d )
++		for( float d = 0.0; d < numDirections; ++d )
+diff --git a/glsl/grassdepth_vp.glsl b/glsl/grassdepth_vp.glsl
+--- a/glsl/grassdepth_vp.glsl
++++ b/glsl/grassdepth_vp.glsl
+@@ -53 +53 @@ void main( void )
+-	if( dist_to_bush <= 50 )
++	if( dist_to_bush <= 50.0 )
+diff --git a/glsl/grassdlight_fp.glsl b/glsl/grassdlight_fp.glsl
+--- a/glsl/grassdlight_fp.glsl
++++ b/glsl/grassdlight_fp.glsl
+@@ -74 +74 @@ void main( void )
+-	float fov = ( u_LightDir.w * 0.25 * ( M_PI / 180 ));
++	float fov = ( u_LightDir.w * 0.25 * ( M_PI / 180.0 ));
+@@ -95 +95 @@ void main( void )
+-	if( bool(u_GenericCondition == 1.0f) )
++	if( bool(u_GenericCondition == 1.0) )
+@@ -126 +126 @@ void main( void )
+-		atten = mix( 0, atten, fogFactor );
++		atten = mix( 0.0, atten, fogFactor );
+diff --git a/glsl/grassdlight_vp.glsl b/glsl/grassdlight_vp.glsl
+--- a/glsl/grassdlight_vp.glsl
++++ b/glsl/grassdlight_vp.glsl
+@@ -64 +64 @@ void main( void )
+-	if( dist_to_bush <= 50 )
++	if( dist_to_bush <= 50.0 )
+diff --git a/glsl/grasssolid_fp.glsl b/glsl/grasssolid_fp.glsl
+--- a/glsl/grasssolid_fp.glsl
++++ b/glsl/grasssolid_fp.glsl
+@@ -45 +45 @@ void main( void )
+-	if( bool(u_GenericCondition == 1.0f) )
++	if( bool(u_GenericCondition == 1.0) )
+diff --git a/glsl/grasssolid_vp.glsl b/glsl/grasssolid_vp.glsl
+--- a/glsl/grasssolid_vp.glsl
++++ b/glsl/grasssolid_vp.glsl
+@@ -57 +57 @@ void main( void )
+-	if( dist_to_bush <= 50 )
++	if( dist_to_bush <= 50.0 )
+@@ -93 +93 @@ void main( void )
+-	var_VertexLight.r = u_GammaTable[int(gammaIndex*0.25)][int(mod(gammaIndex, 4 ))];
++	var_VertexLight.r = u_GammaTable[int(gammaIndex*0.25)][int(mod(gammaIndex, 4.0 ))];
+@@ -95 +95 @@ void main( void )
+-	var_VertexLight.g = u_GammaTable[int(gammaIndex*0.25)][int(mod(gammaIndex, 4 ))];
++	var_VertexLight.g = u_GammaTable[int(gammaIndex*0.25)][int(mod(gammaIndex, 4.0 ))];
+@@ -97 +97 @@ void main( void )
+-	var_VertexLight.b = u_GammaTable[int(gammaIndex*0.25)][int(mod(gammaIndex, 4 ))];
++	var_VertexLight.b = u_GammaTable[int(gammaIndex*0.25)][int(mod(gammaIndex, 4.0 ))];
+diff --git a/glsl/heat_fp.glsl b/glsl/heat_fp.glsl
+--- a/glsl/heat_fp.glsl
++++ b/glsl/heat_fp.glsl
+@@ -33,2 +33,2 @@ void main( void )
+-	fSampledDepth = linearizeDepth( 4096, fSampledDepth );
+-	fSampledDepth = RemapVal( fSampledDepth, vec4( Z_NEAR, 4096, 0.0, 1.0 ) );
++	fSampledDepth = linearizeDepth( 4096.0, fSampledDepth );
++	fSampledDepth = RemapVal( fSampledDepth, vec4( Z_NEAR, 4096.0, 0.0, 1.0 ) );
+@@ -46 +46 @@ void main( void )
+-	vec4 dst_map_val = vec4( noise(p_d * vec2(50)) * 0.25 * u_Scale );
++	vec4 dst_map_val = vec4( noise(p_d * vec2(50.0)) * 0.25 * u_Scale );
+diff --git a/glsl/lensflare_fp.glsl b/glsl/lensflare_fp.glsl
+--- a/glsl/lensflare_fp.glsl
++++ b/glsl/lensflare_fp.glsl
+@@ -82,10 +82,10 @@ void main( void )
+-	color += circle( uv, rnd2000, circColor + 1, rnd20, mm, 0.0, 0.0, 0.0, 1.0 );
+-	color += circle( uv, rnd4000, circColor + 2, rnd40, mm, 0.0, 0.0, 1.0, 1.0 );
+-	color += circle( uv, rnd6000, circColor + 3, rnd60, mm, 0.0, 0.0, 0.0, 1.0 );
+-	color += circle( uv, rnd8000, circColor + 4, rnd80, mm, 0.0, 0.0, 1.0, 1.0 );
+-	color += circle( uv, rnd10000, circColor + 5, rnd100, mm, 0.0, 0.0, 0.0, 1.0 );
+-	color += circle( uv, rnd12000, circColor + 6, rnd120, mm, 0.0, 0.0, 1.0, 1.0 );
+-	color += circle( uv, rnd14000, circColor + 7, rnd140, mm, 0.0, 0.0, 0.0, 1.0 );
+-	color += circle( uv, rnd16000, circColor + 8, rnd160, mm, 0.0, 0.0, 1.0, 1.0 );
+-	color += circle( uv, rnd18000, circColor + 9, rnd180, mm, 0.0, 0.0, 0.0, 1.0 );
+-	color += circle( uv, rnd20000, circColor + 10, rnd200, mm, 0.0, 0.0, 1.0, 1.0 );
++	color += circle( uv, rnd2000, circColor + 1.0, rnd20, mm, 0.0, 0.0, 0.0, 1.0 );
++	color += circle( uv, rnd4000, circColor + 2.0, rnd40, mm, 0.0, 0.0, 1.0, 1.0 );
++	color += circle( uv, rnd6000, circColor + 3.0, rnd60, mm, 0.0, 0.0, 0.0, 1.0 );
++	color += circle( uv, rnd8000, circColor + 4.0, rnd80, mm, 0.0, 0.0, 1.0, 1.0 );
++	color += circle( uv, rnd10000, circColor + 5.0, rnd100, mm, 0.0, 0.0, 0.0, 1.0 );
++	color += circle( uv, rnd12000, circColor + 6.0, rnd120, mm, 0.0, 0.0, 1.0, 1.0 );
++	color += circle( uv, rnd14000, circColor + 7.0, rnd140, mm, 0.0, 0.0, 0.0, 1.0 );
++	color += circle( uv, rnd16000, circColor + 8.0, rnd160, mm, 0.0, 0.0, 1.0, 1.0 );
++	color += circle( uv, rnd18000, circColor + 9.0, rnd180, mm, 0.0, 0.0, 0.0, 1.0 );
++	color += circle( uv, rnd20000, circColor + 10.0, rnd200, mm, 0.0, 0.0, 1.0, 1.0 );
+diff --git a/glsl/interior.h b/glsl/interior.h
+--- a/glsl/interior.h
++++ b/glsl/interior.h
+@@ -29,2 +29 @@ vec4 InteriorMapping( vec4 diffuse, vec2 TexDiffuse, vec3 N, float Time, vec3 Vi
+-	const float staticSeed = 500; // room positions
+-	const float randomSeed = staticSeed;//don't change          floor(Time * SEED_CHANGING_FREQ); // lighting change
++	const int staticSeed = 500; // room positions
+@@ -152 +152 @@ vec4 InteriorMapping( vec4 diffuse, vec2 TexDiffuse, vec3 N, float Time, vec3 Vi
+-        diffuse = diffuse * diffuse.a + interior0 * (1 - diffuse.a);
++        diffuse = diffuse * diffuse.a + interior0 * (1.0 - diffuse.a);
+@@ -154 +154 @@ vec4 InteriorMapping( vec4 diffuse, vec2 TexDiffuse, vec3 N, float Time, vec3 Vi
+-        diffuse = diffuse * diffuse.a + interior1 * (1 - diffuse.a);
++        diffuse = diffuse * diffuse.a + interior1 * (1.0 - diffuse.a);
+@@ -156 +156 @@ vec4 InteriorMapping( vec4 diffuse, vec2 TexDiffuse, vec3 N, float Time, vec3 Vi
+-        diffuse = diffuse * diffuse.a + interior2 * (1 - diffuse.a);
++        diffuse = diffuse * diffuse.a + interior2 * (1.0 - diffuse.a);
+@@ -158 +158 @@ vec4 InteriorMapping( vec4 diffuse, vec2 TexDiffuse, vec3 N, float Time, vec3 Vi
+-        diffuse = diffuse * diffuse.a + interior3 * (1 - diffuse.a);
++        diffuse = diffuse * diffuse.a + interior3 * (1.0 - diffuse.a);
+@@ -160 +160 @@ vec4 InteriorMapping( vec4 diffuse, vec2 TexDiffuse, vec3 N, float Time, vec3 Vi
+-        diffuse = diffuse * diffuse.a + interior4 * (1 - diffuse.a);
++        diffuse = diffuse * diffuse.a + interior4 * (1.0 - diffuse.a);
+diff --git a/glsl/mathlib.h b/glsl/mathlib.h
+--- a/glsl/mathlib.h
++++ b/glsl/mathlib.h
+@@ -143 +143 @@ vec2 VogelDiskSample( int sampleIndex, int samplesCount, float phi )
+-	float theta = sampleIndex * goldenAngle + phi;
++	float theta = float( sampleIndex ) * goldenAngle + phi;
+@@ -164 +164 @@ float randomFunction2( in float seed, in vec2 co )
+-float randomFunction2( in float seed, in vec2 co )
++float randomFunction2( int randomSeed, vec2 co )
+@@ -168 +168 @@ float randomFunction2( in float seed, in vec2 co )
+-	return fract( tan( distance( co * PHI, co ) * seed ) * co.x );
++	return fract( tan( distance( co * PHI, co ) * float( randomSeed ) ) * co.x );
+@@ -220 +220 @@ vec3 VectorAngles( vec3 vecSrc )
+-	ang.z = 0.0f;
++	ang.z = 0.0;
+@@ -222 +222 @@ vec3 VectorAngles( vec3 vecSrc )
+-	if( bool( forward.x != 0.0f ) || bool( forward.y != 0.0f ) )
++	if( bool( forward.x != 0.0 ) || bool( forward.y != 0.0 ) )
+@@ -227 +227 @@ vec3 VectorAngles( vec3 vecSrc )
+-		if( ang.y < 0 ) ang.y += 360;
++		if( ang.y < 0.0 ) ang.y += 360.0;
+@@ -231 +231 @@ vec3 VectorAngles( vec3 vecSrc )
+-		if( ang.x < 0 ) ang.x += 360;
++		if( ang.x < 0.0 ) ang.x += 360.0;
+@@ -236,4 +236,4 @@ vec3 VectorAngles( vec3 vecSrc )
+-		ang.y = 0.0f;
+-		if( forward.z > 0 )
+-			ang.x = 270.0f;
+-		else ang.x = 90.0f;
++		ang.y = 0.0;
++		if( forward.z > 0.0 )
++			ang.x = 270.0;
++		else ang.x = 90.0;
+diff --git a/glsl/motionblur_fp.glsl b/glsl/motionblur_fp.glsl
+--- a/glsl/motionblur_fp.glsl
++++ b/glsl/motionblur_fp.glsl
+@@ -21,8 +21,8 @@ void main( void )
+-	accum += texture2D( u_ColorMap, tc + Vec.xy * Multiplier * 1 ) * (1.0 - 1.0 / 8.0);
+-	accum += texture2D( u_ColorMap, tc + Vec.xy * Multiplier * 2 ) * (1.0 - 2.0 / 8.0);
+-	accum += texture2D( u_ColorMap, tc + Vec.xy * Multiplier * 3 ) * (1.0 - 3.0 / 8.0);
+-	accum += texture2D( u_ColorMap, tc + Vec.xy * Multiplier * 4 ) * (1.0 - 4.0 / 8.0);
+-	accum += texture2D( u_ColorMap, tc + Vec.xy * Multiplier * 5 ) * (1.0 - 5.0 / 8.0);
+-	accum += texture2D( u_ColorMap, tc + Vec.xy * Multiplier * 6 ) * (1.0 - 6.0 / 8.0);
+-	accum += texture2D( u_ColorMap, tc + Vec.xy * Multiplier * 7 ) * (1.0 - 7.0 / 8.0);
+-	accum += texture2D( u_ColorMap, tc + Vec.xy * Multiplier * 8 ) * (1.0 - 8.0 / 8.0);
++	accum += texture2D( u_ColorMap, tc + Vec.xy * Multiplier * 1.0 ) * (1.0 - 1.0 / 8.0);
++	accum += texture2D( u_ColorMap, tc + Vec.xy * Multiplier * 2.0 ) * (1.0 - 2.0 / 8.0);
++	accum += texture2D( u_ColorMap, tc + Vec.xy * Multiplier * 3.0 ) * (1.0 - 3.0 / 8.0);
++	accum += texture2D( u_ColorMap, tc + Vec.xy * Multiplier * 4.0 ) * (1.0 - 4.0 / 8.0);
++	accum += texture2D( u_ColorMap, tc + Vec.xy * Multiplier * 5.0 ) * (1.0 - 5.0 / 8.0);
++	accum += texture2D( u_ColorMap, tc + Vec.xy * Multiplier * 6.0 ) * (1.0 - 6.0 / 8.0);
++	accum += texture2D( u_ColorMap, tc + Vec.xy * Multiplier * 7.0 ) * (1.0 - 7.0 / 8.0);
++	accum += texture2D( u_ColorMap, tc + Vec.xy * Multiplier * 8.0 ) * (1.0 - 8.0 / 8.0);
+diff --git a/glsl/screenwater_fp.glsl b/glsl/screenwater_fp.glsl
+--- a/glsl/screenwater_fp.glsl
++++ b/glsl/screenwater_fp.glsl
+@@ -28 +28 @@ void main( void )
+-	if( bool( u_Speed == 0.5f )) // underwater
++	if( bool( u_Speed == 0.5 )) // underwater
+diff --git a/glsl/studiodecal_fp.glsl b/glsl/studiodecal_fp.glsl
+--- a/glsl/studiodecal_fp.glsl
++++ b/glsl/studiodecal_fp.glsl
+@@ -39 +39 @@ void main( void )
+-		diffuse.a = mix( 0, diffuse.a, fogFactor );
++		diffuse.a = mix( 0.0, diffuse.a, fogFactor );
+diff --git a/glsl/studiodlight_fp.glsl b/glsl/studiodlight_fp.glsl
+--- a/glsl/studiodlight_fp.glsl
++++ b/glsl/studiodlight_fp.glsl
+@@ -171 +171 @@ void main( void )
+-		diffuse = InteriorMapping( diffuse, var_TexDiffuse, N, 0, var_ViewVec * var_MatrixTBN, var_Position ); // u_realtime is currently not used
++		diffuse = InteriorMapping( diffuse, var_TexDiffuse, N, 0.0, var_ViewVec * var_MatrixTBN, var_Position ); // u_realtime is currently not used
+diff --git a/glsl/studiosolid_fp.glsl b/glsl/studiosolid_fp.glsl
+--- a/glsl/studiosolid_fp.glsl
++++ b/glsl/studiosolid_fp.glsl
+@@ -253 +253 @@ void main( void )
+-		diffuse = InteriorMapping( diffuse, var_TexDiffuse, N, 0, var_ViewVec, var_Position ); // u_realtime is currently not used
++		diffuse = InteriorMapping( diffuse, var_TexDiffuse, N, 0.0, var_ViewVec, var_Position ); // u_realtime is currently not used
+diff --git a/glsl/studiosolid_vp.glsl b/glsl/studiosolid_vp.glsl
+--- a/glsl/studiosolid_vp.glsl
++++ b/glsl/studiosolid_vp.glsl
+@@ -32 +32 @@
+-uniform int			u_FoliageSwayHeight;
++uniform float		u_FoliageSwayHeight;
+diff --git a/glsl/texfetch.h b/glsl/texfetch.h
+--- a/glsl/texfetch.h
++++ b/glsl/texfetch.h
+@@ -9,2 +9,2 @@ vec4 colormap2D( sampler2D tex, const vec2 uv )
+-	vec4 sample = texture2D( tex, uv );
+-	return vec4( ConvertSRGBToLinear( sample.rgb ), sample.a );
++	vec4 sampleValue = texture2D( tex, uv );
++	return vec4( ConvertSRGBToLinear( sampleValue.rgb ), sampleValue.a );
+@@ -16,2 +16,2 @@ vec4 colormap2DArray( sampler2DArray tex, vec2 uv, float layer )
+-	vec4 sample = texture2DArray( tex, vec3( uv, layer ) );
+-	return vec4( ConvertSRGBToLinear( sample.rgb ), sample.a );
++	vec4 sampleValue = texture2DArray( tex, vec3( uv, layer ) );
++	return vec4( ConvertSRGBToLinear( sampleValue.rgb ), sampleValue.a );
+@@ -45,3 +45,3 @@
+-vec3 normalmap2DArray( sampler2DArray tex, const vec2 uv, const float layer )
++vec3 normalmap2DArray( sampler2DArray tex, const vec2 uv, const int layer )
+ {
+-    vec4 normalmap = texture2DArray( tex, vec3( uv, layer ) );
++    vec4 normalmap = texture2DArray( tex, vec3( uv, float( layer ) ) );
+diff --git a/glsl/tonemap_fp.glsl b/glsl/tonemap_fp.glsl
+--- a/glsl/tonemap_fp.glsl
++++ b/glsl/tonemap_fp.glsl
+@@ -29 +29 @@ void main( void )
+-	if( bool( u_GenericCondition == 1.0f ))
++	if( bool( u_GenericCondition == 1.0 ))

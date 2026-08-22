@@ -43,6 +43,15 @@ static CVAR_DEFINE_AUTO( r_refdll, "", FCVAR_RENDERINFO, "choose renderer implem
 static CVAR_DEFINE_AUTO( r_refdll_loaded, "", FCVAR_READ_ONLY, "currently loaded renderer" );
 static CVAR_DEFINE_AUTO( r_pvs_radius, "0.1", FCVAR_ARCHIVE, "increase amount of potentially visible leaves by this radius" );
 
+static qboolean R_IOSTextureArraySelftestMode( void )
+{
+#if XASH_IOS
+	return Sys_CheckParm( "-gl4es_texture_array_selftest" );
+#else
+	return false;
+#endif
+}
+
 // there is no need to expose whole host and cl structs into the renderer
 // but we still need to update timings accurately as possible
 // this looks horrible but the only other option would be passing four
@@ -412,6 +421,11 @@ static const ref_api_t gEngfuncs =
 	GL_GetAttribute,
 	GL_GetProcAddress,
 	GL_SwapBuffers,
+#if XASH_IOS
+	GL_GetDrawableInfo,
+#else
+	NULL,
+#endif
 
 	SW_CreateBuffer,
 	SW_LockBuffer,
@@ -449,6 +463,96 @@ static const ref_api_t gEngfuncs =
 	R_GetWindowHandle,
 	R_GetSpriteFrame,
 };
+
+#if XASH_IOS
+#define IOS_SELFTEST_CONTRACT_ENGINE_ITEMS 55
+
+static qboolean R_IOSTextureArrayContractFailure( const char *name, const char *reason )
+{
+	Con_Printf( "iOS texture array selftest contract: missing name=%s reason=%s\n", name, reason );
+	Con_Printf( "iOS texture array selftest terminal: FAIL failures=1 diffusion_started=0\n" );
+	Sys_Quit( "iOS texture array selftest renderer contract failed" );
+	return false;
+}
+
+static void R_IOSTextureArrayContractItem( const char *name, int *count )
+{
+	Con_Printf( "iOS texture array selftest contract: item name=%s source=shared\n", name );
+	( *count )++;
+}
+
+static qboolean R_ValidateIOSTextureArrayRendererContract( void )
+{
+	static const char *const cvars[] =
+	{
+		"gamma", "brightness", "lightgamma", "direct", "r_showtextures",
+		"r_speeds", "r_fullbright", "r_norefresh", "r_lightmap", "r_dynamic",
+		"r_drawentities", "r_decals", "r_showhull", "gl_vsync", "gl_clear",
+		"cl_himodels", "cl_lightstyle_lerping", "tracerred", "tracergreen",
+		"tracerblue", "traceralpha", "r_sprite_lerping", "r_sprite_lighting",
+		"r_drawviewmodel", "r_glowshellfreq", "host_allow_materials", "r_pvs_radius",
+	};
+	int count = 0;
+
+	for( size_t i = 0; i < ARRAYSIZE( cvars ); ++i )
+	{
+		if( !Cvar_FindVar( cvars[i] ))
+			return R_IOSTextureArrayContractFailure( cvars[i], "unregistered" );
+		R_IOSTextureArrayContractItem( cvars[i], &count );
+	}
+
+#define IOS_REQUIRE_CALLBACK( member ) \
+	do { \
+		if( !gEngfuncs.member ) \
+			return R_IOSTextureArrayContractFailure( "callback." #member, "null" ); \
+		R_IOSTextureArrayContractItem( "callback." #member, &count ); \
+	} while( 0 )
+	IOS_REQUIRE_CALLBACK( EngineGetParm );
+	IOS_REQUIRE_CALLBACK( pfnGetCvarPointer );
+	IOS_REQUIRE_CALLBACK( Host_Error );
+	IOS_REQUIRE_CALLBACK( Cvar_RegisterVariable );
+	IOS_REQUIRE_CALLBACK( Cmd_AddCommand );
+	IOS_REQUIRE_CALLBACK( Cmd_RemoveCommand );
+	IOS_REQUIRE_CALLBACK( COM_SetRandomSeed );
+	IOS_REQUIRE_CALLBACK( COM_RandomLong );
+	IOS_REQUIRE_CALLBACK( _Mem_AllocPool );
+	IOS_REQUIRE_CALLBACK( _Mem_FreePool );
+	IOS_REQUIRE_CALLBACK( R_Init_Video );
+	IOS_REQUIRE_CALLBACK( R_Free_Video );
+	IOS_REQUIRE_CALLBACK( GL_SetAttribute );
+	IOS_REQUIRE_CALLBACK( Sys_CheckParm );
+	IOS_REQUIRE_CALLBACK( Con_Reportf );
+	IOS_REQUIRE_CALLBACK( Con_Printf );
+	IOS_REQUIRE_CALLBACK( pfnGetCvarFloat );
+	IOS_REQUIRE_CALLBACK( Cvar_Set );
+	IOS_REQUIRE_CALLBACK( GL_GetAttribute );
+	IOS_REQUIRE_CALLBACK( GL_GetProcAddress );
+	IOS_REQUIRE_CALLBACK( GL_SwapBuffers );
+	IOS_REQUIRE_CALLBACK( GL_GetDrawableInfo );
+#undef IOS_REQUIRE_CALLBACK
+
+#define IOS_REQUIRE_PARM( label, parm ) \
+	do { \
+		if( !pfnEngineGetParm( parm, 0 )) \
+			return R_IOSTextureArrayContractFailure( "parm." label, "null" ); \
+		R_IOSTextureArrayContractItem( "parm." label, &count ); \
+	} while( 0 )
+	IOS_REQUIRE_PARM( "PARM_GET_CLIENT_PTR", PARM_GET_CLIENT_PTR );
+	IOS_REQUIRE_PARM( "PARM_GET_HOST_PTR", PARM_GET_HOST_PTR );
+	IOS_REQUIRE_PARM( "PARM_GET_MOVEVARS_PTR", PARM_GET_MOVEVARS_PTR );
+	IOS_REQUIRE_PARM( "PARM_GET_DLIGHTS_PTR", PARM_GET_DLIGHTS_PTR );
+#undef IOS_REQUIRE_PARM
+
+	/* PARM_CONNSTATE is a valid scalar even when its value is zero. */
+	( void )pfnEngineGetParm( PARM_CONNSTATE, 0 );
+	R_IOSTextureArrayContractItem( "parm.PARM_CONNSTATE", &count );
+	R_IOSTextureArrayContractItem( "global.refState", &count );
+
+	if( count != IOS_SELFTEST_CONTRACT_ENGINE_ITEMS )
+		return R_IOSTextureArrayContractFailure( "inventory.engine-count", "mismatch" );
+	return true;
+}
+#endif
 
 static void R_UnloadProgs( void )
 {
@@ -586,6 +690,8 @@ static qboolean R_LoadProgs( const char *name )
 
 	Cvar_FullSet( "host_refloaded", "1", FCVAR_READ_ONLY );
 	ref.initialized = true;
+	if( R_IOSTextureArraySelftestMode( ))
+		return true;
 
 	R_CreateBuiltinTextures();
 	CL_FillTriAPI( &gTriApi );
@@ -779,6 +885,11 @@ qboolean R_Init( void )
 	Cvar_Get( "r_drawentities", "1", FCVAR_CHEAT, "render entities" );
 	Cvar_Get( "cl_himodels", "1", FCVAR_ARCHIVE, "draw high-resolution player models in multiplayer" );
 
+#if XASH_IOS
+	if( R_IOSTextureArraySelftestMode() && !R_ValidateIOSTextureArrayRendererContract( ))
+		return false;
+#endif
+
 	// cvars are created, execute video config
 	Cbuf_AddText( "exec video.cfg\n" );
 	Cbuf_Execute();
@@ -799,6 +910,14 @@ qboolean R_Init( void )
 
 	if( Sys_GetParmFromCmdLine( "-ref", requested_cmdline ))
 		success = R_LoadRenderer( requested_cmdline, false );
+
+	if( R_IOSTextureArraySelftestMode() && !success )
+	{
+		Con_Printf( "iOS texture array selftest boot: renderer-failed\n" );
+		Con_Printf( "iOS texture array selftest terminal: FAIL failures=1 diffusion_started=0\n" );
+		Sys_Quit( "iOS texture array selftest renderer initialization failed" );
+		return false;
+	}
 
 	if( !success && !COM_StringEmptyOrNULL( r_refdll.string ) && Q_stricmp( requested_cmdline, r_refdll.string ))
 	{
@@ -844,6 +963,9 @@ qboolean R_Init( void )
 		Sys_Error( "Can't initialize any renderer. Check your video drivers!\n" );
 		return false;
 	}
+
+	if( R_IOSTextureArraySelftestMode( ))
+		return true;
 
 	SCR_Init();
 
