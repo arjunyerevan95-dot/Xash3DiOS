@@ -3,11 +3,15 @@
 set -euo pipefail
 
 IPA_PATH=${1:-artifacts/xash3d-fwgs-ios-arm64.ipa}
+ROOT_DIR=$(cd "$(dirname "$0")/../.." && pwd)
 
 if [ ! -f "$IPA_PATH" ]; then
 	echo "IPA not found: $IPA_PATH" >&2
 	exit 1
 fi
+
+python3 "$ROOT_DIR/scripts/ios/validate-ios-shader-lod-compatibility.py" \
+	"$ROOT_DIR" "$ROOT_DIR/3rdparty/gl4es/gl4es" --self-test
 
 VERIFY_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/xash3d-ios-verify.XXXXXX")
 cleanup()

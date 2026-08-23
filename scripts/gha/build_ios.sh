@@ -40,6 +40,8 @@ git -C 3rdparty/gl4es/gl4es apply --check "$GITHUB_WORKSPACE/scripts/ios/gl4es-w
 git -C 3rdparty/gl4es/gl4es apply "$GITHUB_WORKSPACE/scripts/ios/gl4es-wo56-production-array-admission-ios.patch" || die
 git -C 3rdparty/gl4es/gl4es apply --check "$GITHUB_WORKSPACE/scripts/ios/gl4es-wo56-provider-lifecycle-ios.patch" || die
 git -C 3rdparty/gl4es/gl4es apply "$GITHUB_WORKSPACE/scripts/ios/gl4es-wo56-provider-lifecycle-ios.patch" || die
+git -C 3rdparty/gl4es/gl4es apply --check "$GITHUB_WORKSPACE/scripts/ios/gl4es-wo56-shader-lod-compatibility-ios.patch" || die
+git -C 3rdparty/gl4es/gl4es apply "$GITHUB_WORKSPACE/scripts/ios/gl4es-wo56-shader-lod-compatibility-ios.patch" || die
 python3 "$GITHUB_WORKSPACE/scripts/ios/validate-ios-drawable-bridge.py" \
 	"$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/SDL" \
 	"$GITHUB_WORKSPACE/3rdparty/gl4es/gl4es" --self-test || die
@@ -63,6 +65,9 @@ python3 "$GITHUB_WORKSPACE/scripts/ios/validate-ios-texture-array.py" \
 	"$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/3rdparty/gl4es/gl4es" \
 	--self-test || die
 python3 "$GITHUB_WORKSPACE/scripts/ios/validate-ios-provider-lifecycle.py" \
+	"$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/3rdparty/gl4es/gl4es" \
+	--self-test || die
+python3 "$GITHUB_WORKSPACE/scripts/ios/validate-ios-shader-lod-compatibility.py" \
 	"$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/3rdparty/gl4es/gl4es" \
 	--self-test || die
 python3 "$GITHUB_WORKSPACE/scripts/ios/validate-ios-selftest-boot.py" \

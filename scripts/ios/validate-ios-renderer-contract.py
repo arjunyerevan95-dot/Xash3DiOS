@@ -22,6 +22,7 @@ ALLOWED_PATHS = {
     "Decisions/DEC-007.md",
     "Decisions/DEC-008.md",
     "Decisions/DEC-009.md",
+    "Decisions/DEC-010.md",
     "Documentation/CURRENT_STATE.md",
     "Documentation/XASH3DIOS_PORTING_STATE.md",
     "Evidence/WO-056/manifest.md",
@@ -37,6 +38,7 @@ ALLOWED_PATHS = {
     "scripts/ios/diffusion-wo56-production-array-admission-ios.patch",
     "scripts/ios/gl4es-wo56-production-array-admission-ios.patch",
     "scripts/ios/gl4es-wo56-provider-lifecycle-ios.patch",
+    "scripts/ios/gl4es-wo56-shader-lod-compatibility-ios.patch",
     "scripts/ios/gl4es-wo56-texture-array-ios.patch",
     "scripts/ios/validate-diffusion-mobile-shaders.py",
     "scripts/ios/validate-ios-production-array-admission.py",
@@ -44,6 +46,7 @@ ALLOWED_PATHS = {
     "scripts/ios/validate-ios-selftest-boot.py",
     "scripts/ios/validate-ios-ordinary-bootstrap.py",
     "scripts/ios/validate-ios-provider-lifecycle.py",
+    "scripts/ios/validate-ios-shader-lod-compatibility.py",
     "scripts/ios/validate-ios-texture-array.py",
     "scripts/ios/verify_ipa.sh",
     "scripts/ios/wo56e-renderer-contract.json",
@@ -51,6 +54,7 @@ ALLOWED_PATHS = {
     "scripts/ios/wo56k-production-array-admission-contract.json",
     "scripts/ios/wo56m-ordinary-bootstrap-contract.json",
     "scripts/ios/wo56o-provider-lifecycle-contract.json",
+    "scripts/ios/wo56p-shader-lod-compatibility-contract.json",
 }
 TERMINAL_FAIL = "iOS texture array selftest terminal: FAIL failures=1 diffusion_started=0"
 EXPECTED_COUNTS = {"cvars": 27, "callbacks": 22, "parameters": 5, "globals": 3}

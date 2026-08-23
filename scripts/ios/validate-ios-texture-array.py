@@ -152,7 +152,7 @@ def validate(files: dict[str, str]) -> list[str]:
         "#define varying out", "#define varying in",
         "#define texture2DArray texture", "#define texture2DProj textureProj", "gl4es_FragColor",
         "precision mediump sampler2DArray",
-        "if(!texture_array_shader && !fpeShader",
+        "if(!essl300_shader && !fpeShader",
         "derivatives are core in ESSL 300", "gl_FragDepth is core in ESSL 300",
     ):
         require(shader, token, "stage-correct ESSL300", failures)

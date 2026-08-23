@@ -16,6 +16,7 @@ int main( int argc, char **argv )
 	size_t capacity = 4096;
 	char *input = calloc( capacity, 1 );
 	char *output;
+	shaderconv_need_t need = { 0 };
 
 	if( !input ) return 1;
 	while( !feof( stdin ) )
@@ -36,9 +37,13 @@ int main( int argc, char **argv )
 	hardext.highp = 1;
 	hardext.derivatives = 1;
 	hardext.shaderlod = 1;
+	hardext.glsl300es = argc > 2 && !strcmp( argv[2], "legacy" ) ? 0 : 1;
 	hardext.maxdrawbuffers = 1;
-	output = ConvertShader( input, argc > 1 && !strcmp( argv[1], "vertex" ), NULL );
+	need.need_texcoord = -1;
+	need.need_essl300 = argc > 2 && !strcmp( argv[2], "force300" );
+	output = ConvertShader( input, argc > 1 && !strcmp( argv[1], "vertex" ), &need );
 	if( !output ) return 1;
+	fprintf( stderr, "need_essl300=%d\n", need.need_essl300 );
 	fputs( output, stdout );
 
 	free( output );

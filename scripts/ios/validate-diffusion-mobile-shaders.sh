@@ -31,5 +31,9 @@ cc -std=gnu11 -DEGL_NO_X11 \
 	"$GL4ES_DIR/src/gl/string_utils.c" \
 	-lm -o "$WORK_DIR/gl4es-shaderconv-dump"
 
+python3 "$ROOT_DIR/scripts/ios/validate-ios-shader-lod-compatibility.py" \
+	"$ROOT_DIR" "$GL4ES_DIR" "$SOURCE_DIR" \
+	--converter "$WORK_DIR/gl4es-shaderconv-dump" --self-test
+
 python3 "$ROOT_DIR/scripts/ios/validate-diffusion-mobile-shaders.py" \
 	"$SOURCE_DIR" "$WORK_DIR/gl4es-shaderconv-dump" "$VALIDATOR"
