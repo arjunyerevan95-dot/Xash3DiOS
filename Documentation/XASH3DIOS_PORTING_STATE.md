@@ -3052,3 +3052,19 @@ Exactly one first incomplete action remains: after orchestrator review, explicit
 Stop state: **WO-056 Phase P production integration and build qualification has stopped at Outcome C for orchestrator review. No duplicate CI, device test, or crash work is authorized.**
 
 The authoritative Google Docs ledger Outcome C append was revision-guarded and verified by heading/stop-state readback at revision `AIroW344ejmf1X0qqeS902FM-mzXBeZRUNn7jr2DrJStCX7UHCvJ_D7i1MjM_YzkWfcmY_VECglu_WYK7M3sLJWy7E9uzAJIa6Sym9ZD5e8`.
+
+## Work Order 56 Phase P corrected-head CI requalification checkpoint — active
+
+The orchestrator accepts the production-integration Outcome C and authorizes one separate CI requalification checkpoint. Baseline `bc1bc0a95667d49da889707b7191e54616103a35` preserves patch commit `d37bf36a5b707273359728a5ae08f81e712bea5d`, integration commit `ddadc3d83c5584fed6e516ab3beaaf727f780122`, and the exact source-qualified correction for the two cumulative allowlists. No active or newer workflow exists at issuance.
+
+The worker must reconcile the published issuance head, prove its engineering tree is unchanged from `bc1bc0a`, rerun the bounded shader-LOD/self-test/renderer/Python/JSON/diff preflight, and then launch exactly one `iOS Proof of Life` workflow-dispatch run. No engineering edit is authorized. If preflight detects drift, stop without CI. If the run fails, make no correction and do not rerun.
+
+Outcome A requires the sole run to pass the complete retained validator, native arm64 engine/Half-Life/Diffusion, package, IPA, marker-owner, architecture, and proprietary-data gates. Retain exactly one artifact and ordinary IPA, independently verify all identities and package contents, and create at most one verified tempfile object. The result remains build-qualified only; no installation or device acceptance is authorized.
+
+Outcome B records preflight drift or a deterministic local contradiction without a run. Outcome C records the sole run's first failure without a correction, rerun, partial IPA, or instrumentation upload. Every outcome must update/read-back verify ControlPlane and both ledgers, push, verify clean local/live-remote equality, callback the orchestrator, and stop for review.
+
+Active executor is preserved Xash Worker Gen 3 thread `01a02a6a-349a-75f1-88dc-c1ad920dd38e`. Device testing, user evidence requests, crash investigation, scene/stability/gameplay claims, later phases, duplicate workflows, and unrelated cleanup remain prohibited.
+
+Stop state: **WO-056 Phase P corrected-head CI requalification checkpoint is active. Exactly one workflow is authorized after clean preflight.**
+
+The authoritative Google Docs ledger order append was revision-guarded and verified by heading/stop-state readback at revision `AIroW35OsP6RxB1exqB2h_HobCgpq8o-_398M04s5xAlilL0HrWjYyBNVqCKjk9IzBpCmWrgppbNn-3zE1_nQAyZRyMXjTfzdksMlhk5ogc`.

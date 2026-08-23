@@ -303,3 +303,17 @@ Phase O's worker-produced result was build-qualified only. The later user-perfor
 - Exactly one first incomplete action: after orchestrator review, explicitly authorize one separate CI requalification checkpoint for the corrected cumulative scope allowlists on the final reported head.
 - Google ledger readback revision: `AIroW344ejmf1X0qqeS902FM-mzXBeZRUNn7jr2DrJStCX7UHCvJ_D7i1MjM_YzkWfcmY_VECglu_WYK7M3sLJWy7E9uzAJIa6Sym9ZD5e8`.
 - Stop state: Outcome C recorded; no duplicate CI, device test, crash investigation, or later-phase work is authorized before orchestrator review.
+
+## Phase P corrected-head CI requalification checkpoint — evidence required
+
+- Issuance baseline: `bc1bc0a95667d49da889707b7191e54616103a35`; clean local/tracking/live-remote equality; no active or newer relevant workflow.
+- Frozen engineering lineage: `d37bf36a5b707273359728a5ae08f81e712bea5d` patch, `ddadc3d83c5584fed6e516ab3beaaf727f780122` integration, and the two cumulative allowlist additions in `bc1bc0a`.
+- Prior failure control: run `32616482259`, job `97137964583`, SHA `ddadc3d8`, stopped after shader-LOD validation and before native compilation; artifacts API `total_count=0`.
+- Preflight evidence: published issuance differs from `bc1bc0a` only in authorized ControlPlane/ledger records; exact patch/contract/validator/build/workflow/package hashes and order are unchanged; both allowlist corrections are present; shader-LOD, self-test, renderer-contract, Python/JSON, and diff checks pass.
+- Exactly one authorized run: `iOS Proof of Life`, `workflow_dispatch`, published branch head. Record run/job/head/event/status/conclusion and all relevant step conclusions. No duplicate/replacement run.
+- Outcome A evidence: one retained artifact with ID/name/archive bytes/digest/expiry; one ordinary IPA with filename/bundle/bytes/SHA-256; thin arm64 engine/renderer/Diffusion binaries; exact ordinary arguments; markers in correct owners; no proprietary data; one tempfile object/direct link with matching metadata and round-trip SHA-256.
+- Outcome B/C evidence: exact preflight or CI first failure, run/artifact state, confirmation that no engineering correction/rerun/upload/device/crash work occurred, and minimum next discriminator.
+- Qualification limit: even Outcome A is build/package-qualified only; device rendering, scene completeness, stability, transitions, gameplay, and `ch1map1` remain unqualified.
+- Active executor/callback: `01a02a6a-349a-75f1-88dc-c1ad920dd38e` must update/read back all records and callback `01a02450-2442-7bd3-9232-46419e80d731` after clean local/live-remote equality.
+- Google ledger order: document `1IYL3pI07fWvoYniP_NxZ7yO3gz9vbnM6sBFK8BT2zLU`, tab `t.0`, verified revision `AIroW35OsP6RxB1exqB2h_HobCgpq8o-_398M04s5xAlilL0HrWjYyBNVqCKjk9IzBpCmWrgppbNn-3zE1_nQAyZRyMXjTfzdksMlhk5ogc`.
+- Stop gate: select A/B/C, report exactly once, push records, callback, and stop for orchestrator review.
