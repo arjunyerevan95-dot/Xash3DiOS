@@ -3035,6 +3035,20 @@ No independent GL4ES redesign, Diffusion shader/material/model change, accepted 
 
 Active executor is preserved Xash Worker Gen 3 thread `01a02a6a-349a-75f1-88dc-c1ad920dd38e`. It must update/read-back verify ControlPlane and both ledgers, push, confirm clean local/live-remote equality, callback the orchestrator with the selected outcome and exact identities, and stop for review.
 
-Stop state: **WO-056 Phase P production integration and build qualification checkpoint is active.**
+Superseded stop state: the production-integration order below was active at issuance and is now closed by Outcome C.
 
-The authoritative Google Docs ledger order append was revision-guarded and verified by heading/stop-state readback at revision `AIroW37PnkPqMsbHyPFXDL72uZ-ytXchFloR1kcCa0KhAwyKdhfgD6WU1dcBQ6Z1_TKPzO-zGIuga59l_E6OQ9-wVTgoZCynTz9rwtNdkg4`.
+## Work Order 56 Phase P production integration and build qualification — Outcome C
+
+The accepted downstream patch commit `d37bf36a5b707273359728a5ae08f81e712bea5d` remains preserved. Integration commit `ddadc3d83c5584fed6e516ab3beaaf727f780122` places its exact `10,564`-byte / SHA-256 `91AB64B6C392303BEA189BE2D66E409836489DFC6F46F2FC3DFB0BACCFA60FE4` patch after provider lifecycle and adds the Phase P machine contract, dedicated validator, converter control, and retained build/renderer/self-test/shader/package/IPA registrations.
+
+Local evidence passes the complete 13-patch GL4ES apply/reverse at pin `81547d986798e876de8b434193920b606a72363f`, all representative core-LOD and paired ESSL 300 output fingerprints, the unchanged ESSL 100 explicit-LOD control, and all specified mutation/rejection gates. The corrected reproducible GrassDlight assembled-vertex source hash is `c101ec6d21d8c42f5b22c306151b6ebb2769e59b5aaca4d57f297a1e3430878b`; accepted converted outputs are unchanged.
+
+Exactly one workflow was consumed: run `32616482259`, job `97137964583`, on `ddadc3d83c5584fed6e516ab3beaaf727f780122`. It passed dependency installation and every validator through the new shader-LOD contract, then failed before native compilation because two authorized changed validation paths were missing from older cumulative scope allowlists. The source-qualified mechanical correction adds `scripts/ios/gl4es-shaderconv-dump.c` and `scripts/ios/validate-diffusion-mobile-shaders.sh` to both allowlists; local self-test and renderer-contract suites pass. The one-run rule prohibits a replacement run in this checkpoint.
+
+Outcome **C** is selected. Artifact count is zero; no candidate, IPA, tempfile upload, device evidence/request, crash investigation, or later phase was produced. Google ledger Outcome C and stop-state readback is verified at revision `AIroW344ejmf1X0qqeS902FM-mzXBeZRUNn7jr2DrJStCX7UHCvJ_D7i1MjM_YzkWfcmY_VECglu_WYK7M3sLJWy7E9uzAJIa6Sym9ZD5e8`.
+
+Exactly one first incomplete action remains: after orchestrator review, explicitly authorize one separate CI requalification checkpoint for the corrected cumulative scope allowlists on the final reported head.
+
+Stop state: **WO-056 Phase P production integration and build qualification has stopped at Outcome C for orchestrator review. No duplicate CI, device test, or crash work is authorized.**
+
+The authoritative Google Docs ledger Outcome C append was revision-guarded and verified by heading/stop-state readback at revision `AIroW344ejmf1X0qqeS902FM-mzXBeZRUNn7jr2DrJStCX7UHCvJ_D7i1MjM_YzkWfcmY_VECglu_WYK7M3sLJWy7E9uzAJIa6Sym9ZD5e8`.

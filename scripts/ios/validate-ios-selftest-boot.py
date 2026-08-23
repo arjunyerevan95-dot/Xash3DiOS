@@ -36,6 +36,8 @@ ALLOWED_PATHS = {
     "scripts/ios/gl4es-wo56-provider-lifecycle-ios.patch",
     "scripts/ios/gl4es-wo56-shader-lod-compatibility-ios.patch",
     "scripts/ios/gl4es-wo56-texture-array-ios.patch",
+    "scripts/ios/gl4es-shaderconv-dump.c",
+    "scripts/ios/validate-diffusion-mobile-shaders.sh",
     "scripts/ios/validate-diffusion-mobile-shaders.py",
     "scripts/ios/validate-ios-production-array-admission.py",
     "scripts/ios/validate-ios-renderer-contract.py",
