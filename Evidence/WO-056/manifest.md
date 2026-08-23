@@ -366,3 +366,17 @@ Phase O's worker-produced result was build-qualified only. The later user-perfor
 - Outcome: **C**. Production is deterministic, but frozen provenance is a second unresolved lineage. Exactly one first incomplete action is a bounded frozen-contract provenance discriminator for source tree, patch state, assembly-owner revision, and byte policy.
 - External state unchanged: run `32627471670`, job `97164927481`, artifacts `0`; no CI/rerun, candidate, IPA/tempfile, device evidence/request, crash work, engineering edit, or later phase.
 - Stop state: Outcome C; stopped for orchestrator review.
+
+## Phase P production-contract realignment authorization
+
+- Authorization baseline: `0d98d8f67a285acc7602373299293def33af5a91`; branch `agent/ios-proof-of-life`; local/tracking/live remote equal and clean; no active/newer relevant workflow.
+- Accepted decision: [DEC-011](../../Decisions/DEC-011.md) selects the deterministic final production `P1` vector and rejects the mixed non-production frozen fixture lineage as production authority.
+- Provenance closure: preserved `.tmp/wo56p/compare.py` hardcodes `build/run40-audit/Diffusion` at `36af6e18c44d676cf3e9ddb172bb96162c2e7519`, not production `14d156bf3a6993c172697fac83a937836c3b5561`; rerun reproduces five current frozen hashes plus old GrassDlight V `d61684a3...`.
+- Canonical inputs: the exact final `P1` six-source bytes/hashes already recorded above; Diffusion pin/order owner `scripts/ios/builddiffusion.sh`; assembly owner `scripts/ios/validate-diffusion-mobile-shaders.py::build_source`; raw byte policy `latin-1`, LF, no normalization.
+- Authorized engineering files: only `scripts/ios/wo56p-shader-lod-compatibility-contract.json` and `scripts/ios/validate-ios-shader-lod-compatibility.py`, after temporary proof.
+- Required positive evidence: actual converted-output fingerprints for all six `P1` sources; fragment core-LOD counts `11/11/9`; no ESSL 300 EXT directive/intrinsic; paired ESSL 300 vertex reconversion with `need_essl300=1`; unchanged legacy ESSL 100 control.
+- Required negative evidence: reject non-production pin and every old/superseded tuple; pin/order/owner/byte-policy drift; family/source/output drift; semantic weakening; cross-stage removal; fabricated capability; unlinked acceptance; and error suppression.
+- Environment boundary: no local `glslangValidator` was present at authorization. No install or CI is authorized; Apple/native compile-link remains a later CI gate.
+- External state: run `32627471670`, job `97164927481`, artifacts `0`; no new workflow, candidate, IPA, tempfile, device, or crash work.
+- First incomplete action: construct and qualify the two-file production-bound candidate locally, select Outcome A/B/C, durably report, callback, and stop.
+- Google ledger continuity: source-lineage Outcome C was confirmed at revision `AIroW34Qa99hCDpSQ9L0SAeijCarysJzmwkPQQ7KBx4_qJG2zq1wmrxKhvrJkoEqRzzfK2ScZWldx6Ak7D1OgPlhcxZ8abmDMqFp-KtW4wU`; the realignment authorization was revision-guarded and verified at revision `AIroW36kP9-zG7CBHD3WGClwdaDof8D8o-6o3RIVczXbnOsNqlnBO7LwrNB9XSdTm-uFLPCGXOWP_1PM3zezF713kCoGBhpGIo5dI52-5ZQ`.

@@ -3106,3 +3106,19 @@ Run `32627471670`, job `97164927481`, and artifact count zero are unchanged. No 
 Exactly one first incomplete action remains: after orchestrator review, authorize a bounded frozen-contract provenance discriminator identifying the source tree, patch state, assembly-owner revision, and byte policy that generated all six frozen hashes. Do not amend the contract or launch CI first.
 
 Stop state: **WO-056 Phase P production source-lineage discriminator stopped at Outcome C for orchestrator review.**
+
+## Work Order 56 Phase P production-contract realignment and local translator qualification - active
+
+The orchestrator accepts source-lineage Outcome C at `0d98d8f67a285acc7602373299293def33af5a91` but rejects another open-ended frozen-hash provenance hunt. Two independent production replays agree at all `54/54` points. The preserved source-lineage harness instead hardcodes non-production `build/run40-audit/Diffusion` at commit `36af6e18c44d676cf3e9ddb172bb96162c2e7519`, reproducing five current frozen hashes plus superseded GrassDlight vertex `d61684a3...`; the frozen contract is therefore mixed non-production evidence.
+
+[DEC-011](../Decisions/DEC-011.md) selects the exact final production `P1` vector at Diffusion `14d156bf3a6993c172697fac83a937836c3b5561` as the only eligible production fixture lineage. The next bounded continuation remains WO-056 Phase P: in a temporary copy, bind the contract to the exact production pin/order/assembly owner/raw-byte policy and `P1` sources, recompute all converted-output fingerprints through the accepted patched GL4ES converter, and promote only the minimal contract/validator delta if every local explicit-LOD, cross-stage, legacy, mutation, rejection, retained-contract, and diff gate passes.
+
+Tracked engineering scope is limited to `scripts/ios/wo56p-shader-lod-compatibility-contract.json` and `scripts/ios/validate-ios-shader-lod-compatibility.py`. The old frozen and `d61684a3...` tuples must remain explicit rejected fixtures. Do not repeat the 54-stage audit or continue historical hash genealogy.
+
+No local `glslangValidator` is present at authorization. This does not authorize installation or CI; native Apple compile/link remains a later explicit CI gate. No GL4ES/Diffusion patch or source change, workflow, candidate, artifact, IPA/tempfile, device test, user evidence request, crash investigation, or later phase is authorized.
+
+Outcome A requires the exact two-file delta and all local translator/semantic/rejection gates, then stops before CI. Outcome B/C promotes no partial or hash-only contract and records the exact contradiction or unresolved boundary. The worker must update/read-back verify ControlPlane and both ledgers, push, verify clean local/tracking/live-remote equality, callback the orchestrator with exact source/output tuples and stop state, and stop for review.
+
+Stop state: **WO-056 Phase P production-contract realignment and local translator qualification is active. No CI, IPA, device, or crash work is authorized.**
+
+The authoritative Google Docs ledger authorization was revision-guarded and verified by heading, scope, callback, and stop-state readback at revision `AIroW36kP9-zG7CBHD3WGClwdaDof8D8o-6o3RIVczXbnOsNqlnBO7LwrNB9XSdTm-uFLPCGXOWP_1PM3zezF713kCoGBhpGIo5dI52-5ZQ`.
