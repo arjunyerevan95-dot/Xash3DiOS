@@ -380,3 +380,13 @@ Phase O's worker-produced result was build-qualified only. The later user-perfor
 - External state: run `32627471670`, job `97164927481`, artifacts `0`; no new workflow, candidate, IPA, tempfile, device, or crash work.
 - First incomplete action: construct and qualify the two-file production-bound candidate locally, select Outcome A/B/C, durably report, callback, and stop.
 - Google ledger continuity: source-lineage Outcome C was confirmed at revision `AIroW34Qa99hCDpSQ9L0SAeijCarysJzmwkPQQ7KBx4_qJG2zq1wmrxKhvrJkoEqRzzfK2ScZWldx6Ak7D1OgPlhcxZ8abmDMqFp-KtW4wU`; the realignment authorization was revision-guarded and verified at revision `AIroW36kP9-zG7CBHD3WGClwdaDof8D8o-6o3RIVczXbnOsNqlnBO7LwrNB9XSdTm-uFLPCGXOWP_1PM3zezF713kCoGBhpGIo5dI52-5ZQ`.
+
+## Phase P production-contract realignment — Outcome B evidence
+
+- Temporary candidate scope: only `scripts/ios/wo56p-shader-lod-compatibility-contract.json` and `scripts/ios/validate-ios-shader-lod-compatibility.py`; nothing promoted.
+- Dedicated result: pass for JSON/Python/diff, six production source/output fingerprints, fragment ESSL 300 core LOD `11/11/9` with zero EXT directive/intrinsic, vertex ESSL 100 then coherent ESSL 300 reconversion with `need_essl300=1` and attribute/varying mappings, legacy semantics, and positive/mutation/rejection fixtures.
+- Exact tuples (V/F/F-output/V300-output): BmodelSolid `7816b565...` / `8811a26c...` / `326ca15f...` / `95b30abc...`; StudioSolid `5a31f846...` / `6ba9ecdb...` / `b4aa2405...` / `143b7641...`; GrassDlight `f932c2bc...` / `1ac26eba...` / `fb3c4bb6...` / `a6f8ccec...`. Full hashes are recorded in the completed work-order section.
+- First contradiction: both retained validators fail identically at clean issuance and candidate roots with `Phase E scope changed: ['Decisions/DEC-011.md']` and `Phase G scope changed: ['Decisions/DEC-011.md']`. Their frozen lists omit DEC-011; repair exceeds the two-file engineering scope.
+- Outcome: **B**; no engineering promotion, CI, artifact, IPA, native/device/crash work, or later phase. Run/job/artifacts remain `32627471670` / `97164927481` / `0`.
+- First incomplete action: orchestrator decides whether a bounded retained-validator allowlist correction is authorized, then explicitly reissues local candidate qualification if appropriate.
+- Stop state: Outcome B; orchestrator review.

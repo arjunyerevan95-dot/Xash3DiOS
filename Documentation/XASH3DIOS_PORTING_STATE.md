@@ -3122,3 +3122,13 @@ Outcome A requires the exact two-file delta and all local translator/semantic/re
 Stop state: **WO-056 Phase P production-contract realignment and local translator qualification is active. No CI, IPA, device, or crash work is authorized.**
 
 The authoritative Google Docs ledger authorization was revision-guarded and verified by heading, scope, callback, and stop-state readback at revision `AIroW36kP9-zG7CBHD3WGClwdaDof8D8o-6o3RIVczXbnOsNqlnBO7LwrNB9XSdTm-uFLPCGXOWP_1PM3zezF713kCoGBhpGIo5dI52-5ZQ`.
+
+## Work Order 56 Phase P production-contract realignment — Outcome B
+
+The exact two-file detached candidate passed its dedicated production source/output, semantic, legacy, mutation, rejection, JSON, Python, and diff checks. Its final fragment core-LOD counts are `11/11/9`, all ESSL 300 EXT counts are zero, and all paired vertex stages reconvert coherently. No engineering file was promoted.
+
+The first mandatory retained gate is contradictory at the clean issuance baseline itself: the renderer-contract and selftest-boot validators reject tracked `Decisions/DEC-011.md` because their frozen Phase E/G scope lists stop at DEC-010. Repairing those retained validators is outside this checkpoint's exact engineering scope. Outcome **B** is therefore selected. CI run/job/artifacts remain `32627471670` / `97164927481` / `0`; no workflow, IPA, native/device/crash work, or later phase occurred.
+
+Exactly one first incomplete action remains: orchestrator review and a bounded decision on authorizing the two retained-validator allowlist additions before requalifying the same two-file candidate.
+
+Stop state: **WO-056 Phase P production-contract realignment stopped at Outcome B for orchestrator review.**

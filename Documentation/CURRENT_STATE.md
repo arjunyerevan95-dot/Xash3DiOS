@@ -15,7 +15,7 @@ Last updated: `2026-08-23T22:58:58+05:30`
 
 ## Current control state
 
-- Current issued work order: [WO-056](../WorkOrders/WO-056.md), Phase P production-contract realignment and local translator qualification checkpoint active
+- Current issued work order: [WO-056](../WorkOrders/WO-056.md), Phase P production-contract realignment and local translator qualification checkpoint stopped at Outcome B for orchestrator review
 - Status: production source-lineage Outcome C is accepted; [DEC-011](../Decisions/DEC-011.md) rejects the mixed non-production frozen fixtures as production authority and selects the twice-reproduced final production `P1` vector for one local-only contract realignment
 - Current phase: WO-056 Phase P - ordinary-runtime fragment explicit-LOD shader compatibility
 - First incomplete step: bind a temporary candidate contract to the exact production pin/order/assembly owner/raw-byte policy and `P1` source vector, recompute all affected converted-output fingerprints with the accepted patched GL4ES converter, and promote only the minimal contract/validator delta if every local semantic and rejection gate passes
@@ -100,6 +100,15 @@ Last updated: `2026-08-23T22:58:58+05:30`
 - Authoritative Google ledger corrected-head Outcome C append was revision-guarded and verified by readback at revision `AIroW36q5Bc6hPxrOyv7zFbwlHZcRL572Bl9seTU75OD5hSY7YCz382om_lmorLNLE_hHyO--amatBzWoGZteR0THqfWIlZ_TUEGr6ph9l8`
 - Authoritative Google ledger production source-lineage discriminator authorization was revision-guarded and verified by heading, scope, callback, and stop-state readback at revision `AIroW378EDpgRMtpG6fjzsJp2xAu1-H-vLFl6rSceaBpfLQxBzpQQaLq9sjAtzEI-FKehMYmWL-yqN52H82qIilVwzeo4QjHyZHZbOH0e3w`
 - Authoritative Google ledger production source-lineage Outcome C was verified at worker-reported revision `AIroW34Qa99hCDpSQ9L0SAeijCarysJzmwkPQQ7KBx4_qJG2zq1wmrxKhvrJkoEqRzzfK2ScZWldx6Ak7D1OgPlhcxZ8abmDMqFp-KtW4wU`; the active production-contract realignment order was revision-guarded and verified by heading, scope, callback, and stop-state readback at revision `AIroW36kP9-zG7CBHD3WGClwdaDof8D8o-6o3RIVczXbnOsNqlnBO7LwrNB9XSdTm-uFLPCGXOWP_1PM3zezF713kCoGBhpGIo5dI52-5ZQ`
+
+## WO-056 Phase P production-contract realignment — Outcome B
+
+- A detached candidate changed only the authorized contract and validator. Its JSON/Python checks, dedicated positive suite, production source/output fingerprints, explicit-LOD counts `11/11/9`, cross-stage reconversion, legacy semantics, and mutation/rejection suite passed.
+- Final production tuples were BmodelSolid V/F/output/reconverted-V `7816b565...` / `8811a26c...` / `326ca15f...` / `95b30abc...`; StudioSolid `5a31f846...` / `6ba9ecdb...` / `b4aa2405...` / `143b7641...`; GrassDlight `f932c2bc...` / `1ac26eba...` / `fb3c4bb6...` / `a6f8ccec...`.
+- First contradiction: both mandated retained checks fail unchanged at issuance `ad12d82181a083fbe4b771facfbedb0256d8e4d0` because their frozen Phase E/G scope lists omit the already tracked `Decisions/DEC-011.md`. The same failures occur with and without candidate files.
+- Outcome **B**: no engineering delta was promoted because repairing the retained validators would exceed the exact two-file engineering scope. Run `32627471670`, job `97164927481`, artifact count zero, and all native/device/crash boundaries remain unchanged.
+- Exactly one first incomplete action: orchestrator review and an explicit bounded order deciding whether the retained validators may add `Decisions/DEC-011.md` to their frozen scope before this same two-file candidate is requalified.
+- Stop state: **Outcome B; stopped for orchestrator review.**
 
 ## Referenced decisions
 
