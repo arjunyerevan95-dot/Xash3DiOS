@@ -3094,3 +3094,15 @@ Outcome A selects one deterministic production lineage and the minimum follow-on
 Stop state: **WO-056 Phase P production source-lineage discriminator is active. No implementation, CI, IPA, device, or crash work is authorized.**
 
 The authoritative Google Docs ledger authorization was revision-guarded and verified by heading, scope, callback, and stop-state readback at revision `AIroW378EDpgRMtpG6fjzsJp2xAu1-H-vLFl6rSceaBpfLQxBzpQQaLq9sjAtzEI-FKehMYmWL-yqN52H82qIilVwzeo4QjHyZHZbOH0e3w`.
+
+## Work Order 56 Phase P production source-lineage discriminator - Outcome C
+
+Two independent raw-Git-blob replays at Diffusion `14d156bf3a6993c172697fac83a937836c3b5561` and MainUI `8c68de2f2325a0130953719efc3ae413eb24e01a` are byte-for-byte identical at all 54 stage/source checkpoints. Pristine and `diffusion-ios.patch` share one six-source vector; `diffusion-shaders-ios.patch` changes all six; the remaining six production patches make no further representative-source change.
+
+None of the frozen BmodelSolid, StudioSolid, or GrassDlight vertex/fragment hashes appears at pristine baseline or any production stage. Outcome **C** is selected: the deterministic production lineage is established, but the frozen contract provenance remains a second unresolved lineage. The first failing boundary precedes patch stage 01; exact vectors, hunks, offsets, and bounded diffs are in `Evidence/WO-056/manifest.md`.
+
+Run `32627471670`, job `97164927481`, and artifact count zero are unchanged. No workflow, correction, candidate, artifact, IPA/tempfile, device evidence/request, crash investigation, or later phase was consumed.
+
+Exactly one first incomplete action remains: after orchestrator review, authorize a bounded frozen-contract provenance discriminator identifying the source tree, patch state, assembly-owner revision, and byte policy that generated all six frozen hashes. Do not amend the contract or launch CI first.
+
+Stop state: **WO-056 Phase P production source-lineage discriminator stopped at Outcome C for orchestrator review.**

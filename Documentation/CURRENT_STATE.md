@@ -1,6 +1,6 @@
 # Xash3DiOS Current State
 
-Last updated: `2026-08-23T14:30:24+05:30`
+Last updated: `2026-08-23T17:34:12+05:30`
 
 ## Repository
 
@@ -15,10 +15,10 @@ Last updated: `2026-08-23T14:30:24+05:30`
 
 ## Current control state
 
-- Current issued work order: [WO-056](../WorkOrders/WO-056.md), Phase P production source-lineage discriminator checkpoint active
-- Status: Phase O Outcome A and the prior Phase P checkpoints remain accepted; corrected-head CI requalification Outcome C is accepted and one documentation-only/local-replay discriminator is authorized to resolve the six production assembled-source fingerprints
+- Current issued work order: [WO-056](../WorkOrders/WO-056.md), Phase P production source-lineage discriminator stopped at Outcome C for orchestrator review
+- Status: two independent raw-byte production replays are deterministic and identical, but none of the six frozen representative source hashes occurs at pristine pin or any production patch stage; the contract lineage therefore remains unresolved
 - Current phase: WO-056 Phase P - ordinary-runtime fragment explicit-LOD shader compatibility
-- First incomplete step: in two independent disposable Diffusion checkouts at pin `14d156bf3a6993c172697fac83a937836c3b5561`, replay the canonical production patch order step by step and record the exact first stage at which each BmodelSolid/StudioSolid/GrassDlight vertex/fragment assembled-source hash diverges from the frozen Phase P contract
+- First incomplete step: after orchestrator review, authorize one bounded frozen-contract provenance discriminator that identifies the exact source tree, patch state, assembly-owner revision, and byte policy that generated all six frozen hashes; do not amend the contract or launch CI until that lineage is reproduced
 - Corrected boundary: GL4ES's generic ESSL probe formed malformed `#version 300 es#extension ...` source, leaving `hardext.glsl300es=0`; `BuildExtensionsList` therefore withheld `GL_EXT_texture_array` before the engine layer query
 - Verified Phase P boundary: texture-array use promotes the affected fragment shaders to ESSL 300, but baseline GL4ES still applies its ESSL 100 extension rewrite, emitting a rejected `GL_EXT_shader_texture_lod` directive and undeclared `texture2DLodEXT`; the paired vertex stage remains ESSL 100 unless GL4ES's existing program compatibility/reconversion state carries an ESSL 300 requirement across both stages
 - Preserved unresolved boundary: the user-observed hard crash occurs after the last durable engine record and remains separate from Phase P
@@ -39,7 +39,7 @@ Last updated: `2026-08-23T14:30:24+05:30`
 - Highest physical-device-qualified gate: Bundle 130 ordinary provider/engine/Diffusion texture-array admission with `2,048` live layers
 - Highest build-qualified ordinary candidate: WO-056 Phase O / Bundle 130
 - Latest device result: unplanned but accepted Bundle 130 observation; array admission succeeds, the same incomplete sky/water/text scene appears, affected fragment shader families fail, and the user observes a hard crash after frame 56 or later
-- First unqualified gate: deterministic production-patched Diffusion representative source fingerprints; the full Diffusion native/package/IPA matrix remains unexecuted after the sole run stopped at that gate
+- First unqualified gate: provenance of the six frozen representative source fingerprints; the deterministic production lineage is known, but the frozen lineage is not reproduced and the full Diffusion native/package/IPA matrix remains unexecuted
 - Latest candidate tuple: `f42f2c96b61624fe510fe32288bfbfa6873cc686`; workflow `32570119378`; job `97024299913`; artifact `9475150885`
 - Latest IPA: `xash3d-fwgs-ios-arm64.ipa`, Bundle 130, `8,718,358` bytes, SHA-256 `9FD6E3DD7E8FE19B4B3987479D2E69FFD99EF7FF4368FD1F9884286BB095BB5D`
 
@@ -76,6 +76,10 @@ Last updated: `2026-08-23T14:30:24+05:30`
 - Sole requalification workflow `32627471670`, job `97164927481`, failed in the build step after engine/Half-Life arm64 completion because all six BmodelSolid/StudioSolid/GrassDlight assembled vertex/fragment sources differed from the frozen representative contract fingerprints. IPA verification/upload were skipped and artifact count is zero.
 - Requalification Outcome C: no engineering correction, rerun, candidate, IPA, tempfile upload, device evidence, crash investigation, or later-phase work was produced or consumed.
 - The orchestrator accepts that Outcome C and authorizes only a two-replay, stage-by-stage production Diffusion source-lineage discriminator. It may use ignored disposable helpers/checkouts and must preserve raw Latin-1/newline bytes; it may not edit the contract, validator, patch stack, source, CI, or package surfaces.
+- Production source-lineage discriminator Outcome C: two independent checkouts at Diffusion `14d156bf3a6993c172697fac83a937836c3b5561` and MainUI `8c68de2f2325a0130953719efc3ae413eb24e01a` consumed raw committed source and patch bytes. All `54` stage/source assemblies were byte-for-byte equal across replays, with zero CRLF bytes in final sources.
+- The pristine and post-`diffusion-ios.patch` source vectors are identical. `diffusion-shaders-ios.patch` is the first patch to change all six sources; stages 03 through 08 make no further change. Exact byte counts, hashes, hunks, byte offsets, and bounded diffs are recorded in the evidence manifest.
+- None of the six frozen hashes occurs at pristine baseline or any of the eight production patch stages. Outcome A cannot select an authoritative frozen-versus-production lineage and Outcome B is contradicted; Outcome C fixes the first failing boundary before patch stage 01, between the frozen contract provenance and the pinned pristine `build_source` inputs.
+- CI state is unchanged: run `32627471670`, job `97164927481`, remains the latest failed corrected-head run; artifact count remains zero; no workflow, candidate, IPA/tempfile, device evidence, crash work, or engineering change was consumed.
 - Preserve explicit mip-LOD behavior; no implicit sampling, constant-LOD, disabled-family, per-family, force, fabricated-capability, unlinked-program, CPU/2-D/atlas, or error-suppression workaround is allowed.
 - Do not alter accepted texture-array admission, arguments, diagnostic harness, materials/data, model/vegetation policy, maps, menus, input, transitions, gameplay, `ch1map1`, crash handling, or platform lifecycle. No Phase P device test is authorized.
 

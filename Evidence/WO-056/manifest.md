@@ -343,3 +343,26 @@ Phase O's worker-produced result was build-qualified only. The later user-perfor
 - Prohibited evidence consumption: no workflow, artifact, IPA, tempfile, device observation, crash investigation, contract amendment, validator/build/patch/source edit, or later phase.
 - First incomplete action: perform the two exact stage-by-stage replays and select Outcome A/B/C at the discriminator stop gate.
 - Google ledger authorization: revision-guarded append and heading/scope/callback/stop-state readback verified at revision `AIroW378EDpgRMtpG6fjzsJp2xAu1-H-vLFl6rSceaBpfLQxBzpQQaLq9sjAtzEI-FKehMYmWL-yqN52H82qIilVwzeo4QjHyZHZbOH0e3w`.
+
+## Phase P production source-lineage discriminator - Outcome C evidence
+
+- Issuance: clean local/tracking/live-remote equality at `1dd8e832505246a27d3af465e1b2f131883b1987`; no active/newer workflow. Independent disposable clones used Diffusion `14d156bf3a6993c172697fac83a937836c3b5561` and MainUI `8c68de2f2325a0130953719efc3ae413eb24e01a`.
+- Raw-byte method: source and patch inputs came directly from committed Git blobs; apply used command-level `core.autocrlf=false` / `core.eol=lf`. Final assemblies contain zero CRLF bytes. Patch order/modes exactly match `builddiffusion.sh`.
+- Stage aliases: `00` pristine; `01` diffusion-ios; `02` diffusion-shaders; `03` WO49 topology; `04` WO49 transform; `05` WO51 material state; `06` WO52 material trace; `07` WO52 inactive sampler; `08` WO56 array admission.
+- Exact vector `P0` (`bytes/SHA-256`): BmodelSolid-V `8795/640a0b63a4ec499947b3c688a9a2bd2a3a45afd9f6a709d5392c18742546bae2`; BmodelSolid-F `68959/2148a586bc3acc9e10462dbe77a308d6c84f3545882da68dd835a6c030b9ec2a`; StudioSolid-V `21507/e8aabf128db7baa350d8c01fbc3c44cbb2695fad3c1581def929e0a41812fca5`; StudioSolid-F `50641/3661578ae9e4920fe77a1a798c6add16de9017ef867d189743a15be159491879`; GrassDlight-V `15574/73c0a77cf052b1b57d64d6cc02da6674ea8df97c272f17d1731c890dbdc05de9`; GrassDlight-F `34933/1f4aca4a8d50236a540b9dfaa9c6714925f6d1c9ef6d7039a7a996e389a3fb9c`.
+- Exact vector `P1` (`bytes/SHA-256`): BmodelSolid-V `8794/7816b56534758074110b00c7579247cb849d656bcb1a814c237b49b52fda7267`; BmodelSolid-F `69242/8811a26c3b83ea6f81c825d0844837a5ffcd6e497cd610ead94d1b1b59e22bb2`; StudioSolid-V `21534/5a31f846473a9ebbc8394ec37dac263f55b198b5d272d138e31999e5cb2ea5a8`; StudioSolid-F `50922/6ba9ecdb22cbbc0db8fd649882cdc420666dd0d1b193ca84ef76818ce76bcf41`; GrassDlight-V `15602/f932c2bc6cdc9bed77a65853d6a5109e8908948443ca47bd5d14fb7a570e89fa`; GrassDlight-F `35321/1ac26ebaf4c1b16a54fe95e342b5d8a90c59d350f53a9ca0549201cda747d535`.
+
+| Replay | 00 | 01 | 02 | 03 | 04 | 05 | 06 | 07 | 08 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| A complete vector | P0 | P0 | P1 | P1 | P1 | P1 | P1 | P1 | P1 |
+| B complete vector | P0 | P0 | P1 | P1 | P1 | P1 | P1 | P1 | P1 |
+
+- Equality proof: A/B raw assemblies are byte-for-byte equal at all `54/54` stage/source points; complete metric tables are identical.
+- Frozen comparison: none of the six frozen hashes occurs in P0, P1, or any stage. The first failing boundary is therefore before stage `00`, between frozen-contract provenance and pinned pristine `build_source` inputs.
+- First actual mutations: all are in `diffusion-shaders-ios.patch`. BmodelSolid-V: `glsl/bmodelsolid_vp.glsl`, `@@ -61 +61 @@`, byte `6874`, line `251`, `0.0f` -> `0.0`. BmodelSolid-F: `glsl/bmodelsolid_fp.glsl`, `@@ -298 +298 @@`, byte `6739`, line `220`, `sampleIndex` -> `float( sampleIndex )`.
+- StudioSolid-V/F: `glsl/studiosolid_vp.glsl` `@@ -32 +32 @@`, byte `6679`, line `218`; `glsl/studiosolid_fp.glsl` `@@ -253 +253 @@`, byte `6669`, line `218`. Both add the explicit `float( sampleIndex )` cast.
+- GrassDlight-V/F: `glsl/grassdlight_vp.glsl` `@@ -64 +64 @@`, byte `6720`, line `219`; `glsl/grassdlight_fp.glsl` `@@ -74 +74 @@`, byte `6725`, line `219`. Both add the same explicit cast.
+- Controls: contract JSON parse passed; the dedicated integration/contract/rejection self-test passed against preserved `build/wo56p-gl4es-replay`. A diagnostic pristine-nested-tree invocation rejected absent accepted-patch tokens and changed nothing.
+- Outcome: **C**. Production is deterministic, but frozen provenance is a second unresolved lineage. Exactly one first incomplete action is a bounded frozen-contract provenance discriminator for source tree, patch state, assembly-owner revision, and byte policy.
+- External state unchanged: run `32627471670`, job `97164927481`, artifacts `0`; no CI/rerun, candidate, IPA/tempfile, device evidence/request, crash work, engineering edit, or later phase.
+- Stop state: Outcome C; stopped for orchestrator review.
