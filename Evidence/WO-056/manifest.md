@@ -390,3 +390,4 @@ Phase O's worker-produced result was build-qualified only. The later user-perfor
 - Outcome: **B**; no engineering promotion, CI, artifact, IPA, native/device/crash work, or later phase. Run/job/artifacts remain `32627471670` / `97164927481` / `0`.
 - First incomplete action: orchestrator decides whether a bounded retained-validator allowlist correction is authorized, then explicitly reissues local candidate qualification if appropriate.
 - Stop state: Outcome B; orchestrator review.
+- Readback: repository reporting commit `0e96bfa0d0b3d0d0f96d4ae45bc4e2b518aaccc4`; Google ledger revision `AIroW36jJl4-63gAtpb2ytosx-5ZOtxKZb2OvZKv4GHE1fbWfAVHbAOaWe82P-kr25i870J0A4xUzdoQpLtBf2_2VH2E3z90WXoZY6SCW64`, with heading/commit/stop-state exact matches.

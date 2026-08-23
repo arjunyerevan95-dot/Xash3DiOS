@@ -109,6 +109,7 @@ Last updated: `2026-08-23T22:58:58+05:30`
 - Outcome **B**: no engineering delta was promoted because repairing the retained validators would exceed the exact two-file engineering scope. Run `32627471670`, job `97164927481`, artifact count zero, and all native/device/crash boundaries remain unchanged.
 - Exactly one first incomplete action: orchestrator review and an explicit bounded order deciding whether the retained validators may add `Decisions/DEC-011.md` to their frozen scope before this same two-file candidate is requalified.
 - Stop state: **Outcome B; stopped for orchestrator review.**
+- Repository reporting commit `0e96bfa0d0b3d0d0f96d4ae45bc4e2b518aaccc4`; authoritative Google ledger Outcome B heading, commit, and stop-state readback verified at revision `AIroW36jJl4-63gAtpb2ytosx-5ZOtxKZb2OvZKv4GHE1fbWfAVHbAOaWe82P-kr25i870J0A4xUzdoQpLtBf2_2VH2E3z90WXoZY6SCW64`.
 
 ## Referenced decisions
 

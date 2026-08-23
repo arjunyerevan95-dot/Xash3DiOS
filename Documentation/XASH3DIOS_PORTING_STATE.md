@@ -3132,3 +3132,5 @@ The first mandatory retained gate is contradictory at the clean issuance baselin
 Exactly one first incomplete action remains: orchestrator review and a bounded decision on authorizing the two retained-validator allowlist additions before requalifying the same two-file candidate.
 
 Stop state: **WO-056 Phase P production-contract realignment stopped at Outcome B for orchestrator review.**
+
+Durable readback: repository reporting commit `0e96bfa0d0b3d0d0f96d4ae45bc4e2b518aaccc4`; Google ledger Outcome B heading, commit, and stop state verified at revision `AIroW36jJl4-63gAtpb2ytosx-5ZOtxKZb2OvZKv4GHE1fbWfAVHbAOaWe82P-kr25i870J0A4xUzdoQpLtBf2_2VH2E3z90WXoZY6SCW64`.
