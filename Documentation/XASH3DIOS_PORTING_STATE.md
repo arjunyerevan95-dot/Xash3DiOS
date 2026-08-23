@@ -3080,3 +3080,17 @@ Exactly one first incomplete action remains: after orchestrator review, explicit
 Stop state: **WO-056 Phase P corrected-head CI requalification has stopped at Outcome C for orchestrator review. No correction, rerun, device test, crash work, or later phase is authorized.**
 
 The authoritative Google Docs ledger Outcome C append was revision-guarded and verified by heading/stop-state readback at revision `AIroW36q5Bc6hPxrOyv7zFbwlHZcRL572Bl9seTU75OD5hSY7YCz382om_lmorLNLE_hHyO--amatBzWoGZteR0THqfWIlZ_TUEGr6ph9l8`.
+
+## Work Order 56 Phase P production source-lineage discriminator - active
+
+The orchestrator accepts corrected-head CI requalification Outcome C at `3fd9cbbc48f0d2ea486f06b1a546c25bd20a196e`. Run `32627471670`, job `97164927481`, failed after engine/Half-Life arm64 completion because all six BmodelSolid/StudioSolid/GrassDlight assembled vertex/fragment source fingerprints differed from the frozen Phase P contract. Artifact count is zero; no IPA, tempfile, correction, rerun, device evidence, or crash work exists. No newer or active relevant workflow exists at authorization.
+
+The next bounded continuation remains WO-056 Phase P. In two independent disposable Diffusion checkouts at exact pin `14d156bf3a6993c172697fac83a937836c3b5561`, replay the canonical production Diffusion patches from `scripts/ios/builddiffusion.sh` one stage at a time. Using the unchanged `scripts/ios/validate-diffusion-mobile-shaders.py::build_source` owner and exact frozen filenames/defines, record raw Latin-1 byte counts and SHA-256 values for all six sources at pristine baseline, after every patch, and at final production state. Prove both replays agree, then attribute the first exact patch/file/hunk or assembly-input divergence from every frozen fingerprint.
+
+This is a discriminator only. It authorizes ignored temporary checkouts/helpers and durable record updates, but no tracked engineering/source/configuration edit, contract fingerprint change, validator/build/patch change, CI, candidate, artifact, IPA/tempfile, device test, user evidence request, crash investigation, or later phase. Optional converter comparison is read-only supporting evidence and cannot qualify or amend the contract.
+
+Outcome A selects one deterministic production lineage and the minimum follow-on action without implementing it. Outcome B records a reproduced frozen final lineage that contradicts CI and the minimum CI-environment capture, without launching it. Outcome C records non-determinism, unreproducible pin/patch state, or another unresolved minimum discriminator. The worker must update/read-back verify ControlPlane and both ledgers, push, verify clean local/tracking/live-remote equality, callback the orchestrator, and stop.
+
+Stop state: **WO-056 Phase P production source-lineage discriminator is active. No implementation, CI, IPA, device, or crash work is authorized.**
+
+The authoritative Google Docs ledger authorization was revision-guarded and verified by heading, scope, callback, and stop-state readback at revision `AIroW378EDpgRMtpG6fjzsJp2xAu1-H-vLFl6rSceaBpfLQxBzpQQaLq9sjAtzEI-FKehMYmWL-yqN52H82qIilVwzeo4QjHyZHZbOH0e3w`.

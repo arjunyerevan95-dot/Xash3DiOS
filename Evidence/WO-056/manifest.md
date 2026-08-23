@@ -331,3 +331,15 @@ Phase O's worker-produced result was build-qualified only. The later user-perfor
 - Exactly one first incomplete action: after orchestrator review, explicitly authorize one bounded source-lineage discriminator that captures and compares those six CI assembled shaders with the frozen contract sources and selects the deterministic fingerprint lineage before any future CI run.
 - Google ledger readback: `AIroW36q5Bc6hPxrOyv7zFbwlHZcRL572Bl9seTU75OD5hSY7YCz382om_lmorLNLE_hHyO--amatBzWoGZteR0THqfWIlZ_TUEGr6ph9l8`.
 - Stop state: Outcome C fixed; no correction, rerun, device test, crash investigation, or later phase is authorized before orchestrator review.
+
+## Phase P production source-lineage discriminator authorization
+
+- Issuance baseline: `3fd9cbbc48f0d2ea486f06b1a546c25bd20a196e`; branch `agent/ios-proof-of-life`; local/tracking/live remote equal and clean.
+- Latest and sole corrected-head run: `32627471670`, job `97164927481`, head `955180ae4493bf91177de92e858c6d6d1c2b6c8e`, conclusion `failure`; no newer or active relevant run at authorization.
+- Failed evidence boundary: BmodelSolid V/F, StudioSolid V/F, and GrassDlight V/F production assembled-source fingerprints all differed from the frozen contract; artifact API count `0`; no IPA or tempfile.
+- Frozen source fingerprints: BmodelSolid V `a90ba14bde9de6a4512f3d8215147843c533d70d1a13b8ba5feac4a2a78ffdd6`, F `9b4a2da8d24aa5dd86b9c376832d2cb5e20c932ec922545f923edf31f02dcad2`; StudioSolid V `9f8a7608a22050f382fd842581e51c0a2abaca2a121066f0f9449dd6588321a8`, F `f1892d636d84e83f5d7ca7b5ea60a9b8655e1a8985aa2b357bad701a913f0250`; GrassDlight V `c101ec6d21d8c42f5b22c306151b6ebb2769e59b5aaca4d57f297a1e3430878b`, F `c830d70f1eef4aeb8ee845f106d58ca77d1ede6bc71f50b39b58eee2f551e893`.
+- Exact production sources: Diffusion pin `14d156bf3a6993c172697fac83a937836c3b5561`; order owner `scripts/ios/builddiffusion.sh`; assembly owner `scripts/ios/validate-diffusion-mobile-shaders.py::build_source`; contract `scripts/ios/wo56p-shader-lod-compatibility-contract.json`.
+- Authorized evidence: two independent disposable stepwise patch replays, complete raw-byte/byte-count/SHA-256 stage tables for all six sources, first-divergence attribution and bounded diffs, optional read-only converter comparison, and local non-mutating controls.
+- Prohibited evidence consumption: no workflow, artifact, IPA, tempfile, device observation, crash investigation, contract amendment, validator/build/patch/source edit, or later phase.
+- First incomplete action: perform the two exact stage-by-stage replays and select Outcome A/B/C at the discriminator stop gate.
+- Google ledger authorization: revision-guarded append and heading/scope/callback/stop-state readback verified at revision `AIroW378EDpgRMtpG6fjzsJp2xAu1-H-vLFl6rSceaBpfLQxBzpQQaLq9sjAtzEI-FKehMYmWL-yqN52H82qIilVwzeo4QjHyZHZbOH0e3w`.
