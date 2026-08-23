@@ -317,3 +317,17 @@ Phase O's worker-produced result was build-qualified only. The later user-perfor
 - Active executor/callback: `01a02a6a-349a-75f1-88dc-c1ad920dd38e` must update/read back all records and callback `01a02450-2442-7bd3-9232-46419e80d731` after clean local/live-remote equality.
 - Google ledger order: document `1IYL3pI07fWvoYniP_NxZ7yO3gz9vbnM6sBFK8BT2zLU`, tab `t.0`, verified revision `AIroW35OsP6RxB1exqB2h_HobCgpq8o-_398M04s5xAlilL0HrWjYyBNVqCKjk9IzBpCmWrgppbNn-3zE1_nQAyZRyMXjTfzdksMlhk5ogc`.
 - Stop gate: select A/B/C, report exactly once, push records, callback, and stop for orchestrator review.
+
+## Phase P corrected-head CI requalification — Outcome C
+
+- Preflight identity: issuance `955180ae4493bf91177de92e858c6d6d1c2b6c8e`; corrected engineering baseline `bc1bc0a95667d49da889707b7191e54616103a35`; local/tracking/live remote clean and equal; no active workflow before dispatch.
+- Drift proof: `bc1bc0a..955180ae` changes only `Documentation/CURRENT_STATE.md`, `Documentation/XASH3DIOS_PORTING_STATE.md`, `Evidence/WO-056/manifest.md`, and `WorkOrders/WO-056.md`; all named engineering blobs are identical.
+- Local gates: exact two allowlist additions confirmed; Python compile, JSON parse, shader-LOD positive/mutation/rejection, cumulative self-test, renderer-contract, issuance diff check, and working-tree `git diff --check` pass.
+- Sole workflow: run `32627471670`, job `97164927481`, event `workflow_dispatch`, head `955180ae4493bf91177de92e858c6d6d1c2b6c8e`, conclusion `failure`.
+- Step record: setup `success`; checkout `success`; Apple toolchain `success`; dependencies `success`; engine/Half-Life/Diffusion build `failure`; IPA contract `skipped`; artifact upload `skipped`; post-checkout `success`; complete job `success`.
+- First failing gate: production representative shader-LOD assembled-source fingerprints. BmodelSolid V/F, StudioSolid V/F, and GrassDlight V/F all changed relative to the frozen contract after engine/Half-Life arm64 completion.
+- Artifact state: GitHub API `total_count=0`; no artifact, IPA, tempfile object/link, device request/evidence, crash work, engineering correction, rerun, or later phase.
+- Outcome: **C**. Minimum discriminator is the production-patched Diffusion assembly lineage versus the frozen representative contract source lineage.
+- Exactly one first incomplete action: after orchestrator review, explicitly authorize one bounded source-lineage discriminator that captures and compares those six CI assembled shaders with the frozen contract sources and selects the deterministic fingerprint lineage before any future CI run.
+- Google ledger readback: `AIroW36q5Bc6hPxrOyv7zFbwlHZcRL572Bl9seTU75OD5hSY7YCz382om_lmorLNLE_hHyO--amatBzWoGZteR0THqfWIlZ_TUEGr6ph9l8`.
+- Stop state: Outcome C fixed; no correction, rerun, device test, crash investigation, or later phase is authorized before orchestrator review.

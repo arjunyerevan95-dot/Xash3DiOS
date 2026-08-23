@@ -1,6 +1,6 @@
 # Xash3DiOS Current State
 
-Last updated: `2026-08-23T13:29:39+05:30`
+Last updated: `2026-08-23T13:48:42+05:30`
 
 ## Repository
 
@@ -15,17 +15,17 @@ Last updated: `2026-08-23T13:29:39+05:30`
 
 ## Current control state
 
-- Current issued work order: [WO-056](../WorkOrders/WO-056.md), Phase P corrected-head CI requalification active
-- Status: Phase O Outcome A and Phase P source-lineage/patch-materialization/integration Outcome C are accepted; one corrected-head CI requalification checkpoint is active
+- Current issued work order: [WO-056](../WorkOrders/WO-056.md), Phase P corrected-head CI requalification Outcome C at orchestrator review
+- Status: Phase O Outcome A and Phase P source-lineage/patch-materialization/integration Outcome C are accepted; corrected-head CI requalification stopped at Outcome C after its sole workflow failed the production representative source-fingerprint gate
 - Current phase: WO-056 Phase P - ordinary-runtime fragment explicit-LOD shader compatibility
-- First incomplete step: reconcile the published issuance head without engineering changes, rerun the bounded local preflight, then launch exactly one iOS Proof of Life workflow on that head
+- First incomplete step: after orchestrator review, explicitly authorize one bounded source-lineage discriminator that captures and compares the six production-patched CI assembled shaders with the frozen contract sources and selects the deterministic fingerprint lineage before any future CI run
 - Corrected boundary: GL4ES's generic ESSL probe formed malformed `#version 300 es#extension ...` source, leaving `hardext.glsl300es=0`; `BuildExtensionsList` therefore withheld `GL_EXT_texture_array` before the engine layer query
 - Verified Phase P boundary: texture-array use promotes the affected fragment shaders to ESSL 300, but baseline GL4ES still applies its ESSL 100 extension rewrite, emitting a rejected `GL_EXT_shader_texture_lod` directive and undeclared `texture2DLodEXT`; the paired vertex stage remains ESSL 100 unless GL4ES's existing program compatibility/reconversion state carries an ESSL 300 requirement across both stages
 - Preserved unresolved boundary: the user-observed hard crash occurs after the last durable engine record and remains separate from Phase P
 
 ## Active worker binding
 
-- Active executor: preserved Xash Worker Gen 3 thread `01a02a6a-349a-75f1-88dc-c1ad920dd38e`, host `slingshot:env_e_6a6f826a8f4483218b6956e12dea53cc`, reactivated for the one-run corrected-head CI requalification checkpoint.
+- Completion executor: preserved Xash Worker Gen 3 thread `01a02a6a-349a-75f1-88dc-c1ad920dd38e`, host `slingshot:env_e_6a6f826a8f4483218b6956e12dea53cc`; stopped at the corrected-head CI requalification Outcome C review gate.
 - Prior patch-materialization transport failures wrote no repository state; the accepted implementation is the mechanically derived top-level patch at `d37bf36a5b707273359728a5ae08f81e712bea5d`.
 - Superseded continuation worker: `Continue Work Order 56`, thread `01a022ae-5ea9-7121-8512-2fe40f5e99a2`; retained as implementation history after repeated context/policy transport failures and no longer the active executor.
 - Superseded execution worker: `Xash3DiOS Worker Bootstrap`, thread `019ff1ea-8387-7291-b391-f030d22db2ef`; retained as implementation history but removed from active execution after repeated context/policy transport failures and current `systemError` status.
@@ -39,7 +39,7 @@ Last updated: `2026-08-23T13:29:39+05:30`
 - Highest physical-device-qualified gate: Bundle 130 ordinary provider/engine/Diffusion texture-array admission with `2,048` live layers
 - Highest build-qualified ordinary candidate: WO-056 Phase O / Bundle 130
 - Latest device result: unplanned but accepted Bundle 130 observation; array admission succeeds, the same incomplete sky/water/text scene appears, affected fragment shader families fail, and the user observes a hard crash after frame 56 or later
-- First unqualified gate: the full retained native/package/IPA matrix on the corrected final engineering tree, using the single workflow authorized by the active checkpoint
+- First unqualified gate: deterministic production-patched Diffusion representative source fingerprints; the full Diffusion native/package/IPA matrix remains unexecuted after the sole run stopped at that gate
 - Latest candidate tuple: `f42f2c96b61624fe510fe32288bfbfa6873cc686`; workflow `32570119378`; job `97024299913`; artifact `9475150885`
 - Latest IPA: `xash3d-fwgs-ios-arm64.ipa`, Bundle 130, `8,718,358` bytes, SHA-256 `9FD6E3DD7E8FE19B4B3987479D2E69FFD99EF7FF4368FD1F9884286BB095BB5D`
 
@@ -72,6 +72,9 @@ Last updated: `2026-08-23T13:29:39+05:30`
 - The earlier GrassDlight assembled-vertex source fingerprint is corrected to the reproducible `c101ec6d21d8c42f5b22c306151b6ebb2769e59b5aaca4d57f297a1e3430878b`; accepted baseline and reconverted outputs remain `f1e4e9c4...` and `19c1c6ea...`, so shader behavior evidence is unchanged.
 - Sole workflow `32616482259`, job `97137964583`, passed every validator through the new shader-LOD gate and then failed because the cumulative Phase G scope allowlist omitted two newly authorized modified validation files. The mechanical allowlist correction passes local self-test and renderer-contract suites, but no duplicate CI run is permitted.
 - Outcome C: GitHub reports zero artifacts; no candidate, IPA, tempfile upload, device evidence, crash investigation, or later-phase work was produced or consumed.
+- Corrected-head preflight on issuance `955180ae4493bf91177de92e858c6d6d1c2b6c8e` passed: only the four authorized records differ from `bc1bc0a95667d49da889707b7191e54616103a35`; all engineering blobs and both allowlist corrections match; Python/JSON, shader-LOD, cumulative self-test, renderer-contract, and diff checks pass cleanly.
+- Sole requalification workflow `32627471670`, job `97164927481`, failed in the build step after engine/Half-Life arm64 completion because all six BmodelSolid/StudioSolid/GrassDlight assembled vertex/fragment sources differed from the frozen representative contract fingerprints. IPA verification/upload were skipped and artifact count is zero.
+- Requalification Outcome C: no engineering correction, rerun, candidate, IPA, tempfile upload, device evidence, crash investigation, or later-phase work was produced or consumed.
 - Preserve explicit mip-LOD behavior; no implicit sampling, constant-LOD, disabled-family, per-family, force, fabricated-capability, unlinked-program, CPU/2-D/atlas, or error-suppression workaround is allowed.
 - Do not alter accepted texture-array admission, arguments, diagnostic harness, materials/data, model/vegetation policy, maps, menus, input, transitions, gameplay, `ch1map1`, crash handling, or platform lifecycle. No Phase P device test is authorized.
 
@@ -87,7 +90,7 @@ Last updated: `2026-08-23T13:29:39+05:30`
 - Phase P contract: `scripts/ios/wo56p-shader-lod-compatibility-contract.json`, `4,575` worktree bytes, SHA-256 `C0A82F427B1FE2A6F734E40F9E8996EE4761CB039925BDC6176A3C95ACDCF125`
 - Phase P validator: `scripts/ios/validate-ios-shader-lod-compatibility.py`, `14,965` worktree bytes, SHA-256 `E7B7FF196F1B90C4A2F49590B7F1BEE71CD977DAB4D8ED67BFF2E20CC15BB1B6`
 - Phase P patch: `scripts/ios/gl4es-wo56-shader-lod-compatibility-ios.patch`, `10,564` bytes, SHA-256 `91AB64B6C392303BEA189BE2D66E409836489DFC6F46F2FC3DFB0BACCFA60FE4`
-- Authoritative Google ledger corrected-head CI requalification order was revision-guarded and verified by readback at revision `AIroW35OsP6RxB1exqB2h_HobCgpq8o-_398M04s5xAlilL0HrWjYyBNVqCKjk9IzBpCmWrgppbNn-3zE1_nQAyZRyMXjTfzdksMlhk5ogc`
+- Authoritative Google ledger corrected-head Outcome C append was revision-guarded and verified by readback at revision `AIroW36q5Bc6hPxrOyv7zFbwlHZcRL572Bl9seTU75OD5hSY7YCz382om_lmorLNLE_hHyO--amatBzWoGZteR0THqfWIlZ_TUEGr6ph9l8`
 
 ## Referenced decisions
 

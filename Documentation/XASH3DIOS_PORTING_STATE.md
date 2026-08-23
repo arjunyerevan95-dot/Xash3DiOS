@@ -3065,6 +3065,18 @@ Outcome B records preflight drift or a deterministic local contradiction without
 
 Active executor is preserved Xash Worker Gen 3 thread `01a02a6a-349a-75f1-88dc-c1ad920dd38e`. Device testing, user evidence requests, crash investigation, scene/stability/gameplay claims, later phases, duplicate workflows, and unrelated cleanup remain prohibited.
 
-Stop state: **WO-056 Phase P corrected-head CI requalification checkpoint is active. Exactly one workflow is authorized after clean preflight.**
+Superseded stop state: the corrected-head requalification order was active at issuance and is closed by Outcome C below.
 
-The authoritative Google Docs ledger order append was revision-guarded and verified by heading/stop-state readback at revision `AIroW35OsP6RxB1exqB2h_HobCgpq8o-_398M04s5xAlilL0HrWjYyBNVqCKjk9IzBpCmWrgppbNn-3zE1_nQAyZRyMXjTfzdksMlhk5ogc`.
+## Work Order 56 Phase P corrected-head CI requalification — Outcome C
+
+Clean preflight passed on issuance `955180ae4493bf91177de92e858c6d6d1c2b6c8e`. Local/tracking/live remote were equal and clean with no active workflow. Its difference from corrected engineering head `bc1bc0a95667d49da889707b7191e54616103a35` is limited to the four authorized records; all frozen engineering blobs and exact allowlist additions match. Python/JSON, shader-LOD, cumulative self-test, renderer-contract, and diff checks pass.
+
+Exactly one workflow was consumed: run `32627471670`, job `97164927481`, `workflow_dispatch`, head `955180ae4493bf91177de92e858c6d6d1c2b6c8e`. Setup, checkout, Apple toolchain, dependencies, and post-checkout passed. The build step failed after engine/Half-Life arm64 completion because the production representative shader-LOD check found changed assembled fingerprints for all six BmodelSolid/StudioSolid/GrassDlight vertex/fragment sources. IPA verification and upload were skipped.
+
+Outcome **C** is selected. GitHub artifact count is zero; no candidate, IPA, tempfile, device request/evidence, crash investigation, engineering correction, rerun, or later phase exists. The first unqualified boundary is the production-patched Diffusion representative-source lineage; later Diffusion native/package/IPA/marker/architecture/data gates were not executed.
+
+Exactly one first incomplete action remains: after orchestrator review, explicitly authorize one bounded source-lineage discriminator that captures and compares the six production-patched CI assembled shaders with the frozen contract sources and selects the deterministic contract fingerprint lineage before any future CI run.
+
+Stop state: **WO-056 Phase P corrected-head CI requalification has stopped at Outcome C for orchestrator review. No correction, rerun, device test, crash work, or later phase is authorized.**
+
+The authoritative Google Docs ledger Outcome C append was revision-guarded and verified by heading/stop-state readback at revision `AIroW36q5Bc6hPxrOyv7zFbwlHZcRL572Bl9seTU75OD5hSY7YCz382om_lmorLNLE_hHyO--amatBzWoGZteR0THqfWIlZ_TUEGr6ph9l8`.
