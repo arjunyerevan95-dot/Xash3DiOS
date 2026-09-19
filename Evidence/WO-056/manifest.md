@@ -390,4 +390,31 @@ Phase O's worker-produced result was build-qualified only. The later user-perfor
 - Outcome: **B**; no engineering promotion, CI, artifact, IPA, native/device/crash work, or later phase. Run/job/artifacts remain `32627471670` / `97164927481` / `0`.
 - First incomplete action: orchestrator decides whether a bounded retained-validator allowlist correction is authorized, then explicitly reissues local candidate qualification if appropriate.
 - Stop state: Outcome B; orchestrator review.
-- Readback: repository reporting commit `0e96bfa0d0b3d0d0f96d4ae45bc4e2b518aaccc4`; Google ledger revision `AIroW36jJl4-63gAtpb2ytosx-5ZOtxKZb2OvZKv4GHE1fbWfAVHbAOaWe82P-kr25i870J0A4xUzdoQpLtBf2_2VH2E3z90WXoZY6SCW64`, with heading/commit/stop-state exact matches.
+- Reporting commit (corrected by Astra review): `0e96bfa0b40342d998915ad3ed853048e6d90466`. Historical Google readback revision `AIroW36jJl4-63gAtpb2ytosx-5ZOtxKZb2OvZKv4GHE1fbWfAVHbAOaWe82P-kr25i870J0A4xUzdoQpLtBf2_2VH2E3z90WXoZY6SCW64` included the erroneous SHA; see the consolidated authorization correction/readback below.
+
+## Phase P consolidated delivery — Astra review and readiness
+
+- Verified 2026-09-19: branch `agent/ios-proof-of-life`; local/tracking/live remote clean at `740a007481615c44d6479e91d631f1c71f8afa2c`. Published authorization is the commit containing this section; the snapshot SHA is its pre-publication baseline, not a self-referential final SHA.
+- Correct Outcome B reporting commit: `0e96bfa0b40342d998915ad3ed853048e6d90466`. Prior `0e96bfa0d0b3d0d0f96d4ae45bc4e2b518aaccc4` was nonexistent; references corrected without changing the recorded outcome.
+- Accepted patch `d37bf36a5b707273359728a5ae08f81e712bea5d`, integration `ddadc3d83c5584fed6e516ab3beaaf727f780122`; top-level patch SHA-256 remains `91AB64B6C392303BEA189BE2D66E409836489DFC6F46F2FC3DFB0BACCFA60FE4`.
+- Latest failed CI [32627471670](https://github.com/arjunyerevan95-dot/Xash3DiOS/actions/runs/32627471670), job `97164927481`, tested `955180ae4493bf91177de92e858c6d6d1c2b6c8e`, artifacts zero. Worker readiness found no queued/in-progress or newer relevant run. This publication launches no build.
+- Last successful ordinary Bundle 130: run `32570119378`, candidate `f42f2c96b61624fe510fe32288bfbfa6873cc686`, artifact `9475150885` is expired. No Phase P IPA or current download link exists.
+
+Preserved candidate: `C:\Users\arjun\Documents\Codex\2026-08-22\you-are-the-fresh-xash3dios-controlplane\.tmp\wo56p-realignment-candidate`, detached at `ad12d82181a083fbe4b771facfbedb0256d8e4d0`, exactly two unstaged files, no staged/untracked additions:
+
+- `scripts/ios/wo56p-shader-lod-compatibility-contract.json`: 6,900 bytes, SHA-256 `A4D060EED76E2107F4D3ACDCCFDA2582126BA19FC7FB8A828831C0FB850AF9CC`.
+- `scripts/ios/validate-ios-shader-lod-compatibility.py`: 23,072 bytes, SHA-256 `B2B53D1329F677960A6683FE2856A14AB47182A436E4EE7E87BDBCE80470C2BC`.
+
+The same `.tmp` parent retains `wo56p-lineage-raw-a` and `-b` at production Diffusion `14d156bf3a6993c172697fac83a937836c3b5561` with preserved modifications and MainUI `8c68de2f2325a0130953719efc3ae413eb24e01a`. `wo56p-qualification/gl4es-shaderconv-dump.exe`: 276,992 bytes, SHA-256 `D455A242524ACFF8D46B7202BCA220CAB92E6D4652113B0F34D2BECA99196176`.
+
+Readiness limitations: main repo `build/` is absent. `wo56p-integration-d830684a` is clean at upstream GL4ES `81547d986798e876de8b434193920b606a72363f`, not a patched replay. The orchestrator's `.tmp/wo56p-patch-proof-d37bf36a` survives as plain files. Most main-repo submodules are uninitialized; glslangValidator/clang/cl were absent from worker PATH. Codebase Memory returned no indexed projects; no reindex performed. None is newly qualified by this publication.
+
+Review findings reproduced from source: the converter harness supplies `force300`; the broad shader gate invokes separate `-S` stages without paired link; its array-feature profile is incomplete; whole-patch identity failures can mask semantic mutation-test coverage. Independently rerunning preserved candidate output/legacy checks passed, but a full-suite attempt against the unpatched retained tree correctly rejected missing patch tokens. Do not describe this as a fresh full-stack/lifecycle/native replay pass.
+
+Latest device log/screenshot remain the Bundle 130 `A69C4C28-8963-4A2C-AAA7-BF134733EECF` attachments under orchestrator attachment root. Log SHA-256 `A4D92F07FCC2401C615B7179D45A06EB01289007D40AFDF537B3324510ACAE47`; screenshot `C88414F8C5B66644D645E13F6B60A3B1DF94FCD0084F4A7793E58B57CE4D7ED9`. Array admission is accepted; incomplete scene/hard crash are not resolved. No matching termination report is available.
+
+New worker `01a0b962-7609-7c61-9b80-13bd47175f39` on `local` sent an acknowledged readiness callback to `01a02450-2442-7bd3-9232-46419e80d731`. It preserved all files and awaits the published amendment. Its unrelated default workspace requires explicit Xash workdir and scoped write permission.
+
+PortingOS references remain the WO-056 Phase P experiment and `scripts/ios/wo56p-shader-lod-compatibility-contract.json`, plus retained Phase I/K/M/O contracts. No new PortingOS snapshot ID is asserted. See the final [WO-056 amendment](../../WorkOrders/WO-056.md#phase-p-consolidated-delivery-amendment--ordinary-shader-qualified-candidate) for exact gates, maximum two qualifying runs, and the pre-device review stop.
+
+Google authorization/correction append: exact 5,584-character readback verified in the authoritative document, tab `t.0`, revision `ANLCKQmq3e3qcvCBiCxDk9qOCN9J6T1LZ-G5-fdxQj9T_yLAiOPwSRK0Rl8YuJJ66iecWngi6suJIFEz-ZrPPQ8Ct7b4eeYRoUic9FP75WA`. Prior content was preserved. The skill's file-backed reader rejected Windows absolute paths; native structured connector inspection/readback was used for this append-only edit.

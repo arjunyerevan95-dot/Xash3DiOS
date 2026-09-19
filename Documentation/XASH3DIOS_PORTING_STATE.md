@@ -3133,4 +3133,20 @@ Exactly one first incomplete action remains: orchestrator review and a bounded d
 
 Stop state: **WO-056 Phase P production-contract realignment stopped at Outcome B for orchestrator review.**
 
-Durable readback: repository reporting commit `0e96bfa0d0b3d0d0f96d4ae45bc4e2b518aaccc4`; Google ledger Outcome B heading, commit, and stop state verified at revision `AIroW36jJl4-63gAtpb2ytosx-5ZOtxKZb2OvZKv4GHE1fbWfAVHbAOaWe82P-kr25i870J0A4xUzdoQpLtBf2_2VH2E3z90WXoZY6SCW64`.
+Reporting commit (corrected by Astra review): `0e96bfa0b40342d998915ad3ed853048e6d90466`. Historical Google Outcome B readback revision `AIroW36jJl4-63gAtpb2ytosx-5ZOtxKZb2OvZKv4GHE1fbWfAVHbAOaWe82P-kr25i870J0A4xUzdoQpLtBf2_2VH2E3z90WXoZY6SCW64` contained the erroneous commit reference; the consolidated authorization below records its correction without changing Outcome B.
+
+## Work Order 56 Phase P consolidated delivery — Astra authorization
+
+The orchestrator accepts the prior realignment Outcome B as an authorization/scope blockage, not new evidence against the shader correction. Correct reporting commit: `0e96bfa0b40342d998915ad3ed853048e6d90466`; the earlier `0e96bfa0d0b3d0d0f96d4ae45bc4e2b518aaccc4` was nonexistent. Baseline `740a007481615c44d6479e91d631f1c71f8afa2c` remains clean/equal at issuance.
+
+The final amendment in `WorkOrders/WO-056.md` now authorizes one consolidated delivery: reuse the preserved two-file production candidate, correct the retained scope checks, execute real GL4ES program-level version negotiation/reconversion, link production-profile shader pairs with an offline compiler, and build one ordinary IPA. Required local tool preparation and directly related test/build integration maintenance are included. The prior two-file/no-tool/no-CI restrictions are superseded for this continuation; historical outcomes remain closed.
+
+The review found that forced `need_essl300` converter tests do not execute negotiation, separate-stage glslang tests do not prove linked pairs, the offline array profile is incomplete, and whole-patch hash rejection can mask semantic mutation coverage. A successful native arm64 build/offline link is not Apple iPhone driver acceptance. The shared LOD/version correction remains the active hypothesis; no crash cause is established.
+
+Maximum two qualifying runs, counting push triggers; no blind same-head rerun, second run only after a demonstrated in-scope correction, and stop after first qualified IPA. Preserve generated shader/options/test evidence and matching available binary/symbol identities. Completion requires exact candidate/run/job/artifact/bundle/IPA/hash and verified download identity, both ledgers/ControlPlane readback, push/equality, callback, and orchestrator package review before any device test.
+
+New executor: Xash Astra Worker `01a0b962-7609-7c61-9b80-13bd47175f39`, host `local`; readiness callback to orchestrator `01a02450-2442-7bd3-9232-46419e80d731` was acknowledged. Prior workers and detached experiments are preserved. The worker must explicitly use the Xash workdir and scoped permissions, not its unrelated default workspace.
+
+At publication, CI remains failed run `32627471670`, job `97164927481`, artifacts zero. Bundle 130 is the last successful ordinary build and device-qualified array-admission boundary; its artifact is expired. No engineering source, workflow execution, new IPA, or device evidence is produced by this documentation authorization.
+
+First incomplete action: recover/reconcile the preserved production candidate with the retained-validator repair in a temporary qualification checkout, then continue through the published delivery gates. Stop gate: orchestrator package review; no device/crash work authorized.
