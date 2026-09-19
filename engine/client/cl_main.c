@@ -3953,6 +3953,11 @@ void CL_Init( void )
 
 	VID_Init();	// init video
 
+#if XASH_IOS
+	if( Sys_CheckParm( "-gl4es_texture_array_selftest" ))
+		Sys_Quit( "iOS texture array selftest complete" );
+#endif
+
 	// unreliable buffer. unsed for unreliable commands and voice stream
 	MSG_Init( &cls.datagram, "cls.datagram", cls.datagram_buf, sizeof( cls.datagram_buf ));
 

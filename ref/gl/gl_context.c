@@ -22,6 +22,64 @@ GNU General Public License for more details.
 #include "gl4es/include/gl4esinit.h"
 #endif
 
+#if XASH_IOS && XASH_GL4ES
+#include <dlfcn.h>
+
+typedef struct ios_index_trace_owner_s
+{
+	const char *name;
+	void *address;
+	Dl_info info;
+	qboolean resolved;
+} ios_index_trace_owner_t;
+
+static ios_index_trace_owner_t ios_index_trace_owners[] =
+{
+	{ "glDrawRangeElements", NULL, { 0 }, false },
+	{ "glDrawRangeElementsEXT", NULL, { 0 }, false },
+	{ "glDrawElements", NULL, { 0 }, false }
+};
+static qboolean ios_index_trace_ownership_logged;
+
+static void R_IOSIndexTraceOwnership( const char *name, void *address )
+{
+	if( ios_index_trace_ownership_logged || !name || !address )
+		return;
+	for( size_t i = 0; i < ARRAYSIZE( ios_index_trace_owners ); ++i )
+	{
+		ios_index_trace_owner_t *owner = &ios_index_trace_owners[i];
+		if( !Q_strcmp( name, owner->name ))
+		{
+			owner->address = address;
+			owner->resolved = dladdr( address, &owner->info ) != 0;
+		}
+	}
+	/* Diffusion aliases EXT to the resolved core pointer when core range draws
+	 * are present. Query the wrapper alias here so the one ownership record
+	 * still proves all three live entry points without changing that policy. */
+	if( ios_index_trace_owners[0].address && !ios_index_trace_owners[1].address )
+	{
+		ios_index_trace_owner_t *owner = &ios_index_trace_owners[1];
+		owner->address = gl4es_GetProcAddress( owner->name );
+		owner->resolved = owner->address && dladdr( owner->address, &owner->info ) != 0;
+	}
+	if( ios_index_trace_owners[0].address && ios_index_trace_owners[1].address && ios_index_trace_owners[2].address )
+	{
+		gEngfuncs.Con_Printf( "iOS index trace ownership: range=%p image=%s symbol=%s range_ext=%p image=%s symbol=%s elements=%p image=%s symbol=%s\n",
+			ios_index_trace_owners[0].address,
+			ios_index_trace_owners[0].resolved && ios_index_trace_owners[0].info.dli_fname ? ios_index_trace_owners[0].info.dli_fname : "<unknown>",
+			ios_index_trace_owners[0].resolved && ios_index_trace_owners[0].info.dli_sname ? ios_index_trace_owners[0].info.dli_sname : "<unknown>",
+			ios_index_trace_owners[1].address,
+			ios_index_trace_owners[1].resolved && ios_index_trace_owners[1].info.dli_fname ? ios_index_trace_owners[1].info.dli_fname : "<unknown>",
+			ios_index_trace_owners[1].resolved && ios_index_trace_owners[1].info.dli_sname ? ios_index_trace_owners[1].info.dli_sname : "<unknown>",
+			ios_index_trace_owners[2].address,
+			ios_index_trace_owners[2].resolved && ios_index_trace_owners[2].info.dli_fname ? ios_index_trace_owners[2].info.dli_fname : "<unknown>",
+			ios_index_trace_owners[2].resolved && ios_index_trace_owners[2].info.dli_sname ? ios_index_trace_owners[2].info.dli_sname : "<unknown>" );
+		ios_index_trace_ownership_logged = true;
+	}
+}
+#endif
+
 
 
 static void R_ClearScreen( void )
@@ -210,6 +268,11 @@ static intptr_t GL_RefGetParm( int parm, int arg )
 		return glConfig.wrapper;
 	case PARM_STENCIL_ACTIVE:
 		return glState.stencilEnabled;
+#if XASH_APPLE
+	case PARM_DEBUG_FRAMEBUFFER_TRACE:
+		R_IOSFramebufferTraceCheckpoint( arg );
+		return 0;
+#endif
 	case PARM_TEX_FILTERING:
 		if( arg < 0 )
 			return gl_texture_nearest.value == 0.0f;
@@ -385,7 +448,11 @@ static void GAME_EXPORT R_OverrideTextureSourceSize( unsigned int texnum, uint s
 static void* GAME_EXPORT R_GetProcAddress( const char *name )
 {
 #if XASH_GL4ES
-	return gl4es_GetProcAddress( name );
+	void *address = gl4es_GetProcAddress( name );
+#if XASH_IOS
+	R_IOSIndexTraceOwnership( name, address );
+#endif
+	return address;
 #else // TODO: other wrappers
 	return gEngfuncs.GL_GetProcAddress( name );
 #endif
@@ -471,6 +538,293 @@ static void R_FillTriAPI( triangleapi_t *api )
 	api->GetMatrix     = TriGetMatrix;
 	api->FogParams     = TriFogParams;
 }
+
+#if XASH_IOS && XASH_GL4ES
+#define IOS_GL_FRAMEBUFFER_COMPLETE 0x8CD5u
+
+typedef struct ios_direct_drawable_state_s
+{
+	ref_ios_direct_drawable_t drawable;
+	uint64_t invocation;
+	uint64_t context;
+	uint32_t contextGeneration;
+	uint32_t resizeGeneration;
+	uint32_t registeredFramebuffer;
+	uint32_t menuSamples;
+	uint32_t activeSamples;
+	uint32_t presentSamples;
+	uint32_t records;
+	uint32_t menuChecksum;
+	qboolean menuChecksumValid;
+	qboolean policyPrinted;
+	qboolean proofPrinted;
+} ios_direct_drawable_state_t;
+
+static ios_direct_drawable_state_t ios_direct_drawable;
+static void ( *ios_direct_drawable_original_swap )( void );
+
+static qboolean R_IOSDirectDrawableCanPrint( void )
+{
+	if( ios_direct_drawable.records >= REF_IOS_DIRECT_DRAWABLE_MAX_RECORDS )
+		return false;
+	ios_direct_drawable.records++;
+	return true;
+}
+
+static void R_IOSDirectDrawableFillEngineState( ref_ios_direct_drawable_t *state )
+{
+	const model_t *world = gp_cl ? gp_cl->models[1] : NULL;
+	int clientState = (int)ENGINE_GET_PARM( PARM_CONNSTATE );
+
+	state->invocation = ios_direct_drawable.invocation;
+	state->clientState = clientState;
+	state->enginePhase = clientState == ca_active ? 2 : 1;
+	state->mapName[0] = '\0';
+	if( world && world->name[0] )
+		Q_strncpy( state->mapName, world->name, sizeof( state->mapName ));
+}
+
+static qboolean R_IOSDirectDrawableQuery( ref_ios_direct_drawable_t *state )
+{
+	if( !gEngfuncs.GL_GetDrawableInfo ||
+		!gEngfuncs.GL_GetDrawableInfo( state, sizeof( *state ) ) )
+		return false;
+	R_IOSDirectDrawableFillEngineState( state );
+	return state->version == REF_IOS_DIRECT_DRAWABLE_VERSION &&
+		state->size >= sizeof( *state );
+}
+
+static qboolean R_IOSDirectDrawableRegister( ref_ios_direct_drawable_t *state,
+	const char *reason, qboolean printLifecycle )
+{
+	gl4es_external_default_state_t proof;
+	qboolean valid, printRegister;
+
+	printRegister = printLifecycle || !Q_strcmp( reason, "context-created" );
+
+	valid = state && state->context && state->currentContext &&
+		state->contextMatches && state->viewFramebuffer && state->viewRenderbuffer &&
+		state->drawableWidth && state->drawableHeight &&
+		state->requestedSamples == 0 && state->effectiveSamples == 0;
+	if( !valid || !set_external_default_framebuffer( state->viewFramebuffer ) )
+	{
+		if( R_IOSDirectDrawableCanPrint() )
+			gEngfuncs.Con_Printf( "iOS direct drawable register: result=failed reason=%s context=0x%llx current=0x%llx match=%u view=%u/%u size=%ux%u samples=%u/%u\n",
+				reason, (unsigned long long)( state ? state->context : 0 ),
+				(unsigned long long)( state ? state->currentContext : 0 ),
+				state ? state->contextMatches : 0, state ? state->viewFramebuffer : 0,
+				state ? state->viewRenderbuffer : 0, state ? state->drawableWidth : 0,
+				state ? state->drawableHeight : 0, state ? state->requestedSamples : 0,
+				state ? state->effectiveSamples : 0 );
+		return false;
+	}
+
+	valid = gl4es_external_default_framebuffer_state( state->drawableWidth,
+		state->drawableHeight, 0, &proof ) != 0;
+	if( printRegister && R_IOSDirectDrawableCanPrint() )
+		gEngfuncs.Con_Printf( "iOS direct drawable register: result=%s reason=%s context=0x%llx context_gen=%u resize_gen=%u view=%u/%u size=%ux%u samples=%u/%u external_gen=%u logical=%u/%u/%u native=%u/%u status=0x%04x\n",
+			valid ? "ok" : "failed", reason, (unsigned long long)state->context,
+			state->contextGeneration, state->resizeGeneration,
+			state->viewFramebuffer, state->viewRenderbuffer,
+			state->drawableWidth, state->drawableHeight,
+			state->requestedSamples, state->effectiveSamples, proof.generation,
+			proof.logical_current, proof.logical_read, proof.logical_draw,
+			proof.native_draw, proof.native_read, proof.framebuffer_status );
+	if( printLifecycle && R_IOSDirectDrawableCanPrint() )
+		gEngfuncs.Con_Printf( "iOS direct drawable lifecycle: reason=%s context=0x%llx context_gen=%u resize_gen=%u view=%u/%u reasserted=%u complete=%u\n",
+			reason, (unsigned long long)state->context, state->contextGeneration,
+			state->resizeGeneration, state->viewFramebuffer, state->viewRenderbuffer,
+			valid ? 1 : 0, valid && proof.framebuffer_status == IOS_GL_FRAMEBUFFER_COMPLETE );
+	if( !valid )
+		return false;
+
+	ios_direct_drawable.drawable = *state;
+	ios_direct_drawable.context = state->context;
+	ios_direct_drawable.contextGeneration = state->contextGeneration;
+	ios_direct_drawable.resizeGeneration = state->resizeGeneration;
+	ios_direct_drawable.registeredFramebuffer = state->viewFramebuffer;
+	return true;
+}
+
+static qboolean R_IOSDirectDrawableSampleScheduled( const ref_ios_direct_drawable_t *state )
+{
+	if( state->enginePhase == 2 && Q_strstr( state->mapName, "ch1map0" ) )
+	{
+		if( ios_direct_drawable.activeSamples < REF_IOS_DIRECT_DRAWABLE_ACTIVE_SAMPLES )
+		{
+			ios_direct_drawable.activeSamples++;
+			return true;
+		}
+		return false;
+	}
+	if( state->enginePhase != 2 &&
+		ios_direct_drawable.menuSamples < REF_IOS_DIRECT_DRAWABLE_MENU_SAMPLES )
+	{
+		ios_direct_drawable.menuSamples++;
+		return true;
+	}
+	return false;
+}
+
+static void R_IOSDirectDrawablePrintProof( const ref_ios_direct_drawable_t *state,
+	const gl4es_external_default_state_t *proof )
+{
+	qboolean active = state->enginePhase == 2 && Q_strstr( state->mapName, "ch1map0" );
+	qboolean changed = false;
+
+	if( !active && proof->checksum_valid && !ios_direct_drawable.menuChecksumValid )
+	{
+		ios_direct_drawable.menuChecksum = proof->checksum;
+		ios_direct_drawable.menuChecksumValid = true;
+	}
+	if( active && proof->checksum_valid && ios_direct_drawable.menuChecksumValid )
+		changed = proof->checksum != ios_direct_drawable.menuChecksum;
+
+	if( R_IOSDirectDrawableCanPrint() )
+		gEngfuncs.Con_Printf( "iOS direct drawable logical-zero: inv=%llu phase=%u map=%s registered=%u external_gen=%u logical=%u/%u/%u native=%u/%u status=0x%04x checksum=%u/0x%08x\n",
+			(unsigned long long)state->invocation, state->enginePhase,
+			state->mapName[0] ? state->mapName : "-", proof->registered_framebuffer,
+			proof->generation, proof->logical_current, proof->logical_read,
+			proof->logical_draw, proof->native_draw, proof->native_read,
+			proof->framebuffer_status, proof->checksum_valid, proof->checksum );
+
+	if( active && !ios_direct_drawable.proofPrinted && R_IOSDirectDrawableCanPrint() )
+	{
+		gEngfuncs.Con_Printf( "iOS direct drawable proof: inv=%llu map=%s view=%u logical_native_agree=%u complete=%u checksum_valid=%u menu_checksum_valid=%u checksum_changed=%u checksum=0x%08x menu_checksum=0x%08x\n",
+			(unsigned long long)state->invocation,
+			state->mapName[0] ? state->mapName : "-", state->viewFramebuffer,
+			proof->logical_current == 0 && proof->logical_read == 0 &&
+			proof->logical_draw == 0 && proof->native_draw == state->viewFramebuffer &&
+			proof->native_read == state->viewFramebuffer,
+			proof->framebuffer_status == IOS_GL_FRAMEBUFFER_COMPLETE,
+			proof->checksum_valid, ios_direct_drawable.menuChecksumValid,
+			changed, proof->checksum, ios_direct_drawable.menuChecksum );
+		if( changed )
+			ios_direct_drawable.proofPrinted = true;
+	}
+}
+
+static void R_IOSDirectDrawableSwap( void )
+{
+	ref_ios_direct_drawable_t state;
+	gl4es_external_default_state_t proof;
+	qboolean lifecycleChanged, sample;
+
+	if( !ios_direct_drawable_original_swap )
+		return;
+	ios_direct_drawable.invocation++;
+	if( !R_IOSDirectDrawableQuery( &state ) )
+	{
+		if( R_IOSDirectDrawableCanPrint() )
+			gEngfuncs.Con_Printf( "iOS direct drawable lifecycle: reason=query-failed inv=%llu\n",
+				(unsigned long long)ios_direct_drawable.invocation );
+		ios_direct_drawable_original_swap();
+		return;
+	}
+
+	lifecycleChanged = state.context != ios_direct_drawable.context ||
+		state.contextGeneration != ios_direct_drawable.contextGeneration ||
+		state.resizeGeneration != ios_direct_drawable.resizeGeneration ||
+		state.viewFramebuffer != ios_direct_drawable.registeredFramebuffer;
+	if( !R_IOSDirectDrawableRegister( &state,
+		lifecycleChanged ? "swap-lifecycle-change" : "swap-reassert", lifecycleChanged ) )
+	{
+		ios_direct_drawable_original_swap();
+		return;
+	}
+
+	if( !ios_direct_drawable.policyPrinted && R_IOSDirectDrawableCanPrint() )
+	{
+		gEngfuncs.Con_Printf( "iOS direct drawable policy: version=%u requested_samples=0 effective_samples=0 msaa_objects=0 resolve=disabled transfer=none logical_zero=live-sdl-view samples=menu:%u,active:%u max_records=%u\n",
+			REF_IOS_DIRECT_DRAWABLE_VERSION, REF_IOS_DIRECT_DRAWABLE_MENU_SAMPLES,
+			REF_IOS_DIRECT_DRAWABLE_ACTIVE_SAMPLES, REF_IOS_DIRECT_DRAWABLE_MAX_RECORDS );
+		ios_direct_drawable.policyPrinted = true;
+	}
+
+	sample = R_IOSDirectDrawableSampleScheduled( &state );
+	if( sample && gl4es_external_default_framebuffer_state( state.drawableWidth,
+		state.drawableHeight, 1, &proof ) )
+		R_IOSDirectDrawablePrintProof( &state, &proof );
+	ios_direct_drawable.drawable = state;
+	ios_direct_drawable_original_swap();
+}
+
+void R_IOSDirectDrawableContextCreated( void )
+{
+	ref_ios_direct_drawable_t state;
+
+	memset( &ios_direct_drawable, 0, sizeof( ios_direct_drawable ) );
+	if( !ios_direct_drawable_original_swap )
+		ios_direct_drawable_original_swap = gEngfuncs.GL_SwapBuffers;
+	gEngfuncs.GL_SwapBuffers = R_IOSDirectDrawableSwap;
+	if( R_IOSDirectDrawableQuery( &state ) )
+		R_IOSDirectDrawableRegister( &state, "context-created", true );
+}
+
+void R_IOSDirectDrawableContextDestroying( void )
+{
+	set_external_default_framebuffer( 0 );
+	if( R_IOSDirectDrawableCanPrint() )
+		gEngfuncs.Con_Printf( "iOS direct drawable lifecycle: reason=context-destroying context=0x%llx cleared=1\n",
+			(unsigned long long)ios_direct_drawable.context );
+	if( ios_direct_drawable_original_swap )
+		gEngfuncs.GL_SwapBuffers = ios_direct_drawable_original_swap;
+}
+
+static int R_IOSDrawableBridge( int action, void *opaqueState, size_t stateSize )
+{
+	ref_ios_direct_drawable_t *state = (ref_ios_direct_drawable_t *)opaqueState;
+	gl4es_external_default_state_t proof;
+	qboolean lifecycleAction;
+
+	if( !state || stateSize < sizeof( *state ) ||
+		state->version != REF_IOS_DIRECT_DRAWABLE_VERSION || state->size < sizeof( *state ) )
+		return 0;
+	R_IOSDirectDrawableFillEngineState( state );
+	lifecycleAction = action == REF_IOS_DIRECT_DRAWABLE_CONTEXT_RESTORED ||
+		action == REF_IOS_DIRECT_DRAWABLE_RESIZED;
+
+	if( action == REF_IOS_DIRECT_DRAWABLE_DESTROYING )
+	{
+		set_external_default_framebuffer( 0 );
+		if( R_IOSDirectDrawableCanPrint() )
+			gEngfuncs.Con_Printf( "iOS direct drawable lifecycle: reason=sdl-destroying context=0x%llx cleared=1\n",
+				(unsigned long long)state->context );
+		return 1;
+	}
+	if( lifecycleAction )
+		return R_IOSDirectDrawableRegister( state,
+			action == REF_IOS_DIRECT_DRAWABLE_CONTEXT_RESTORED ? "context-restored" : "resized",
+			true );
+	if( action == REF_IOS_DIRECT_DRAWABLE_SWAP_ENTRY )
+		return R_IOSDirectDrawableRegister( state, "sdl-swap-entry", false );
+	if( action == REF_IOS_DIRECT_DRAWABLE_PRESENT_BEFORE )
+	{
+		if( !R_IOSDirectDrawableRegister( state, "present-reassert", false ) )
+			return 0;
+		return gl4es_external_default_framebuffer_state( state->drawableWidth,
+			state->drawableHeight, 0, &proof );
+	}
+	if( action == REF_IOS_DIRECT_DRAWABLE_POST_PRESENT )
+	{
+		qboolean printPresent = state->invocation <= 1;
+		if( state->enginePhase == 2 &&
+			ios_direct_drawable.presentSamples < ios_direct_drawable.activeSamples )
+		{
+			ios_direct_drawable.presentSamples++;
+			printPresent = true;
+		}
+		if( printPresent &&
+			R_IOSDirectDrawableCanPrint() )
+			gEngfuncs.Con_Printf( "iOS direct drawable present: inv=%llu phase=%u map=%s view=%u/%u attempted=%u result=%u resolve=0 transfer=0 one_present=1\n",
+				(unsigned long long)state->invocation, state->enginePhase,
+				state->mapName[0] ? state->mapName : "-", state->viewFramebuffer,
+				state->viewRenderbuffer, state->presentAttempted, state->presentResult );
+		return state->presentAttempted && state->presentResult;
+	}
+	return 1;
+}
+#endif
 
 const ref_interface_t gReffuncs =
 {
@@ -575,5 +929,10 @@ const ref_interface_t gReffuncs =
 	R_FillTriAPI,
 
 	VGUI_SetupDrawing,
-};
 
+#if XASH_IOS && XASH_GL4ES
+	R_IOSDrawableBridge,
+#else
+	NULL,
+#endif
+};

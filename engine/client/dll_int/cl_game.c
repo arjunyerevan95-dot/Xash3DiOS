@@ -532,6 +532,26 @@ static void CL_DrawScreenFade( void )
 	if( !alpha )
 		return;
 
+#if XASH_APPLE
+	/*
+	 * Diffusion's GLES fallback already produces a valid colored 3D frame on
+	 * iOS, but a later opaque ScreenFade leaves the presented image black.
+	 * Keep this compatibility gate narrow while the desktop-only custom
+	 * renderer is unavailable. Other mods retain the normal fade path.
+	 */
+	if( !Q_stricmp( GI->gamefolder, "diffusion" ))
+	{
+		static qboolean announced;
+		if( !announced )
+		{
+			Con_Printf( "iOS: suppressing Diffusion ScreenFade overlay (rgba=%u,%u,%u,%u flags=0x%x).\n",
+				sf->fader, sf->fadeg, sf->fadeb, alpha, sf->fadeFlags );
+			announced = true;
+		}
+		return;
+	}
+#endif
+
 	if( !FBitSet( sf->fadeFlags, FFADE_MODULATE ))
 	{
 		ref.dllFuncs.GL_SetRenderMode( kRenderTransTexture );

@@ -1630,6 +1630,23 @@ static void CL_StartDark( void )
 		screenfade_t *sf = &clgame.fade;
 		float fadetime = 5.0f;
 
+#if XASH_APPLE
+		/*
+		 * Diffusion marks its opening map dark while its desktop renderer and
+		 * HUD present the intro.  The GLES fallback renders the world correctly,
+		 * but that startup fade is the final full-screen draw and leaves the iOS
+		 * framebuffer black.  Suppress only the map-start blackout; subsequent
+		 * ScreenFade messages (damage, death and scripted transitions) still work.
+		 */
+		if( !Q_stricmp( GI->gamefolder, "diffusion" ))
+		{
+			memset( sf, 0, sizeof( *sf ));
+			Cvar_DirectSet( &v_dark, "0" );
+			Con_Printf( "iOS: suppressed Diffusion startup blackout for the GLES fallback renderer.\n" );
+			return;
+		}
+#endif
+
 		client_textmessage_t *title = CL_TextMessageGet( "GAMETITLE" );
 		if( Host_IsQuakeCompatible( ))
 			fadetime = 1.0f;

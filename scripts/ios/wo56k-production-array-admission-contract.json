@@ -1,0 +1,189 @@
+{
+  "schema": 1,
+  "workOrder": "56K",
+  "outcome": "A",
+  "baseline": {
+    "controlPlane": "b3531a8dbed396aed22aca109b9cab64939305f6",
+    "qualifiedImplementation": "bc4b2b7181b3111053f14ff86e8ff634718acf30",
+    "deviceQualification": "Bundle 116 native-array conformance PASS"
+  },
+  "minimumLandscapeLayers": 16,
+  "capabilityPredicate": {
+    "allRequired": true,
+    "conditions": [
+      "live native OpenGL ES context major version is at least 3",
+      "glTexImage3D, glTexSubImage3D, and glTexStorage3D resolve from the live provider",
+      "GL_MAX_ARRAY_TEXTURE_LAYERS is at least MAX_LANDSCAPE_LAYERS (16)",
+      "ESSL 300 compiles on the live provider",
+      "the GL4ES array object, upload, sampler, shader translation, realization, and lifecycle routes are compiled",
+      "the engine resolves mutable and compressed 3D upload entry points and retains GL_TEXTURE_ARRAY_EXT",
+      "Diffusion observes GL_EXT_texture_array, at least 16 layers, and both array loader callbacks",
+      "the terrain cache key and emitted shader source retain BMODEL_MULTI_LAYERS and its normal/specular/emboss feature directives"
+    ],
+    "falseResult": "GL_EXT_texture_array remains unadvertised or the downstream gate is cleared; R_LoadLandscapes returns without array work"
+  },
+  "provenance": [
+    {
+      "stage": "native-provider",
+      "owner": "GL4ES GetHardwareExtensions",
+      "source": "src/glx/hardext.c",
+      "input": "live GL_VERSION, gles_getProcAddress, GL_MAX_ARRAY_TEXTURE_LAYERS, ESSL 300 compile",
+      "output": "hardext.texture_array, hardext.maxarraylayers, hardext.glsl300es",
+      "failure": "unsupported ES version, missing procedure, insufficient limit, or missing ESSL 300 keeps advertisement false"
+    },
+    {
+      "stage": "gl4es-extension-provider",
+      "owner": "BuildExtensionsList",
+      "source": "src/gl/getter.c",
+      "input": "complete native predicate plus gl4es_texture_array_available",
+      "output": "conditional GL_EXT_texture_array token",
+      "failure": "token is omitted; no spoof or override exists"
+    },
+    {
+      "stage": "engine-gate",
+      "owner": "GL_InitExtensions / GL_CheckExtension",
+      "source": "ref/gl/gl_opengl.c",
+      "input": "extension token, four production upload procedures, live maximum layers",
+      "output": "GL_TEXTURE_ARRAY_EXT and max_2d_texture_layers",
+      "failure": "extension bit is cleared and maximum is zero when the limit is below 16"
+    },
+    {
+      "stage": "engine-loader-export",
+      "owner": "R_FillRenderAPI / GL_SetTextureTarget / GL_CreateTextureArray / GL_LoadTextureArray",
+      "source": "ref/gl/gl_context.c; ref/gl/gl_image.c",
+      "input": "GL_TEXTURE_ARRAY_EXT and IMAGE_MULTILAYER",
+      "output": "GL_TEXTURE_2D_ARRAY_EXT objects through GL_CreateTextureArray and GL_LoadTextureArray callbacks",
+      "failure": "creation/load returns zero; no 2-D, atlas, or CPU fallback"
+    },
+    {
+      "stage": "diffusion-gate",
+      "owner": "GL_InitExtensions",
+      "source": "client/render/r_opengl.cpp",
+      "input": "GL_EXT_texture_array, GL_MAX_ARRAY_TEXTURE_LAYERS_EXT >= 16, GL_LoadTextureArray and GL_CreateTextureArray callbacks",
+      "output": "R_TEXTURE_ARRAY_EXT and max_2d_texture_layers",
+      "failure": "R_TEXTURE_ARRAY_EXT is cleared and landscapes remain unavailable"
+    },
+    {
+      "stage": "terrain-loader",
+      "owner": "R_LoadLandscapes / LoadHeightMap / LoadTerrainLayers",
+      "source": "client/render/r_misc.cpp",
+      "input": "R_TEXTURE_ARRAY_EXT, up to MAX_LANDSCAPE_LAYERS, height weights, diffuse layers, complete optional normal layer set",
+      "output": "weight, diffuse, and normal GL_TEXTURE_2D_ARRAY_EXT objects with failure cleanup",
+      "failure": "terrain remains invalid; created array objects are released; no bypassed LoadTerrainLayers"
+    },
+    {
+      "stage": "terrain-shader",
+      "owner": "GL_UberShaderForSolidBmodel / GL_UberShaderForBmodelDlight / GL_ProcessShader",
+      "source": "client/render/r_shader.cpp; glsl/bmodelsolid_*.glsl; glsl/bmodeldlight_*.glsl",
+      "input": "R_TEXTURE_ARRAY_EXT, TERRAIN_NUM_LAYERS, BMODEL_MULTI_LAYERS, BMODEL_BUMP, BMODEL_SPECULAR, BMODEL_EMBOSS",
+      "output": "GLSL_ALLOW_TEXTURE_ARRAY with sampler2DArray/texture2DArray production variants",
+      "failure": "terrain variants are not created unless array objects and the capability gate exist"
+    }
+  ],
+  "gl4esOperations": [
+    {
+      "operation": "object creation/deletion",
+      "entryPoints": ["glGenTextures", "glDeleteTextures"],
+      "mode": "wrapper-owned object lifecycle with distinct ENABLED_TEXTURE_ARRAY identity and native deletion"
+    },
+    {
+      "operation": "binding/cache",
+      "entryPoints": ["glBindTexture(GL_TEXTURE_2D_ARRAY)"],
+      "mode": "translated through gl4es_texture_array_bind; distinct per-unit actual_texarray cache"
+    },
+    {
+      "operation": "mutable allocation/upload",
+      "entryPoints": ["glTexImage3D", "glTexSubImage3D"],
+      "mode": "validated and forwarded to the resolved native ES3 procedures"
+    },
+    {
+      "operation": "immutable allocation",
+      "entryPoints": ["glTexStorage3D"],
+      "mode": "validated and forwarded; immutable state and level count cached by GL4ES"
+    },
+    {
+      "operation": "compressed diffuse/normal upload",
+      "entryPoints": ["glCompressedTexImage3DARB", "glCompressedTexSubImage3DARB"],
+      "mode": "DXT decoded per layer to RGBA8, then forwarded through the native array image/subimage path"
+    },
+    {
+      "operation": "sampler reflection/uniform",
+      "entryPoints": ["GL_SAMPLER_2D_ARRAY", "glUniform1i"],
+      "mode": "reflected as TU_ARRAY; integer uniform helpers and per-unit realization preserve the array target"
+    },
+    {
+      "operation": "draw realization",
+      "entryPoints": ["realize_textures", "glDrawElements", "glDrawArrays"],
+      "mode": "array sampler realizes GL_TEXTURE_2D_ARRAY before the existing qualified draw routes"
+    },
+    {
+      "operation": "limit query",
+      "entryPoints": ["glGetIntegerv(GL_MAX_ARRAY_TEXTURE_LAYERS)"],
+      "mode": "returns the live context value cached in hardext.maxarraylayers"
+    },
+    {
+      "operation": "shader translation",
+      "entryPoints": ["ConvertShader"],
+      "mode": "terrain array variants translate to stage-correct ESSL 300 with GLSL_ALLOW_TEXTURE_ARRAY"
+    }
+  ],
+  "terrainMaterialContract": {
+    "maximumLayers": 16,
+    "objects": {
+      "diffuse": "LOAD_TEXTURE_ARRAY -> GL_TEXTURE_2D_ARRAY_EXT",
+      "normal": "LOAD_TEXTURE_ARRAY(TF_NORMALMAP) -> GL_TEXTURE_2D_ARRAY_EXT when every layer has a normal map",
+      "weights": "CREATE_TEXTURE_ARRAY -> GL_TEXTURE_2D_ARRAY_EXT"
+    },
+    "samplerUnits": {
+      "solidDiffuseArray": 0,
+      "solidNormalArray": 4,
+      "solidWeightArray": 5,
+      "dlightDiffuseArray": 0,
+      "dlightWeightArray": 5,
+      "dlightNormalArray": 6
+    },
+    "requiredDirectives": [
+      "GLSL_ALLOW_TEXTURE_ARRAY",
+      "TERRAIN_NUM_LAYERS",
+      "BMODEL_MULTI_LAYERS",
+      "BMODEL_BUMP",
+      "BMODEL_SPECULAR",
+      "BMODEL_EMBOSS"
+    ]
+  },
+  "negativeCases": [
+    "native ES2 or unknown context",
+    "missing glTexImage3D",
+    "missing glTexSubImage3D",
+    "missing glTexStorage3D",
+    "zero or fewer than 16 array layers",
+    "ESSL 300 unavailable",
+    "GL4ES array route unavailable",
+    "engine production upload procedure missing",
+    "engine and Diffusion maximum-layer disagreement",
+    "Diffusion loader callback absent",
+    "terrain shader directive stripped",
+    "diffuse, normal, or weight array creation failure"
+  ],
+  "forbiddenFallbacks": [
+    "unconditional or spoofed extension advertisement",
+    "cvar, command-line, or environment force enable",
+    "ordinary GL_TEXTURE_2D substitution",
+    "atlas substitution",
+    "CPU terrain sampling",
+    "layer-zero-only sampling",
+    "bypassed LoadTerrainLayers",
+    "stripped terrain normal/specular/emboss semantics"
+  ],
+  "ordinaryStartup": {
+    "halfLife": "unchanged and unflagged",
+    "diffusion": "unchanged and unflagged; landscapes are skipped only when the complete predicate is false",
+    "diagnosticHarness": "Bundle 116 selftest flag, 57-item contract, checksum a915906d, terminal PASS, and bounded shutdown remain unchanged",
+    "terrainRuntimeQualification": "not performed or claimed in Phase K"
+  },
+  "markers": [
+    "iOS production texture array provider:",
+    "iOS production texture array engine:",
+    "iOS production texture array admission:"
+  ]
+}

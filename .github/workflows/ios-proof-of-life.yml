@@ -31,6 +31,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           submodules: recursive
+          fetch-depth: 0
 
       - name: Record Apple toolchain
         run: |
@@ -39,9 +40,11 @@ jobs:
           xcrun --sdk iphoneos --show-sdk-version
 
       - name: Install iOS dependencies
-        run: bash scripts/gha/deps_ios.sh
+        run: |
+          brew install glslang
+          bash scripts/gha/deps_ios.sh
 
-      - name: Build engine and portable HLSDK
+      - name: Build engine, Half-Life, and Diffusion modules
         run: bash scripts/gha/build_ios.sh
 
       - name: Verify IPA contract

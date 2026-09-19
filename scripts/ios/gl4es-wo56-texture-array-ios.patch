@@ -1,0 +1,818 @@
+diff --git a/src/gl/enable.c b/src/gl/enable.c
+index bfed03ad..593c3fc4 100644
+--- a/src/gl/enable.c
++++ b/src/gl/enable.c
+@@ -257,6 +257,16 @@ static void proxy_glEnable(GLenum cap, bool enable, void (APIENTRY_GLES *next)(G
+                 next(cap);
+             }
+             break;
++        case GL_TEXTURE_2D_ARRAY:
++            FLUSH_BEGINEND;
++            if(enable)
++                glstate->enable.texture[glstate->texture.active] |= (1<<ENABLED_TEXTURE_ARRAY);
++            else
++                glstate->enable.texture[glstate->texture.active] &= ~(1<<ENABLED_TEXTURE_ARRAY);
++            gl_changetex(glstate->texture.active);
++            if(glstate->fpe_state)
++                fpe_changetex(glstate->texture.active);
++            break;
+ 
+         
+         default: errorGL(); FLUSH_BEGINEND; realize_active(); next(cap); break;
+diff --git a/src/gl/fpe.c b/src/gl/fpe.c
+index 903f55d3..ea289e2b 100644
+--- a/src/gl/fpe.c
++++ b/src/gl/fpe.c
+@@ -623,6 +623,7 @@ void APIENTRY_GL4ES fpe_SyncUniforms(uniformcache_t *cache, program_t* glprogram
+                     GoUniformfv(glprogram, m->id, n_uniform(m->type), 1, (GLfloat*)((uintptr_t)cache->cache+m->parent_offs));
+                     break;
+                 case GL_SAMPLER_2D:
++                case GL_SAMPLER_2D_ARRAY:
+                 case GL_SAMPLER_CUBE:
+                 case GL_INT:
+                 case GL_INT_VEC2:
+diff --git a/src/gl/uniform.c b/src/gl/uniform.c
+--- a/src/gl/uniform.c
++++ b/src/gl/uniform.c
+@@ -32,6 +32,7 @@ int uniformsize(GLenum type) {
+         GOV(GL_BOOL, /*GLboolean*/GLint); //GLboolean is an unsigned char and is not suitable here
+         GOM(GL_FLOAT, GLfloat);
+         GO(GL_SAMPLER_2D, GLint, 1);
++        GO(GL_SAMPLER_2D_ARRAY, GLint, 1);
+         GO(GL_SAMPLER_CUBE , GLint, 1);
+     // Need other types?
+     }
+@@ -65,6 +66,7 @@ int is_uniform_int(GLenum type) {
+         case GL_BOOL_VEC3:
+         case GL_BOOL_VEC4:
+         case GL_SAMPLER_2D:
++        case GL_SAMPLER_2D_ARRAY:
+         case GL_SAMPLER_CUBE:
+             return 1;
+     }
+@@ -87,6 +89,7 @@ int n_uniform(GLenum type) {
+         case GL_INT:
+         case GL_BOOL:
+         case GL_SAMPLER_2D:
++        case GL_SAMPLER_2D_ARRAY:
+         case GL_SAMPLER_CUBE:
+             return 1;
+         case GL_FLOAT_VEC2:
+diff --git a/src/gl/getter.c b/src/gl/getter.c
+index 3a9acc55..f216d3d1 100644
+--- a/src/gl/getter.c
++++ b/src/gl/getter.c
+@@ -470,6 +470,12 @@ int gl4es_commonGet(GLenum pname, GLfloat *params) {
+         case GL_TEXTURE_BINDING_CUBE_MAP:
+             *params=glstate->texture.bound[glstate->texture.active][ENABLED_CUBE_MAP]?glstate->texture.bound[glstate->texture.active][ENABLED_CUBE_MAP]->glname:0;
+             break;
++        case GL_TEXTURE_BINDING_2D_ARRAY:
++            *params=glstate->texture.bound[glstate->texture.active][ENABLED_TEXTURE_ARRAY]?glstate->texture.bound[glstate->texture.active][ENABLED_TEXTURE_ARRAY]->glname:0;
++            break;
++        case GL_MAX_ARRAY_TEXTURE_LAYERS:
++            *params=hardext.maxarraylayers;
++            break;
+         case  GL_ARRAY_BUFFER_BINDING:
+             *params=(glstate->vao->vertex)?glstate->vao->vertex->buffer:0;
+             break;
+@@ -820,6 +826,13 @@ void APIENTRY_GL4ES gl4es_glGetIntegerv(GLenum pname, GLint *params) {
+             tex=glstate->texture.bound[glstate->texture.active][ENABLED_CUBE_MAP];
+             *params=tex->texture;
+             break;
++        case GL_TEXTURE_BINDING_2D_ARRAY:
++            tex=glstate->texture.bound[glstate->texture.active][ENABLED_TEXTURE_ARRAY];
++            *params=tex->texture;
++            break;
++        case GL_MAX_ARRAY_TEXTURE_LAYERS:
++            *params=hardext.maxarraylayers;
++            break;
+         case GL_TEXTURE_BINDING_RECTANGLE_ARB:
+             tex=glstate->texture.bound[glstate->texture.active][ENABLED_TEXTURE_RECTANGLE];
+             *params=tex->texture;
+diff --git a/src/gl/gles.h b/src/gl/gles.h
+index 4065019a..b7dbb669 100644
+--- a/src/gl/gles.h
++++ b/src/gl/gles.h
+@@ -29,6 +29,14 @@ typedef double           GLdouble;
+ 
+ typedef unsigned int     GLhandleARB;
+ typedef char             GLcharARB;
++
++/* GLES3 core tokens used by the first-party iOS texture-array route. */
++#ifndef GL_TEXTURE_2D_ARRAY
++#define GL_TEXTURE_2D_ARRAY                 0x8C1A
++#define GL_TEXTURE_BINDING_2D_ARRAY         0x8C1D
++#define GL_MAX_ARRAY_TEXTURE_LAYERS         0x88FF
++#define GL_SAMPLER_2D_ARRAY                 0x8DC1
++#endif
+ /*************************************************************/
+ 
+ /* OpenGL ES core versions */
+diff --git a/src/gl/glstate.c b/src/gl/glstate.c
+index b0e87bfc..a6cd5a92 100644
+--- a/src/gl/glstate.c
++++ b/src/gl/glstate.c
+@@ -80,6 +80,7 @@ void* NewGLState(void* shared_glstate, int es2only) {
+         glstate->shared_cnt = copy_state->shared_cnt;
+         glstate->headlists = copy_state->headlists;
+         glstate->actual_tex2d = copy_state->actual_tex2d;
++        glstate->actual_texarray = copy_state->actual_texarray;
+         glstate->texture.list = copy_state->texture.list;
+         glstate->glsl = copy_state->glsl;
+         //glstate->gleshard = copy_state->gleshard; // Not shared (at least not the VA)
+@@ -157,6 +158,7 @@ void* NewGLState(void* shared_glstate, int es2only) {
+     if(!shared_glstate)
+     {
+         glstate->actual_tex2d = (GLuint*)calloc(MAX_TEX, sizeof(GLuint));
++        glstate->actual_texarray = (GLuint*)calloc(MAX_TEX, sizeof(GLuint));
+     }
+     // glsl
+     glstate->gleshard = (gleshard_t*)calloc(1, sizeof(gleshard_t)); // Not shared!
+@@ -475,6 +477,7 @@ void DeleteGLState(void* oldstate) {
+ 
+     if(!state->shared_cnt)
+         free(state->actual_tex2d);
++        free(state->actual_texarray);
+     
+     #define free_hashmap(T, N, K, F)        \
+     if(state->N)                            \
+diff --git a/src/gl/glstate.h b/src/gl/glstate.h
+index 02f4d2a6..fe421a8d 100644
+--- a/src/gl/glstate.h
++++ b/src/gl/glstate.h
+@@ -56,6 +56,7 @@ struct glstate_s {
+     glclientstack_t     *clientStack;
+     raster_state_t      raster;
+     GLuint              *actual_tex2d; // store the texture actually bounded TEX2D unit, because it's shared... (TODO: all binding and not only TEX2D)
++    GLuint              *actual_texarray; // native GLES3 GL_TEXTURE_2D_ARRAY binding, never aliased with TEX2D
+     int                 bound_changed; // 0 if not changed or max TMU if changed...
+     int                 fpe_bound_changed; // same but for fpe
+ #ifdef TEXSTREAM
+diff --git a/src/gl/init.c b/src/gl/init.c
+index 7526d913..59a3a6d2 100644
+--- a/src/gl/init.c
++++ b/src/gl/init.c
+@@ -17,6 +17,8 @@
+ #include "fpe_cache.h"
+ #include "init.h"
+ #include "envvars.h"
++#include "texture.h"
++#include "../glx/hardext.h"
+ #if defined(__EMSCRIPTEN__) || defined(__APPLE__)
+ #define NO_INIT_CONSTRUCTOR
+ #endif
+@@ -740,6 +742,9 @@ void close_gl4es() {
+     gl_close();
+     fpe_writePSA();
+     fpe_FreePSA();
++    inited = 0;
++    gl4es_texture_array_reset();
++    ResetHardwareExtensions();
+         #if defined(GL4ES_COMPILE_FOR_USE_IN_SHARED_LIB) && defined(AMIGAOS4)
+         os4CloseLib();
+       #endif
+diff --git a/src/gl/program.c b/src/gl/program.c
+index 2eaeb02b..1d5f57ba 100644
+--- a/src/gl/program.c
++++ b/src/gl/program.c
+@@ -581,6 +581,11 @@ static void fill_program(program_t *glprogram)
+                         glprogram->texunits[tu_idx].type=TU_CUBE;
+                         glprogram->texunits[tu_idx].req_tu = glprogram->texunits[tu_idx].act_tu = 0;
+                         ++tu_idx;
++                    } else if (type==GL_SAMPLER_2D_ARRAY) {
++                        glprogram->texunits[tu_idx].id = id;
++                        glprogram->texunits[tu_idx].type=TU_ARRAY;
++                        glprogram->texunits[tu_idx].req_tu = glprogram->texunits[tu_idx].act_tu = 0;
++                        ++tu_idx;
+                     } else if (type==GL_SAMPLER_2D) {
+                         glprogram->texunits[tu_idx].id = id;
+                         glprogram->texunits[tu_idx].type=TU_TEX2D;
+@@ -608,7 +613,7 @@ static void fill_program(program_t *glprogram)
+         uniform_t *m;
+         khint_t k;
+         kh_foreach(glprogram->uniform, k, m,
+-            if(m->type == GL_SAMPLER_2D || m->type == GL_SAMPLER_CUBE)
++            if(m->type == GL_SAMPLER_2D || m->type == GL_SAMPLER_CUBE || m->type == GL_SAMPLER_2D_ARRAY)
+                 memset((char*)glprogram->cache.cache+m->cache_offs, 0xff, m->cache_size);
+         )
+     }
+diff --git a/src/gl/program.h b/src/gl/program.h
+index a788da4b..babfda0c 100644
+--- a/src/gl/program.h
++++ b/src/gl/program.h
+@@ -194,7 +194,8 @@ typedef enum {
+     TU_TEX2D,
+     TU_TEX3D,
+     TU_RECTANGLE,
+-    TU_CUBE
++    TU_CUBE,
++    TU_ARRAY
+ } texunit_type;
+ 
+ typedef struct {
+diff --git a/src/gl/shaderconv.c b/src/gl/shaderconv.c
+index 3d0f46bd..e43fa399 100644
+--- a/src/gl/shaderconv.c
++++ b/src/gl/shaderconv.c
+@@ -448,6 +448,7 @@ char* ConvertShader(const char* pEntry, int isVertex, shaderconv_need_t *need)
+     }
+   }
+   int fpeShader = (strstr(pEntry, fpeshader_signature)!=NULL)?1:0;
++  int texture_array_program = strstr(pEntry, "GL4ES_TEXTURE_ARRAY_PROGRAM") || strstr(pEntry, "#define BMODEL_MULTI_LAYERS");
+   int maskbefore = 4|(isVertex?1:2);
+   int maskafter = 8|(isVertex?1:2);
+   if((globals4es.dbgshaderconv&maskbefore)==maskbefore) {
+@@ -478,7 +479,9 @@ char* ConvertShader(const char* pEntry, int isVertex, shaderconv_need_t *need)
+     if(exts.ext)
+       free(exts.ext);
+   }
++  int texture_array_shader = texture_array_program ||
++      strstr(pBuffer, "sampler2DArray") || strstr(pBuffer, "texture2DArray");
+ 
+   static shaderconv_need_t dummy_need = {0};
+   if(!need) {
+     need = &dummy_need;
+@@ -507,7 +510,16 @@ char* ConvertShader(const char* pEntry, int isVertex, shaderconv_need_t *need)
+   }
+   #endif
+   //sprintf(GLESFullHeader, GLESHeader, (wanthighp && hardext.highp==1 && !isVertex)?GLESUseFragHighp:"", (wanthighp)?"highp":"mediump", (wanthighp)?"highp":"mediump");
+-  sprintf(GLESFullHeader, GLESHeader[versionHeader], "", (wanthighp)?"highp":"mediump", (wanthighp)?"highp":"mediump");
++  if(texture_array_shader) {
++    const char *stage = isVertex
++      ? "#define attribute in\n#define varying out\n"
++      : "#define varying in\nout mediump vec4 gl4es_FragColor;\n#define gl_FragColor gl4es_FragColor\n";
++    snprintf(GLESFullHeader, sizeof(GLESFullHeader),
++      "#version 300 es\n%s#define GLSL_ALLOW_TEXTURE_ARRAY 1\n#define texture2DArray texture\n#define texture2DProj textureProj\n#define texture2D texture\n#define textureCube texture\nprecision %s float;\nprecision %s int;\nprecision mediump sampler2D;\nprecision mediump samplerCube;\nprecision mediump sampler2DArray;\n",
++      stage, (wanthighp)?"highp":"mediump", (wanthighp)?"highp":"mediump");
++  } else {
++    sprintf(GLESFullHeader, GLESHeader[versionHeader], "", (wanthighp)?"highp":"mediump", (wanthighp)?"highp":"mediump");
++  }
+ 
+   int tmpsize = strlen(pBuffer)*2+strlen(GLESFullHeader)+100;
+   char* Tmp = (char*)calloc(1, tmpsize);
+@@ -546,7 +558,9 @@ char* ConvertShader(const char* pEntry, int isVertex, shaderconv_need_t *need)
+   const char* GLESFakeFragDepth = "mediump float fakeFragDepth = 0.0;\n";
+   if (fragdepth) {
+     /* If #extension is used, it should be placed before the second line of the header. */
+-    if(hardext.fragdepth)
++    if(texture_array_shader) {
++      /* gl_FragDepth is core in ESSL 300. */
++    } else if(hardext.fragdepth)
+       Tmp = gl4es_inplace_insert(gl4es_getline(Tmp, 1), GLESUseFragDepth, Tmp, &tmpsize);
+     else
+       Tmp = gl4es_inplace_insert(gl4es_getline(Tmp, headline-1), GLESFakeFragDepth, Tmp, &tmpsize);
+@@ -554,8 +568,10 @@ char* ConvertShader(const char* pEntry, int isVertex, shaderconv_need_t *need)
+   }
+ 
+   const char* GLESUseShaderNonConstantGlobalInitialzers = "#extension GL_EXT_shader_non_constant_global_initializers : enable\n";
+-  Tmp = gl4es_inplace_insert(gl4es_getline(Tmp, 1), GLESUseShaderNonConstantGlobalInitialzers, Tmp, &tmpsize);
+-  ++headline;
++  if(!texture_array_shader) {
++    Tmp = gl4es_inplace_insert(gl4es_getline(Tmp, 1), GLESUseShaderNonConstantGlobalInitialzers, Tmp, &tmpsize);
++    ++headline;
++  }
+ 
+   Tmp = gl4es_inplace_insert(gl4es_getline(Tmp, headline-1), "#define GL4ES\n", Tmp, &tmpsize);
+ 
+@@ -568,7 +584,9 @@ char* ConvertShader(const char* pEntry, int isVertex, shaderconv_need_t *need)
+   "vec3 fwidth(vec3 p) {return abs(dFdx(p))+abs(dFdy(p));}\n";
+   if (derivatives) {
+     /* If #extension is used, it should be placed before the second line of the header. */
+-    if(hardext.derivatives)
++    if(texture_array_shader) {
++      /* derivatives are core in ESSL 300. */
++    } else if(hardext.derivatives)
+       Tmp = gl4es_inplace_insert(gl4es_getline(Tmp, 1), GLESUseDerivative, Tmp, &tmpsize);
+     else
+       Tmp = gl4es_inplace_insert(gl4es_getline(Tmp, headline-1), GLESFakeDerivative, Tmp, &tmpsize);
+@@ -580,7 +598,7 @@ char* ConvertShader(const char* pEntry, int isVertex, shaderconv_need_t *need)
+     Tmp = gl4es_inplace_insert(gl4es_getline(Tmp, 1), useEXTDrawBuffers, Tmp, &tmpsize);
+   }
+   // if some functions are used, add some int/float alternative
+-  if(!fpeShader && !globals4es.nointovlhack) {
++  if(!texture_array_shader && !fpeShader && !globals4es.nointovlhack) {
+     if(strstr(Tmp, "pow(") || strstr(Tmp, "pow (")) {
+         Tmp = gl4es_inplace_insert(gl4es_getline(Tmp, headline), HackAltPow, Tmp, &tmpsize);
+     }
+diff --git a/src/gl/texture.h b/src/gl/texture.h
+index 33e140a3..e48bb95e 100644
+--- a/src/gl/texture.h
++++ b/src/gl/texture.h
+@@ -97,6 +97,7 @@ typedef enum {
+     ENABLED_TEX3D,
+     ENABLED_TEXTURE_RECTANGLE,
+     ENABLED_CUBE_MAP,
++    ENABLED_TEXTURE_ARRAY,
+     ENABLED_TEXTURE_LAST
+ } texture_enabled_t;
+ 
+@@ -121,6 +122,7 @@ typedef struct {
+     GLenum target;
+     GLsizei width;
+     GLsizei height;
++    GLsizei depth;
+     GLsizei nwidth;
+     GLsizei nheight;
+     GLboolean mipmap_auto;
+@@ -140,6 +142,8 @@ typedef struct {
+     GLboolean compressed;
+     GLboolean streamed;
+     int valid;
++    GLboolean immutable;
++    GLsizei immutable_levels;
+ 	int	streamingID;
+     int fpe_format; // tracking simplified internal format for FPE
+     int npot;
+@@ -194,6 +198,8 @@ static inline GLuint what_target(GLenum target) {
+             return ENABLED_CUBE_MAP;
+         case GL_TEXTURE_RECTANGLE_ARB:
+             return ENABLED_TEXTURE_RECTANGLE;
++        case GL_TEXTURE_2D_ARRAY:
++            return ENABLED_TEXTURE_ARRAY;
+         case GL_TEXTURE_2D:
+         default:
+             return ENABLED_TEX2D;
+@@ -209,6 +215,8 @@ static inline GLenum to_target(GLuint itarget) {
+             return GL_TEXTURE_RECTANGLE_ARB;
+         case ENABLED_CUBE_MAP:
+             return GL_TEXTURE_CUBE_MAP;
++        case ENABLED_TEXTURE_ARRAY:
++            return GL_TEXTURE_2D_ARRAY;
+         case ENABLED_TEX2D:
+         default:
+             return GL_TEXTURE_2D;
+@@ -220,6 +228,25 @@ static inline GLenum to_target(GLuint itarget) {
+ #define IS_TEXTURE_RECTANGLE(T) (T&(1<<ENABLED_TEXTURE_RECTANGLE))
+ #define IS_ANYTEX(T) (T&((1<<ENABLED_TEX2D)|(1<<ENABLED_TEX1D)|(1<<ENABLED_TEX3D)|(1<<ENABLED_TEXTURE_RECTANGLE)))
+ #define IS_CUBE_MAP(T) (T&(1<<ENABLED_CUBE_MAP))
++#define IS_TEXTURE_ARRAY(T) (T&(1<<ENABLED_TEXTURE_ARRAY))
++
++int gl4es_texture_array_available(void);
++void gl4es_texture_array_reset(void);
++void gl4es_texture_array_bind(int unit, GLuint texture);
++void gl4es_texture_array_image(GLenum target, GLint level, GLint internalformat,
++    GLsizei width, GLsizei height, GLsizei depth, GLint border,
++    GLenum format, GLenum type, const GLvoid *data);
++void gl4es_texture_array_subimage(GLenum target, GLint level, GLint xoffset,
++    GLint yoffset, GLint zoffset, GLsizei width, GLsizei height, GLsizei depth,
++    GLenum format, GLenum type, const GLvoid *data);
++void gl4es_texture_array_storage(GLenum target, GLsizei levels,
++    GLenum internalformat, GLsizei width, GLsizei height, GLsizei depth);
++void gl4es_texture_array_compressed_image(GLenum target, GLint level,
++    GLenum internalformat, GLsizei width, GLsizei height, GLsizei depth,
++    GLint border, GLsizei imageSize, const GLvoid *data);
++void gl4es_texture_array_compressed_subimage(GLenum target, GLint level,
++    GLint xoffset, GLint yoffset, GLint zoffset, GLsizei width, GLsizei height,
++    GLsizei depth, GLenum format, GLsizei imageSize, const GLvoid *data);
+ 
+ static inline GLint get_target(GLuint enabled) {
+     if(!enabled)
+diff --git a/src/gl/texture_3d.c b/src/gl/texture_3d.c
+index e80a1f1a..4695483b 100644
+--- a/src/gl/texture_3d.c
++++ b/src/gl/texture_3d.c
+@@ -27,7 +27,11 @@
+ void APIENTRY_GL4ES gl4es_glTexImage3D(GLenum target, GLint level, GLint internalFormat,
+                   GLsizei width, GLsizei height, GLsizei depth, GLint border,
+                   GLenum format, GLenum type, const GLvoid *data) {
+-
++    if(target == GL_TEXTURE_2D_ARRAY) {
++        gl4es_texture_array_image(target, level, internalFormat, width, height,
++            depth, border, format, type, data);
++        return;
++    }
+     // TODO: maybe too naive to force GL_TEXTURE_2D here?
+     gl4es_glTexImage2D(GL_TEXTURE_3D, level, internalFormat, width, height,
+                  border, format, type, data);
+@@ -36,6 +40,12 @@ void APIENTRY_GL4ES gl4es_glTexSubImage3D(GLenum target, GLint level, GLint xoff
+                      GLsizei width, GLsizei height, GLsizei depth, GLenum format,
+                      GLenum type, const GLvoid *data) {
+ 
++    if(target == GL_TEXTURE_2D_ARRAY) {
++        gl4es_texture_array_subimage(target, level, xoffset, yoffset, zoffset,
++            width, height, depth, format, type, data);
++        return;
++    }
++
+     gl4es_glTexSubImage2D(GL_TEXTURE_3D, level, xoffset, yoffset,
+                     width, height, format, type, data);
+ }
+@@ -43,6 +53,10 @@ void APIENTRY_GL4ES gl4es_glTexSubImage3D(GLenum target, GLint level, GLint xoff
+ void APIENTRY_GL4ES gl4es_glTexStorage3D(GLenum target, GLsizei levels, GLenum internalformat, GLsizei width, GLsizei height, GLsizei depth)
+ {
+     DBG(printf("glTexStorage3D(%s, %d, %s, %d, %d, %d)\n", PrintEnum(target), levels, PrintEnum(internalformat), width, height, depth);)
++    if(target == GL_TEXTURE_2D_ARRAY) {
++        gl4es_texture_array_storage(target, levels, internalformat, width, height, depth);
++        return;
++    }
+     gl4es_glTexImage3D(target, 0, internalformat, width, height, depth, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+ }
+ 
+diff --git a/src/gl/texture_array.c b/src/gl/texture_array.c
+new file mode 100644
+index 00000000..614d6f7d
+--- /dev/null
++++ b/src/gl/texture_array.c
+@@ -0,0 +1,152 @@
++#include "texture.h"
++
++#include "debug.h"
++#include "glstate.h"
++#include "loader.h"
++#include "../glx/hardext.h"
++
++typedef void (APIENTRY_GL4ES *native_teximage3d_t)(GLenum, GLint, GLint,
++    GLsizei, GLsizei, GLsizei, GLint, GLenum, GLenum, const GLvoid *);
++typedef void (APIENTRY_GL4ES *native_texsubimage3d_t)(GLenum, GLint, GLint,
++    GLint, GLint, GLsizei, GLsizei, GLsizei, GLenum, GLenum, const GLvoid *);
++typedef void (APIENTRY_GL4ES *native_texstorage3d_t)(GLenum, GLsizei, GLenum,
++    GLsizei, GLsizei, GLsizei);
++
++static native_teximage3d_t native_teximage3d;
++static native_texsubimage3d_t native_texsubimage3d;
++static native_texstorage3d_t native_texstorage3d;
++
++static int load_texture_array_entrypoints(void)
++{
++    if(!hardext.texture_array || !gles_getProcAddress)
++        return 0;
++    if(!native_teximage3d)
++        native_teximage3d = (native_teximage3d_t)gles_getProcAddress("glTexImage3D");
++    if(!native_texsubimage3d)
++        native_texsubimage3d = (native_texsubimage3d_t)gles_getProcAddress("glTexSubImage3D");
++    if(!native_texstorage3d)
++        native_texstorage3d = (native_texstorage3d_t)gles_getProcAddress("glTexStorage3D");
++    return native_teximage3d && native_texsubimage3d && native_texstorage3d;
++}
++
++static const GLvoid *array_pixels(const GLvoid *data)
++{
++    if(data && glstate->vao->unpack)
++        return (const char *)glstate->vao->unpack->data + (uintptr_t)data;
++    return data;
++}
++
++int gl4es_texture_array_available(void)
++{
++    return load_texture_array_entrypoints();
++}
++
++void gl4es_texture_array_reset(void)
++{
++    native_teximage3d = NULL;
++    native_texsubimage3d = NULL;
++    native_texstorage3d = NULL;
++}
++
++void gl4es_texture_array_bind(int unit, GLuint texture)
++{
++    LOAD_GLES(glActiveTexture);
++    LOAD_GLES(glBindTexture);
++    if(!load_texture_array_entrypoints()) {
++        errorShim(GL_INVALID_OPERATION);
++        return;
++    }
++    if(glstate->gleshard->active != unit) {
++        glstate->gleshard->active = unit;
++        gles_glActiveTexture(GL_TEXTURE0 + unit);
++    }
++    gles_glBindTexture(GL_TEXTURE_2D_ARRAY, texture);
++    glstate->actual_texarray[unit] = texture;
++}
++
++static gltexture_t *array_bound(void)
++{
++    return glstate->texture.bound[glstate->texture.active][ENABLED_TEXTURE_ARRAY];
++}
++
++static int array_validate(GLenum target, GLsizei width, GLsizei height, GLsizei depth)
++{
++    if(target != GL_TEXTURE_2D_ARRAY) {
++        errorShim(GL_INVALID_ENUM);
++        return 0;
++    }
++    if(width < 0 || height < 0 || depth < 0 || depth > hardext.maxarraylayers) {
++        errorShim(GL_INVALID_VALUE);
++        return 0;
++    }
++    if(!load_texture_array_entrypoints()) {
++        errorShim(GL_INVALID_OPERATION);
++        return 0;
++    }
++    return 1;
++}
++
++void gl4es_texture_array_image(GLenum target, GLint level, GLint internalformat,
++    GLsizei width, GLsizei height, GLsizei depth, GLint border,
++    GLenum format, GLenum type, const GLvoid *data)
++{
++    gltexture_t *tex;
++    if(!array_validate(target, width, height, depth)) return;
++    tex = array_bound();
++    if(tex->immutable) {
++        errorShim(GL_INVALID_OPERATION);
++        return;
++    }
++    realize_bound(glstate->texture.active, target);
++    native_teximage3d(target, level, internalformat, width, height, depth,
++        border, format, type, array_pixels(data));
++    tex->width = width;
++    tex->height = height;
++    tex->depth = depth;
++    tex->format = format;
++    tex->type = type;
++    tex->internalformat = internalformat;
++    tex->valid = 1;
++    errorGL();
++}
++
++void gl4es_texture_array_subimage(GLenum target, GLint level, GLint xoffset,
++    GLint yoffset, GLint zoffset, GLsizei width, GLsizei height, GLsizei depth,
++    GLenum format, GLenum type, const GLvoid *data)
++{
++    gltexture_t *tex;
++    if(!array_validate(target, width, height, depth)) return;
++    tex = array_bound();
++    if(!tex->valid || xoffset < 0 || yoffset < 0 || zoffset < 0 ||
++       xoffset + width > tex->width || yoffset + height > tex->height ||
++       zoffset + depth > tex->depth) {
++        errorShim(GL_INVALID_VALUE);
++        return;
++    }
++    realize_bound(glstate->texture.active, target);
++    native_texsubimage3d(target, level, xoffset, yoffset, zoffset, width,
++        height, depth, format, type, array_pixels(data));
++    errorGL();
++}
++
++void gl4es_texture_array_storage(GLenum target, GLsizei levels,
++    GLenum internalformat, GLsizei width, GLsizei height, GLsizei depth)
++{
++    gltexture_t *tex;
++    if(!array_validate(target, width, height, depth)) return;
++    tex = array_bound();
++    if(levels <= 0 || tex->immutable) {
++        errorShim(levels <= 0 ? GL_INVALID_VALUE : GL_INVALID_OPERATION);
++        return;
++    }
++    realize_bound(glstate->texture.active, target);
++    native_texstorage3d(target, levels, internalformat, width, height, depth);
++    tex->width = width;
++    tex->height = height;
++    tex->depth = depth;
++    tex->internalformat = internalformat;
++    tex->immutable = GL_TRUE;
++    tex->immutable_levels = levels;
++    tex->valid = 1;
++    errorGL();
++}
+diff --git a/src/gl/texture_compressed.c b/src/gl/texture_compressed.c
+index 25d2d742..ebb61e32 100644
+--- a/src/gl/texture_compressed.c
++++ b/src/gl/texture_compressed.c
+@@ -477,6 +477,38 @@ void APIENTRY_GL4ES gl4es_glCompressedTexImage3D(GLenum target, GLint level, GLe
+                             GLsizei width, GLsizei height, GLsizei depth, GLint border,
+                             GLsizei imageSize, const GLvoid *data) {
+                                 
++    if(target == GL_TEXTURE_2D_ARRAY && isDXTc(internalformat)) {
++        const int blockbytes = (internalformat==GL_COMPRESSED_RGB_S3TC_DXT1_EXT ||
++            internalformat==GL_COMPRESSED_RGBA_S3TC_DXT1_EXT) ? 8 : 16;
++        const size_t layerbytes = ((width+3)/4) * ((height+3)/4) * blockbytes;
++        const GLvoid *src = data;
++        GLubyte *rgba;
++        int simpleAlpha = 0, complexAlpha = 0;
++        if(glstate->vao->unpack && data)
++            src = (const char*)glstate->vao->unpack->data + (uintptr_t)data;
++        if(!data || imageSize < (GLsizei)(layerbytes * depth)) {
++            errorShim(data ? GL_INVALID_VALUE : GL_INVALID_OPERATION);
++            return;
++        }
++        rgba = malloc((size_t)width * height * depth * 4);
++        if(!rgba) { errorShim(GL_OUT_OF_MEMORY); return; }
++        for(int layer=0; layer<depth; ++layer) {
++            GLvoid *decoded = uncompressDXTc(width, height, internalformat,
++                (GLsizei)layerbytes, 0, &simpleAlpha, &complexAlpha,
++                (const char*)src + layerbytes*layer);
++            if(!decoded) { free(rgba); errorShim(GL_INVALID_OPERATION); return; }
++            memcpy(rgba + (size_t)width*height*4*layer, decoded,
++                (size_t)width*height*4);
++            free(decoded);
++        }
++        glbuffer_t *saved_unpack = glstate->vao->unpack;
++        glstate->vao->unpack = NULL;
++        gl4es_texture_array_image(target, level, GL_RGBA8, width, height, depth,
++            border, GL_RGBA, GL_UNSIGNED_BYTE, rgba);
++        glstate->vao->unpack = saved_unpack;
++        free(rgba);
++        return;
++    }
+     gl4es_glCompressedTexImage2D(target, level, internalformat, width, height, border, imageSize, data);
+ }
+ 
+@@ -490,6 +522,38 @@ void APIENTRY_GL4ES gl4es_glCompressedTexSubImage3D(GLenum target, GLint level,
+                                GLsizei width, GLsizei height, GLsizei depth, GLenum format, 
+                                GLsizei imageSize, const GLvoid *data) {
+ 
++    if(target == GL_TEXTURE_2D_ARRAY && isDXTc(format)) {
++        const int blockbytes = (format==GL_COMPRESSED_RGB_S3TC_DXT1_EXT ||
++            format==GL_COMPRESSED_RGBA_S3TC_DXT1_EXT) ? 8 : 16;
++        const size_t layerbytes = ((width+3)/4) * ((height+3)/4) * blockbytes;
++        const GLvoid *src = data;
++        GLubyte *rgba;
++        int simpleAlpha = 0, complexAlpha = 0;
++        if(glstate->vao->unpack && data)
++            src = (const char*)glstate->vao->unpack->data + (uintptr_t)data;
++        if(!data || imageSize < (GLsizei)(layerbytes * depth)) {
++            errorShim(data ? GL_INVALID_VALUE : GL_INVALID_OPERATION);
++            return;
++        }
++        rgba = malloc((size_t)width * height * depth * 4);
++        if(!rgba) { errorShim(GL_OUT_OF_MEMORY); return; }
++        for(int layer=0; layer<depth; ++layer) {
++            GLvoid *decoded = uncompressDXTc(width, height, format,
++                (GLsizei)layerbytes, 0, &simpleAlpha, &complexAlpha,
++                (const char*)src + layerbytes*layer);
++            if(!decoded) { free(rgba); errorShim(GL_INVALID_OPERATION); return; }
++            memcpy(rgba + (size_t)width*height*4*layer, decoded,
++                (size_t)width*height*4);
++            free(decoded);
++        }
++        glbuffer_t *saved_unpack = glstate->vao->unpack;
++        glstate->vao->unpack = NULL;
++        gl4es_texture_array_subimage(target, level, xoffset, yoffset, zoffset,
++            width, height, depth, GL_RGBA, GL_UNSIGNED_BYTE, rgba);
++        glstate->vao->unpack = saved_unpack;
++        free(rgba);
++        return;
++    }
+     gl4es_glCompressedTexSubImage2D(target, level, xoffset, yoffset, width, height, format, imageSize, data);
+ }
+ 
+diff --git a/src/gl/texture_params.c b/src/gl/texture_params.c
+index 354388cb..a8c40754 100644
+--- a/src/gl/texture_params.c
++++ b/src/gl/texture_params.c
+@@ -178,6 +178,12 @@ gltexture_t* gl4es_getTexture(GLenum target, GLuint texture) {
+ }
+ void APIENTRY_GL4ES gl4es_glBindTexture(GLenum target, GLuint texture) {
+     noerrorShim();
++    if(target!=GL_TEXTURE_1D && target!=GL_TEXTURE_2D && target!=GL_TEXTURE_3D &&
++       target!=GL_TEXTURE_RECTANGLE_ARB && target!=GL_TEXTURE_CUBE_MAP &&
++       target!=GL_TEXTURE_2D_ARRAY) {
++        errorShim(GL_INVALID_ENUM);
++        return;
++    }
+     DBG(printf("glBindTexture(%s, %u), active=%i, client=%i, list.active=%p (compiling=%d, pending=%d)\n", PrintEnum(target), texture, glstate->texture.active, glstate->texture.client, glstate->list.active, glstate->list.compiling, glstate->list.pending);)
+     if ((target!=GL_PROXY_TEXTURE_2D) && glstate->list.compiling && glstate->list.active && !glstate->list.pending) {
+         // check if already a texture binded, if yes, create a new list
+@@ -189,6 +195,12 @@ void APIENTRY_GL4ES gl4es_glBindTexture(GLenum target, GLuint texture) {
+         const GLuint itarget = what_target(target);
+ 
+         tex = gl4es_getTexture(target, texture);
++        if(texture && tex->target == 0)
++            tex->target = target;
++        if(texture && tex->target != target) {
++            errorShim(GL_INVALID_OPERATION);
++            return;
++        }
+         if (glstate->texture.bound[glstate->texture.active][itarget] == tex) {
+             ios_wo52_material_gl4es_bind(glstate->texture.active, target,
+                 texture, tex ? tex->glname : 0, 1);
+@@ -214,6 +226,13 @@ void APIENTRY_GL4ES gl4es_glBindTexture(GLenum target, GLuint texture) {
+             case GL_TEXTURE_CUBE_MAP_NEGATIVE_Z:
+                 gles_glBindTexture(target, tex?tex->glname:0);
+                 break;
++            case GL_TEXTURE_2D_ARRAY:
++                gl4es_texture_array_bind(glstate->texture.active, tex?tex->glname:0);
++                if (glstate->bound_changed < glstate->texture.active+1)
++                    glstate->bound_changed = glstate->texture.active+1;
++                if (glstate->fpe_state && glstate->fpe_bound_changed < glstate->texture.active+1)
++                    glstate->fpe_bound_changed = glstate->texture.active+1;
++                break;
+             case GL_TEXTURE_1D:
+             case GL_TEXTURE_2D:
+             case GL_TEXTURE_3D:
+@@ -401,6 +420,10 @@ void APIENTRY_GL4ES gl4es_glDeleteTextures(GLsizei n, const GLuint *textures) {
+                         glstate->actual_tex2d[a] = 0;
+                         found = 1;
+                     }
++                    if(glstate->actual_texarray[a]==tex->glname) {
++                        glstate->actual_texarray[a] = 0;
++                        found = 1;
++                    }
+                     if(found)
+                         glstate->bound_changed = a+1;
+                 }
+@@ -726,6 +749,13 @@ void realize_bound(int TMU, GLenum target) {
+     LOAD_GLES(glDisable);
+ #endif
+     switch (target) {
++        case GL_TEXTURE_2D_ARRAY:
++            if(glstate->actual_texarray[TMU] != t) {
++                gl4es_texture_array_bind(TMU, t);
++                if (glstate->bound_changed < TMU+1)
++                    glstate->bound_changed = TMU+1;
++            }
++            break;
+         case GL_TEXTURE_1D:
+         case GL_TEXTURE_2D:
+         case GL_TEXTURE_3D:
+@@ -850,6 +880,14 @@ void realize_1texture(GLenum target, int wantedTMU, gltexture_t* tex, glsampler_
+         gles_glTexParameteri(target, GL_TEXTURE_WRAP_T, param);
+         tex->actual.wrap_t=param;
+     }
++    if(target==GL_TEXTURE_2D_ARRAY && tex->actual.wrap_r!=sampler->wrap_r) {
++        if(glstate->gleshard->active!=TMU) {
++            glstate->gleshard->active = TMU;
++            gles_glActiveTexture(GL_TEXTURE0+TMU);
++        }
++        gles_glTexParameteri(target, GL_TEXTURE_WRAP_R, sampler->wrap_r);
++        tex->actual.wrap_r=sampler->wrap_r;
++    }
+     if(wantedTMU==-2) {
+         if (oldtex!=tex->glname) gles_glBindTexture(GL_TEXTURE_2D, oldtex);
+     }
+@@ -875,7 +913,9 @@ void realize_textures(int drawing) {
+         // get highest priority texture unit
+         int tmp = glstate->enable.texture[i];
+         int tgt = ENABLED_TEX2D; // default to TEX2D
+-        if(IS_TEX3D(tmp))
++        if(IS_TEXTURE_ARRAY(tmp))
++            tgt = ENABLED_TEXTURE_ARRAY;
++        else if(IS_TEX3D(tmp))
+             tgt = ENABLED_TEX3D;
+         else if(IS_TEXTURE_RECTANGLE(tmp))
+             tgt = ENABLED_TEXTURE_RECTANGLE;
+@@ -889,7 +929,10 @@ void realize_textures(int drawing) {
+         GLenum target = map_tex_target(to_target(tgt));
+         gltexture_t *tex = glstate->texture.bound[i][tgt];
+         GLuint t = tex->glname;
+-        if(tgt!=ENABLED_CUBE_MAP) {// CUBE MAP are immediately bound
++        if(tgt==ENABLED_TEXTURE_ARRAY) {
++            if(t!=glstate->actual_texarray[i])
++                gl4es_texture_array_bind(i, t);
++        } else if(tgt!=ENABLED_CUBE_MAP) {// CUBE MAP are immediately bound
+ #ifdef TEXSTREAM
+             if(glstate->bound_stream[i]) {
+                 realize_active();
+@@ -945,7 +988,7 @@ void realize_textures(int drawing) {
+                 if(!tex->mipmap_auto) {
+                     // should check if glGenerateMipmap exist, and fall back to no mipmap if not
+                     LOAD_GLES2_OR_OES(glGenerateMipmap);
+-                    gles_glGenerateMipmap(GL_TEXTURE_2D);
++                    gles_glGenerateMipmap(target);
+                 }
+                 tex->mipmap_done = 1;
+             }
+diff --git a/src/glx/hardext.c b/src/glx/hardext.c
+index 9944eaaf..ddaefc7c 100644
+--- a/src/glx/hardext.c
++++ b/src/glx/hardext.c
+@@ -18,6 +18,12 @@ static int tested = 0;
+ 
+ hardext_t hardext = {0};
+ 
++void ResetHardwareExtensions(void)
++{
++    tested = 0;
++    memset(&hardext, 0, sizeof(hardext));
++}
++
+ char* gl4es_original_vendor = NULL;
+ char* gl4es_original_renderer = NULL;
+ 
+@@ -346,6 +352,16 @@ void GetHardwareExtensions(int notest)
+     SHUT_LOGD("iOS uint element policy: version=\"%s\" native_es_major=%d extension=%d enabled=%d reason=%s\n",
+         Version?Version:"(null)", native_es_major, elementuint_extension, hardext.elementuint,
+         (native_es_major>=3)?"native-es3-core":(elementuint_extension?"oes-extension":"unsupported"));
++    hardext.texture_array = 0;
++    hardext.maxarraylayers = 0;
++    if(native_es_major>=3 && gles_getProcAddress &&
++       gles_getProcAddress("glTexImage3D") && gles_getProcAddress("glTexSubImage3D") &&
++       gles_getProcAddress("glTexStorage3D")) {
++        gles_glGetIntegerv(GL_MAX_ARRAY_TEXTURE_LAYERS, &hardext.maxarraylayers);
++        hardext.texture_array = hardext.maxarraylayers > 0;
++    }
++    SHUT_LOGD("iOS texture array capability: native_es_major=%d max_layers=%d enabled=%d source=live-context\n",
++        native_es_major, hardext.maxarraylayers, hardext.texture_array);
+     S("GL_OES_packed_depth_stencil ", depthstencil, 1);
+     S("GL_OES_depth24 ", depth24, 1);
+     S("GL_OES_rgb8_rgba8 ", rgba8, 1);
+diff --git a/src/glx/hardext.h b/src/glx/hardext.h
+index 05738fb6..1ed51f6f 100644
+--- a/src/glx/hardext.h
++++ b/src/glx/hardext.h
+@@ -72,10 +72,13 @@ typedef struct _hardext {
+     int glsl120;        // does version 120 glsl shader are supported ?
+     int glsl300es;      // does version 300es glsl shader are supported ?
+     int glsl310es;      // does version 300es glsl shader are supported ?
++    int texture_array;  // native GLES3 GL_TEXTURE_2D_ARRAY route is complete
++    int maxarraylayers; // live GL_MAX_ARRAY_TEXTURE_LAYERS
+ } hardext_t;
+ 
+ EXPORT extern hardext_t hardext;
+ 
+ EXPORT void GetHardwareExtensions(int test);
++EXPORT void ResetHardwareExtensions(void);
+ 
+ #endif

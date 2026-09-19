@@ -145,6 +145,46 @@ static int Sys_BacktracePrintFull( void *data, uintptr_t pc, const char *filenam
 	return 0;
 }
 
+#if XASH_APPLE
+static int Sys_BacktracePrintSimple( void *data, uintptr_t pc )
+{
+	struct print_data *pd = data;
+	Dl_info dlinfo = { 0 };
+	const char *module_name = NULL;
+	const char *symbol_name = NULL;
+	uintptr_t module_offset = 0;
+	uintptr_t symbol_offset = 0;
+
+	if( dladdr((void *)pc, &dlinfo ))
+	{
+		module_name = dlinfo.dli_fname ? COM_FileWithoutPath( dlinfo.dli_fname ) : NULL;
+		symbol_name = dlinfo.dli_sname;
+		if( dlinfo.dli_fbase )
+			module_offset = pc - (uintptr_t)dlinfo.dli_fbase;
+		if( dlinfo.dli_saddr )
+			symbol_offset = pc - (uintptr_t)dlinfo.dli_saddr;
+	}
+
+	if( pd->skip_wrappers )
+	{
+		if( Sys_IsCrashHandlerFrame( symbol_name ))
+			return 0;
+		pd->skip_wrappers = false;
+	}
+
+	if( module_name && symbol_name )
+		Sys_AppendPrint( pd, "%2d: <%s+0x%lx> (%s+0x%lx)\n", pd->idx++, symbol_name,
+			(unsigned long)symbol_offset, module_name, (unsigned long)module_offset );
+	else if( module_name )
+		Sys_AppendPrint( pd, "%2d: %p (%s+0x%lx)\n", pd->idx++, (void *)pc,
+			module_name, (unsigned long)module_offset );
+	else
+		Sys_AppendPrint( pd, "%2d: %p\n", pd->idx++, (void *)pc );
+
+	return 0;
+}
+#endif
+
 int Sys_CrashDetailsLibbacktrace( int logfd, char *message, int len, size_t max_len )
 {
 	struct print_data pd =
@@ -156,7 +196,14 @@ int Sys_CrashDetailsLibbacktrace( int logfd, char *message, int len, size_t max_
 		.skip_wrappers = true,
 	};
 
+#if XASH_APPLE
+	// Mach-O debug information commonly lives in a separate dSYM, so the full
+	// decoder emits only "no debug info". Preserve module-relative PCs instead;
+	// they can be symbolized against the exact IPA binaries after a device test.
+	backtrace_simple( g_bt_state, 0, Sys_BacktracePrintSimple, Sys_BacktracePrintError, &pd );
+#else
 	backtrace_full( g_bt_state, 0, Sys_BacktracePrintFull, Sys_BacktracePrintError, &pd );
+#endif
 
 	return pd.len;
 }

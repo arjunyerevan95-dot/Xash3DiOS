@@ -29,6 +29,18 @@ GNU General Public License for more details.
 static vidmode_t *vidmodes = NULL;
 static int num_vidmodes = 0;
 static void GL_SetupAttributes( void );
+#if XASH_IOS
+typedef int (SDLCALL *ios_direct_drawable_callback_t)( int action, void *state, size_t stateSize );
+extern int SDLCALL SDL_XASH_IOSSetDirectDrawableCallback( ios_direct_drawable_callback_t callback );
+static ios_direct_drawable_callback_t ios_direct_drawable_callback;
+static uint64_t ios_direct_drawable_context;
+static uint32_t ios_direct_drawable_context_generation;
+static uint32_t ios_direct_drawable_resize_generation;
+static uint32_t ios_direct_drawable_framebuffer;
+static uint32_t ios_direct_drawable_renderbuffer;
+static int ios_direct_drawable_width;
+static int ios_direct_drawable_height;
+#endif
 static struct
 {
 	int prev_width, prev_height;
@@ -801,8 +813,82 @@ static void GL_SetupAttributes( void )
 
 void GL_SwapBuffers( void )
 {
+#if XASH_IOS
+	ios_direct_drawable_callback_t callback =
+		(ios_direct_drawable_callback_t)ref.dllFuncs.R_IOSDrawableBridge;
+
+	if( callback != ios_direct_drawable_callback &&
+		SDL_XASH_IOSSetDirectDrawableCallback( callback ) == 0 )
+		ios_direct_drawable_callback = callback;
+#endif
 	SDL_GL_SwapWindow( host.hWnd );
 }
+
+#if XASH_IOS
+int GL_GetDrawableInfo( ref_ios_direct_drawable_t *state, size_t stateSize )
+{
+	SDL_SysWMinfo info;
+	SDL_GLContext current;
+	int width = 0, height = 0, requestedSamples = 0, effectiveSamples = 0;
+	int contextAPI = 0;
+	uint64_t contextIdentity;
+	uint32_t framebuffer, renderbuffer;
+
+	if( !state || stateSize < sizeof( *state ) || !host.hWnd )
+		return 0;
+
+	memset( state, 0, sizeof( *state ));
+	SDL_VERSION( &info.version );
+	if( SDL_GetWindowWMInfo( host.hWnd, &info ) != SDL_TRUE ||
+		info.subsystem != SDL_SYSWM_UIKIT )
+		return 0;
+
+	current = SDL_GL_GetCurrentContext();
+	contextIdentity = (uint64_t)(uintptr_t)glw_state.context;
+	framebuffer = info.info.uikit.framebuffer;
+	renderbuffer = info.info.uikit.colorbuffer;
+	SDL_GL_GetDrawableSize( host.hWnd, &width, &height );
+	SDL_GL_GetAttribute( SDL_GL_MULTISAMPLESAMPLES, &requestedSamples );
+	SDL_GL_GetAttribute( SDL_GL_MULTISAMPLESAMPLES, &effectiveSamples );
+	SDL_GL_GetAttribute( SDL_GL_CONTEXT_MAJOR_VERSION, &contextAPI );
+
+	if( ios_direct_drawable_context != contextIdentity )
+	{
+		ios_direct_drawable_context = contextIdentity;
+		ios_direct_drawable_context_generation++;
+		ios_direct_drawable_resize_generation = 1;
+	}
+	else if( ios_direct_drawable_framebuffer != framebuffer ||
+		ios_direct_drawable_renderbuffer != renderbuffer ||
+		ios_direct_drawable_width != width || ios_direct_drawable_height != height )
+	{
+		ios_direct_drawable_resize_generation++;
+	}
+
+	ios_direct_drawable_framebuffer = framebuffer;
+	ios_direct_drawable_renderbuffer = renderbuffer;
+	ios_direct_drawable_width = width;
+	ios_direct_drawable_height = height;
+
+	state->version = REF_IOS_DIRECT_DRAWABLE_VERSION;
+	state->size = sizeof( *state );
+	state->context = contextIdentity;
+	state->currentContext = (uint64_t)(uintptr_t)current;
+	state->contextMatches = current && current == glw_state.context;
+	state->contextAPI = (uint32_t)contextAPI;
+	state->contextGeneration = ios_direct_drawable_context_generation;
+	state->resizeGeneration = ios_direct_drawable_resize_generation;
+	state->viewFramebuffer = framebuffer;
+	state->viewRenderbuffer = renderbuffer;
+	state->drawableWidth = (uint32_t)width;
+	state->drawableHeight = (uint32_t)height;
+	state->requestedSamples = (uint32_t)requestedSamples;
+	state->effectiveSamples = (uint32_t)effectiveSamples;
+
+	return contextIdentity && state->contextMatches && framebuffer && renderbuffer &&
+		width > 0 && height > 0;
+}
+#endif
 
 int GL_SetAttribute( int attr, int val )
 {
@@ -1151,6 +1237,13 @@ R_Free_Video
 */
 void R_Free_Video( void )
 {
+#if XASH_IOS
+	if( ios_direct_drawable_callback )
+	{
+		SDL_XASH_IOSSetDirectDrawableCallback( NULL );
+		ios_direct_drawable_callback = NULL;
+	}
+#endif
 	GL_DeleteContext ();
 
 	VID_DestroyWindow ();

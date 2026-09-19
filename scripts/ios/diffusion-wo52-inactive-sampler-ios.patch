@@ -1,0 +1,159 @@
+diff --git a/client/render/r_shader.cpp b/client/render/r_shader.cpp
+index 2a856e49..e2eaad91 100644
+--- a/client/render/r_shader.cpp
++++ b/client/render/r_shader.cpp
+@@ -1089,6 +1089,33 @@ bool GL_FindShaderDirective( glsl_program_t *shader, const char *directive )
+ 	return false;
+ }
+ 
++static void GL_AssignSamplerUnit( glsl_program_t *shader, GLint location,
++	const char *sampler, GLint unit )
++{
++#if defined( XASH_IOS )
++	static bool policy_reported = false;
++	static unsigned int rejected_uploads = 0;
++
++	if( !policy_reported )
++	{
++		ALERT( at_aiconsole, "iOS inactive sampler policy: active location 0 preserved; missing=-1; negative uploads skipped\n" );
++		policy_reported = true;
++	}
++
++	if( location < 0 )
++	{
++		if( rejected_uploads < 16 )
++		{
++			ALERT( at_aiconsole, "iOS inactive sampler rejection: program=%s sampler=%s unit=%d location=%d upload=skipped\n",
++				shader ? shader->name : "<none>", sampler ? sampler : "<none>", unit, location );
++			rejected_uploads++;
++		}
++		return;
++	}
++#endif
++	pglUniform1iARB( location, unit );
++}
++
+ static void GL_InitSolidBmodelUniforms( glsl_program_t *shader )
+ {
+ 	ASSERT( shader != NULL );
+@@ -1287,6 +1314,17 @@ static void GL_InitSolidStudioUniforms( glsl_program_t *shader )
+ {
+ 	ASSERT( shader != NULL );
+ 
++	// Conditional uniforms must never inherit the zero-filled program record.
++	// Zero is a valid location and may belong to an unrelated active uniform.
++	shader->u_CubemapBox = -1;
++	shader->u_Cubemap = -1;
++	shader->u_ReflectScale = -1;
++	shader->u_Fresnel = -1;
++	shader->u_InteriorMap = -1;
++	shader->u_InteriorParams = -1;
++	shader->u_BlendTexture = -1;
++	shader->u_ColorMask = -1;
++
+ 	shader->u_ColorMap = pglGetUniformLocationARB( shader->handle, "u_ColorMap" );
+ 	shader->u_BoneQuaternion = pglGetUniformLocationARB( shader->handle, "u_BoneQuaternion" );
+ 	shader->u_BonePosition = pglGetUniformLocationARB( shader->handle, "u_BonePosition" );
+@@ -1339,21 +1377,21 @@ static void GL_InitSolidStudioUniforms( glsl_program_t *shader )
+ 		shader->u_FoliageSwayHeight = pglGetUniformLocationARB( shader->handle, "u_FoliageSwayHeight" );
+ 
+ 	GL_BindShader( shader );
+-	pglUniform1iARB( shader->u_ColorMap, GL_TEXTURE0 );
+-	pglUniform1iARB( shader->u_NormalMap, GL_TEXTURE1 );
++	GL_AssignSamplerUnit( shader, shader->u_ColorMap, "u_ColorMap", GL_TEXTURE0 );
++	GL_AssignSamplerUnit( shader, shader->u_NormalMap, "u_NormalMap", GL_TEXTURE1 );
+ 	if( GL_FindShaderDirective( shader, "REFLECTION_CUBEMAP" ) )  // diffusioncubemaps
+-		pglUniform1iARB( shader->u_CubemapBox, GL_TEXTURE2 );
++		GL_AssignSamplerUnit( shader, shader->u_CubemapBox, "u_CubemapBox", GL_TEXTURE2 );
+ 	
+ 	if( GL_FindShaderDirective( shader, "STUDIO_INTERIOR" ) )
+-		pglUniform1iARB( shader->u_InteriorMap, GL_TEXTURE4 );
++		GL_AssignSamplerUnit( shader, shader->u_InteriorMap, "u_InteriorMap", GL_TEXTURE4 );
+ 	else if( GL_FindShaderDirective( shader, "STUDIO_TEXTURE_BLEND" ) ) // they can't be together
+ 	{
+-		pglUniform1iARB( shader->u_BlendTexture, GL_TEXTURE4 );
++		GL_AssignSamplerUnit( shader, shader->u_BlendTexture, "u_BlendTexture", GL_TEXTURE4 );
+ 		// the amount of dirt on the car is being sent through u_MeshParams[2].y
+ 	}
+ 
+ 	if( GL_FindShaderDirective( shader, "STUDIO_HAS_COLORMASK" ) )
+-		pglUniform1iARB( shader->u_ColorMask, GL_TEXTURE5 );
++		GL_AssignSamplerUnit( shader, shader->u_ColorMask, "u_ColorMask", GL_TEXTURE5 );
+ 
+ 	GL_BindShader( GL_NONE );
+ 
+@@ -1365,6 +1403,11 @@ static void GL_InitStudioDlightUniforms( glsl_program_t *shader )
+ {
+ 	ASSERT( shader != NULL );
+ 
++	shader->u_InteriorMap = -1;
++	shader->u_InteriorParams = -1;
++	shader->u_BlendTexture = -1;
++	shader->u_ColorMask = -1;
++
+ 	shader->u_ColorMap = pglGetUniformLocationARB( shader->handle, "u_ColorMap" );
+ 	shader->u_ProjectMap = pglGetUniformLocationARB( shader->handle, "u_ProjectMap" );
+ 	shader->u_ShadowMap = pglGetUniformLocationARB( shader->handle, "u_ShadowMap" );
+@@ -1400,17 +1443,17 @@ static void GL_InitStudioDlightUniforms( glsl_program_t *shader )
+ 	shader->u_FoliageSwayHeight = pglGetUniformLocationARB( shader->handle, "u_FoliageSwayHeight" );
+ 
+ 	GL_BindShader( shader );
+-	pglUniform1iARB( shader->u_ColorMap, GL_TEXTURE0 );
+-	pglUniform1iARB( shader->u_ProjectMap, GL_TEXTURE1 );
+-	pglUniform1iARB( shader->u_ShadowMap, GL_TEXTURE2 ); // optional
+-	pglUniform1iARB( shader->u_NormalMap, GL_TEXTURE3 );
++	GL_AssignSamplerUnit( shader, shader->u_ColorMap, "u_ColorMap", GL_TEXTURE0 );
++	GL_AssignSamplerUnit( shader, shader->u_ProjectMap, "u_ProjectMap", GL_TEXTURE1 );
++	GL_AssignSamplerUnit( shader, shader->u_ShadowMap, "u_ShadowMap", GL_TEXTURE2 ); // optional
++	GL_AssignSamplerUnit( shader, shader->u_NormalMap, "u_NormalMap", GL_TEXTURE3 );
+ 	if( GL_FindShaderDirective( shader, "STUDIO_INTERIOR" ) )
+-		pglUniform1iARB( shader->u_InteriorMap, GL_TEXTURE4 );
++		GL_AssignSamplerUnit( shader, shader->u_InteriorMap, "u_InteriorMap", GL_TEXTURE4 );
+ 	else if( GL_FindShaderDirective( shader, "STUDIO_TEXTURE_BLEND" ) )
+-		pglUniform1iARB( shader->u_BlendTexture, GL_TEXTURE4 );
++		GL_AssignSamplerUnit( shader, shader->u_BlendTexture, "u_BlendTexture", GL_TEXTURE4 );
+ 
+ 	if( GL_FindShaderDirective( shader, "STUDIO_HAS_COLORMASK" ) )
+-		pglUniform1iARB( shader->u_ColorMask, GL_TEXTURE5 );
++		GL_AssignSamplerUnit( shader, shader->u_ColorMask, "u_ColorMask", GL_TEXTURE5 );
+ 
+ 	GL_BindShader( GL_NONE );
+ 
+@@ -2666,6 +2709,25 @@ word GL_UberShaderForSolidStudio( mstudiomaterial_t *mat, bool vertex_lighting,
+ 	if( tr.materials[mat->gl_diffuse_id].FoliageSwayHeight != 0 )
+ 		GL_AddShaderDirective( options, "STUDIO_SWAY_FOLIAGE" );
+ 
++	// Runtime feature flags must describe the program that was actually built,
++	// not a desktop feature request rejected by the canonical iOS profile.
++#if defined( XASH_IOS )
++	const bool requested_cubemaps = use_cubemaps;
++#endif
++	use_bump = Q_stristr( options, "STUDIO_BUMP" ) != NULL;
++	use_emboss = Q_stristr( options, "STUDIO_EMBOSS" ) != NULL;
++	use_interior = Q_stristr( options, "STUDIO_INTERIOR" ) != NULL;
++	use_specular = Q_stristr( options, "STUDIO_SPECULAR" ) != NULL;
++	use_cubemaps = Q_stristr( options, "REFLECTION_CUBEMAP" ) != NULL;
++#if defined( XASH_IOS )
++	static bool cubemap_rejection_reported = false;
++	if( requested_cubemaps && !use_cubemaps && !cubemap_rejection_reported )
++	{
++		ALERT( at_aiconsole, "iOS material uniform proof: requested cubemap omitted by canonical profile; runtime status inactive; conditional locations=-1; draw uploads skipped\n" );
++		cubemap_rejection_reported = true;
++	}
++#endif
++
+ 	glsl_program_t *shader = GL_FindUberShader( glname, options, &GL_InitSolidStudioUniforms );
+ 	if( !shader )
+ 	{
+@@ -2806,6 +2868,11 @@ word GL_UberShaderForDlightStudio( const plight_t *pl, struct mstudiomat_s *mat,
+ 	if( RI->currententity && RI->currententity->curstate.rendermode == kRenderTransTexture )
+ 		GL_AddShaderDirective( options, "STUDIO_DEFAULTALPHATEST" ); // do not use 0.5 threshold
+ 
++	use_bump = Q_stristr( options, "STUDIO_BUMP" ) != NULL;
++	use_emboss = Q_stristr( options, "STUDIO_EMBOSS" ) != NULL;
++	use_interior = Q_stristr( options, "STUDIO_INTERIOR" ) != NULL;
++	use_specular = Q_stristr( options, "STUDIO_SPECULAR" ) != NULL;
++
+ 	glsl_program_t *shader = GL_FindUberShader( glname, options, &GL_InitStudioDlightUniforms );
+ 	if( !shader )
+ 	{

@@ -1,0 +1,192 @@
+diff --git a/src/gl/shader.c b/src/gl/shader.c
+index 0bde8f10..c3109491 100644
+--- a/src/gl/shader.c
++++ b/src/gl/shader.c
+@@ -193,6 +193,7 @@ void APIENTRY_GL4ES gl4es_glShaderSource(GLuint shader, GLsizei count, const GLc
+     GO(mvpmatrix)   \
+     GO(notexarray)  \
+     GO(clean)       \
++    GO(essl300)     \
+     GO(clipvertex)  \
+     GO2(texs)
+ 
+diff --git a/src/gl/shader.h b/src/gl/shader.h
+index e080eeea..89c90e20 100644
+--- a/src/gl/shader.h
++++ b/src/gl/shader.h
+@@ -20,6 +20,7 @@ typedef struct shaderconv_need_s {
+     int         need_mvmatrix;
+     int         need_mvpmatrix;
+     int         need_clean;         // this shader needs to stay "clean", no hack in here
++    int         need_essl300;       // all stages in the program must use ESSL 300
+     int         need_clipvertex;
+     uint32_t    need_texs;          // flags of what tex is needed
+ } shaderconv_need_t;
+diff --git a/src/gl/shaderconv.c b/src/gl/shaderconv.c
+index 65440b00..f6089af3 100644
+--- a/src/gl/shaderconv.c
++++ b/src/gl/shaderconv.c
+@@ -481,6 +481,13 @@ char* ConvertShader(const char* pEntry, int isVertex, shaderconv_need_t *need)
+   }
+   int texture_array_shader = texture_array_program ||
+       strstr(pBuffer, "sampler2DArray") || strstr(pBuffer, "texture2DArray");
++  int explicit_lod_shader =
++      gl4es_find_string(pBuffer, "texture2DLod") ||
++      gl4es_find_string(pBuffer, "texture2DProjLod") ||
++      gl4es_find_string(pBuffer, "textureCubeLod") ||
++      gl4es_find_string(pBuffer, "texture2DGradARB") ||
++      gl4es_find_string(pBuffer, "texture2DProjGradARB") ||
++      gl4es_find_string(pBuffer, "textureCubeGradARB");
+ 
+   static shaderconv_need_t dummy_need = {0};
+   if(!need) {
+@@ -488,6 +495,10 @@ char* ConvertShader(const char* pEntry, int isVertex, shaderconv_need_t *need)
+     need->need_texcoord = -1;
+     need->need_clean = 1; // no hack, this is a dummy need structure
+   }
++  int essl300_shader = texture_array_shader ||
++      (hardext.glsl300es && (explicit_lod_shader || need->need_essl300));
++  if(essl300_shader)
++    need->need_essl300 = 1;
+   int notexarray = globals4es.notexarray || need->need_notexarray || fpeShader;
+ 
+   //const char* GLESUseFragHighp = "#extension GL_OES_fragment_precision_high : enable\n"; // is this needed?  
+@@ -510,13 +521,16 @@ char* ConvertShader(const char* pEntry, int isVertex, shaderconv_need_t *need)
+   }
+   #endif
+   //sprintf(GLESFullHeader, GLESHeader, (wanthighp && hardext.highp==1 && !isVertex)?GLESUseFragHighp:"", (wanthighp)?"highp":"mediump", (wanthighp)?"highp":"mediump");
+-  if(texture_array_shader) {
++  if(essl300_shader) {
+     const char *stage = isVertex
+       ? "#define attribute in\n#define varying out\n"
+       : "#define varying in\nout mediump vec4 gl4es_FragColor;\n#define gl_FragColor gl4es_FragColor\n";
+     snprintf(GLESFullHeader, sizeof(GLESFullHeader),
+-      "#version 300 es\n%s#define GLSL_ALLOW_TEXTURE_ARRAY 1\n#define texture2DArray texture\n#define texture2DProj textureProj\n#define texture2D texture\n#define textureCube texture\nprecision %s float;\nprecision %s int;\nprecision mediump sampler2D;\nprecision mediump samplerCube;\nprecision mediump sampler2DArray;\n",
+-      stage, (wanthighp)?"highp":"mediump", (wanthighp)?"highp":"mediump");
++      "#version 300 es\n%s%s#define texture2DProj textureProj\n#define texture2D texture\n#define textureCube texture\nprecision %s float;\nprecision %s int;\nprecision mediump sampler2D;\nprecision mediump samplerCube;\n%s",
++      stage,
++      texture_array_shader ? "#define GLSL_ALLOW_TEXTURE_ARRAY 1\n#define texture2DArray texture\n" : "",
++      (wanthighp)?"highp":"mediump", (wanthighp)?"highp":"mediump",
++      texture_array_shader ? "precision mediump sampler2DArray;\n" : "");
+   } else {
+     sprintf(GLESFullHeader, GLESHeader[versionHeader], "", (wanthighp)?"highp":"mediump", (wanthighp)?"highp":"mediump");
+   }
+@@ -558,7 +572,7 @@ char* ConvertShader(const char* pEntry, int isVertex, shaderconv_need_t *need)
+   const char* GLESFakeFragDepth = "mediump float fakeFragDepth = 0.0;\n";
+   if (fragdepth) {
+     /* If #extension is used, it should be placed before the second line of the header. */
+-    if(texture_array_shader) {
++    if(essl300_shader) {
+       /* gl_FragDepth is core in ESSL 300. */
+     } else if(hardext.fragdepth)
+       Tmp = gl4es_inplace_insert(gl4es_getline(Tmp, 1), GLESUseFragDepth, Tmp, &tmpsize);
+@@ -568,7 +582,7 @@ char* ConvertShader(const char* pEntry, int isVertex, shaderconv_need_t *need)
+   }
+ 
+   const char* GLESUseShaderNonConstantGlobalInitialzers = "#extension GL_EXT_shader_non_constant_global_initializers : enable\n";
+-  if(!texture_array_shader) {
++  if(!essl300_shader) {
+     Tmp = gl4es_inplace_insert(gl4es_getline(Tmp, 1), GLESUseShaderNonConstantGlobalInitialzers, Tmp, &tmpsize);
+     ++headline;
+   }
+@@ -584,7 +598,7 @@ char* ConvertShader(const char* pEntry, int isVertex, shaderconv_need_t *need)
+   "vec3 fwidth(vec3 p) {return abs(dFdx(p))+abs(dFdy(p));}\n";
+   if (derivatives) {
+     /* If #extension is used, it should be placed before the second line of the header. */
+-    if(texture_array_shader) {
++    if(essl300_shader) {
+       /* derivatives are core in ESSL 300. */
+     } else if(hardext.derivatives)
+       Tmp = gl4es_inplace_insert(gl4es_getline(Tmp, 1), GLESUseDerivative, Tmp, &tmpsize);
+@@ -597,7 +611,7 @@ char* ConvertShader(const char* pEntry, int isVertex, shaderconv_need_t *need)
+     Tmp = gl4es_inplace_insert(gl4es_getline(Tmp, 1), useEXTDrawBuffers, Tmp, &tmpsize);
+   }
+   // if some functions are used, add some int/float alternative
+-  if(!texture_array_shader && !fpeShader && !globals4es.nointovlhack) {
++  if(!essl300_shader && !fpeShader && !globals4es.nointovlhack) {
+     if(strstr(Tmp, "pow(") || strstr(Tmp, "pow (")) {
+         Tmp = gl4es_inplace_insert(gl4es_getline(Tmp, headline), HackAltPow, Tmp, &tmpsize);
+     }
+@@ -614,32 +628,34 @@ char* ConvertShader(const char* pEntry, int isVertex, shaderconv_need_t *need)
+         Tmp = gl4es_inplace_insert(gl4es_getline(Tmp, headline), HackAltMod, Tmp, &tmpsize);
+     }
+   }
+-  if(!isVertex && hardext.shaderlod && 
+-    (gl4es_find_string(Tmp, "texture2DLod") || gl4es_find_string(Tmp, "texture2DProjLod") 
+-  || gl4es_find_string(Tmp, "textureCubeLod") 
+-  || gl4es_find_string(Tmp, "texture2DGradARB") || gl4es_find_string(Tmp, "texture2DProjGradARB")|| gl4es_find_string(Tmp, "textureCubeGradARB") 
+-  )) {
++  if(!isVertex && !essl300_shader && hardext.shaderlod && explicit_lod_shader) {
+       const char* GLESUseShaderLod = "#extension GL_EXT_shader_texture_lod : enable\n";
+       Tmp = gl4es_inplace_insert(gl4es_getline(Tmp, 1), GLESUseShaderLod, Tmp, &tmpsize);
+   }
+-  if(!isVertex && (gl4es_find_string(Tmp, "texture2DLod"))) {
+-      if(hardext.shaderlod) {
++  if((essl300_shader || !isVertex) && (gl4es_find_string(Tmp, "texture2DLod"))) {
++      if(essl300_shader) {
++        Tmp = gl4es_inplace_replace(Tmp, &tmpsize, "texture2DLod", "textureLod");
++      } else if(hardext.shaderlod) {
+         Tmp = gl4es_inplace_replace(Tmp, &tmpsize, "texture2DLod", "texture2DLodEXT");
+       } else {
+         Tmp = gl4es_inplace_replace(Tmp, &tmpsize, "texture2DLod", "_gl4es_texture2DLod");
+         Tmp = gl4es_inplace_insert(gl4es_getline(Tmp, headline), texture2DLodAlt, Tmp, &tmpsize);
+       }
+   }
+-  if(!isVertex && (gl4es_find_string(Tmp, "texture2DProjLod"))) {
+-      if(hardext.shaderlod) {
++  if((essl300_shader || !isVertex) && (gl4es_find_string(Tmp, "texture2DProjLod"))) {
++      if(essl300_shader) {
++        Tmp = gl4es_inplace_replace(Tmp, &tmpsize, "texture2DProjLod", "textureProjLod");
++      } else if(hardext.shaderlod) {
+         Tmp = gl4es_inplace_replace(Tmp, &tmpsize, "texture2DProjLod", "texture2DProjLodEXT");
+       } else {
+         Tmp = gl4es_inplace_replace(Tmp, &tmpsize, "texture2DProjLod", "_gl4es_texture2DProjLod");
+         Tmp = gl4es_inplace_insert(gl4es_getline(Tmp, headline), texture2DProjLodAlt, Tmp, &tmpsize);
+       }
+   }
+-  if(!isVertex && (gl4es_find_string(Tmp, "textureCubeLod"))) {
+-      if(hardext.shaderlod) {
++  if((essl300_shader || !isVertex) && (gl4es_find_string(Tmp, "textureCubeLod"))) {
++      if(essl300_shader) {
++        Tmp = gl4es_inplace_replace(Tmp, &tmpsize, "textureCubeLod", "textureLod");
++      } else if(hardext.shaderlod) {
+         if(!hardext.cubelod)
+           Tmp = gl4es_inplace_replace(Tmp, &tmpsize, "textureCubeLod", "textureCubeLodEXT");
+       } else {
+@@ -647,24 +663,30 @@ char* ConvertShader(const char* pEntry, int isVertex, shaderconv_need_t *need)
+         Tmp = gl4es_inplace_insert(gl4es_getline(Tmp, headline), textureCubeLodAlt, Tmp, &tmpsize);
+       }
+   }
+-  if(!isVertex && (gl4es_find_string(Tmp, "texture2DGradARB"))) {
+-      if(hardext.shaderlod) {
++  if((essl300_shader || !isVertex) && (gl4es_find_string(Tmp, "texture2DGradARB"))) {
++      if(essl300_shader) {
++        Tmp = gl4es_inplace_replace(Tmp, &tmpsize, "texture2DGradARB", "textureGrad");
++      } else if(hardext.shaderlod) {
+         Tmp = gl4es_inplace_replace(Tmp, &tmpsize, "texture2DGradARB", "texture2DGradEXT");
+       } else {
+         Tmp = gl4es_inplace_replace(Tmp, &tmpsize, "texture2DGradARB", "_gl4es_texture2DGrad");
+         Tmp = gl4es_inplace_insert(gl4es_getline(Tmp, headline), texture2DGradAlt, Tmp, &tmpsize);
+       }
+   }
+-  if(!isVertex && (gl4es_find_string(Tmp, "texture2DProjGradARB"))) {
+-      if(hardext.shaderlod) {
++  if((essl300_shader || !isVertex) && (gl4es_find_string(Tmp, "texture2DProjGradARB"))) {
++      if(essl300_shader) {
++        Tmp = gl4es_inplace_replace(Tmp, &tmpsize, "texture2DProjGradARB", "textureProjGrad");
++      } else if(hardext.shaderlod) {
+         Tmp = gl4es_inplace_replace(Tmp, &tmpsize, "texture2DProjGradARB", "texture2DProjGradEXT");
+       } else {
+         Tmp = gl4es_inplace_replace(Tmp, &tmpsize, "texture2DProjGradARB", "_gl4es_texture2DProjGrad");
+         Tmp = gl4es_inplace_insert(gl4es_getline(Tmp, headline), texture2DProjGradAlt, Tmp, &tmpsize);
+       }
+   }
+-  if(!isVertex && (gl4es_find_string(Tmp, "textureCubeGradARB"))) {
+-      if(hardext.shaderlod) {
++  if((essl300_shader || !isVertex) && (gl4es_find_string(Tmp, "textureCubeGradARB"))) {
++      if(essl300_shader) {
++        Tmp = gl4es_inplace_replace(Tmp, &tmpsize, "textureCubeGradARB", "textureGrad");
++      } else if(hardext.shaderlod) {
+         if(!hardext.cubelod)
+           Tmp = gl4es_inplace_replace(Tmp, &tmpsize, "textureCubeGradARB", "textureCubeGradEXT");
+       } else {

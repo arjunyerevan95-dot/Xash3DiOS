@@ -1,0 +1,177 @@
+diff --git a/client/render/r_grass.cpp b/client/render/r_grass.cpp
+index 636be67..9bd5d37 100644
+--- a/client/render/r_grass.cpp
++++ b/client/render/r_grass.cpp
+@@ -41,6 +41,17 @@ static float		m_flGrassFadeDist;
+ static float		m_flGrassFadeEnd;
+ static bool		m_bGrassUseVBO;
+ 
++#if XASH_IOS
++#define IOS_GRASS_TRACE_LIMIT 128
++#define IOS_GRASS_SAMPLE_STRIDE 4096
++static int m_iOSGrassTraceLines;
++static int m_iOSGrassBuilds;
++#define IOS_GRASS_TRACE( ... ) \
++	do { if( m_iOSGrassTraceLines < IOS_GRASS_TRACE_LIMIT ) { ALERT( at_console, __VA_ARGS__ ); m_iOSGrassTraceLines++; } } while( 0 )
++#else
++#define IOS_GRASS_TRACE( ... ) ((void)0)
++#endif
++
+ /*
+ ================
+ R_GrassUseBufferObject
+@@ -1049,6 +1060,17 @@ void R_ConstructGrass( msurface_t *psurf )
+ 	if( es->grass || !(psurf->flags & SURF_HASGRASS) )
+ 		return;
+ 
++#if XASH_IOS
++	const int ios_surface = psurf - worldmodel->surfaces;
++	const int ios_build = ++m_iOSGrassBuilds;
++	const double ios_start = Sys_DoubleTime();
++	if( ios_build == 1 )
++		ALERT( at_console, "iOS foliage liveness policy: bounded_lines=%d sample_stride=%d\n",
++			IOS_GRASS_TRACE_LIMIT, IOS_GRASS_SAMPLE_STRIDE );
++	IOS_GRASS_TRACE( "iOS foliage: t=%.3f build=%d surface=%d stage=construct-begin expected=%d verts=%d entries=%d\n",
++		ios_start, ios_build, ios_surface, es->grasscount, es->numverts, grassInfo.Count() );
++#endif
++
+ 	for( int i = 0; i < grassInfo.Count(); i++ )
+ 	{
+ 		entry = &grassInfo[i];
+@@ -1056,6 +1078,9 @@ void R_ConstructGrass( msurface_t *psurf )
+ 		if( !Mod_CheckLayerNameForSurf( psurf, entry->name ))
+ 			continue;
+ 
++		IOS_GRASS_TRACE( "iOS foliage: t=%.3f build=%d surface=%d stage=layer-begin entry=%d accepted=%d\n",
++			Sys_DoubleTime(), ios_build, ios_surface, i, total );
++
+ 		hdr = es->grass;
+ 
+ 		if( !hdr ) // first call?
+@@ -1079,6 +1104,10 @@ void R_ConstructGrass( msurface_t *psurf )
+ 				g->cva.mesh = (grassvert_t *)ptr;
+ 				ptr += mesh_size;
+ 			}
++
++			IOS_GRASS_TRACE( "iOS foliage: t=%.3f build=%d surface=%d stage=allocation-return bytes=%u expected=%d\n",
++				Sys_DoubleTime(), ios_build, ios_surface,
++				(unsigned int)( grasshdr_size + meshes_size ), es->grasscount );
+ 		}
+ 
+ 		// update random set to get predictable positions for grass 'random' placement
+@@ -1105,8 +1134,19 @@ void R_ConstructGrass( msurface_t *psurf )
+ 			int numSamples = area * entry->density * DENSITY_FACTOR;
+ 			grass_t *g = &hdr->g[hdr->count];
+ 
++#if XASH_IOS
++			if( numSamples >= IOS_GRASS_SAMPLE_STRIDE )
++				IOS_GRASS_TRACE( "iOS foliage: t=%.3f build=%d surface=%d stage=triangle-begin entry=%d triangle=%d samples=%d accepted=%d\n",
++					Sys_DoubleTime(), ios_build, ios_surface, i, j, numSamples, total );
++#endif
++
+ 			for( int k = 0; k < numSamples; k++ )
+ 			{
++#if XASH_IOS
++				if( k > 0 && !( k % IOS_GRASS_SAMPLE_STRIDE ))
++					IOS_GRASS_TRACE( "iOS foliage: t=%.3f build=%d surface=%d stage=sample-progress entry=%d triangle=%d sample=%d/%d accepted=%d\n",
++						Sys_DoubleTime(), ios_build, ios_surface, i, j, k, numSamples, total );
++#endif
+ 				// Create a random sample...
+ 				float u = RANDOM_FLOAT( 0.0f, 1.0f );
+ 				float v = RANDOM_FLOAT( 0.0f, 1.0f );
+@@ -1142,6 +1182,9 @@ void R_ConstructGrass( msurface_t *psurf )
+ 	if( total > psurf->info->grasscount )
+ 		ALERT( at_error, "R_ConstructGrass: overflow %i > %i. Memory is corrupted!\n", total, psurf->info->grasscount );
+ 
++	IOS_GRASS_TRACE( "iOS foliage: t=%.3f build=%d surface=%d stage=construct-end accepted=%d expected=%d elapsed=%.3f\n",
++		Sys_DoubleTime(), ios_build, ios_surface, total, es->grasscount, Sys_DoubleTime() - ios_start );
++
+ 	// restore normal randomization
+ 	RANDOM_SEED( 0 );
+ }
+@@ -1452,10 +1495,15 @@ bool R_AddGrassToChain( msurface_t *surf, CFrustum *frustum, bool lightpass, mwo
+ 			return false;
+ 
+ 		// initialize grass for surface
++		IOS_GRASS_TRACE( "iOS foliage: t=%.3f surface=%d stage=dispatch-begin expected=%d vbo=%d distance=%.1f fadeend=%.1f\n",
++			Sys_DoubleTime(), surf - worldmodel->surfaces, es->grasscount, m_bGrassUseVBO, cur_dist, fadeend );
+ 		if( m_bGrassUseVBO )
+ 			R_ConstructGrassVBO( surf );
+ 		else
+ 			R_ConstructGrass( surf );
++		IOS_GRASS_TRACE( "iOS foliage: t=%.3f surface=%d stage=dispatch-end header=%d accepted=%d\n",
++			Sys_DoubleTime(), surf - worldmodel->surfaces, es->grass != NULL,
++			es->grass ? es->grass->count : 0 );
+ 
+ 		hdr = es->grass;
+ 
+diff --git a/client/render/r_world.cpp b/client/render/r_world.cpp
+index d262e30..b7c142c 100644
+--- a/client/render/r_world.cpp
++++ b/client/render/r_world.cpp
+@@ -31,6 +31,10 @@ gl_world_t *world = &worlddata;
+ 
+ #define RECURSIVE_WORLD_NODE 0
+ 
++#if XASH_IOS
++static unsigned int m_iOSWorldDrawCalls;
++#endif
++
+ /*
+ ==================
+ Mod_SampleSizeForFace
+@@ -3792,6 +3796,18 @@ void R_DrawWorld( void )
+ 
+ 	double start, end;
+ 
++#if XASH_IOS
++	const bool ios_normal_world = RP_NORMALPASS();
++	const unsigned int ios_world_draw = ios_normal_world ? ++m_iOSWorldDrawCalls : m_iOSWorldDrawCalls;
++	const bool ios_world_trace = ios_normal_world && ios_world_draw <= 12;
++#define IOS_WORLD_TRACE( stage ) \
++	do { if( ios_world_trace ) ALERT( at_console, "iOS world traversal: t=%.3f call=%u stage=%s surfaces=%d draw_surfaces=%d\n", \
++		Sys_DoubleTime(), ios_world_draw, stage, world->numsortedfaces, tr.num_draw_surfaces ); } while( 0 )
++	IOS_WORLD_TRACE( "begin" );
++#else
++#define IOS_WORLD_TRACE( stage ) ((void)0)
++#endif
++
+ 	RI->currententity = GET_ENTITY( 0 );
+ 	RI->currentmodel = RI->currententity->model;
+ 	memset( RI->visfaces, 0x00, (world->numsortedfaces + 7) >> 3 );
+@@ -3807,12 +3823,14 @@ void R_DrawWorld( void )
+ 	memset( tr.draw_decals, NULL, sizeof( tr.draw_decals ) ); // make sure to empty the list
+ 
+ 	start = Sys_DoubleTime();
++	IOS_WORLD_TRACE( "before-visible-surfaces" );
+ 
+ #if RECURSIVE_WORLD_NODE
+ 	R_RecursiveWorldNode( world->nodes, RI->frustum.GetClipFlags() );
+ #else
+ 	R_WorldMarkVisibleFaces();
+ #endif
++	IOS_WORLD_TRACE( "after-visible-surfaces" );
+ 
+ 	end = Sys_DoubleTime();
+ 
+@@ -3823,15 +3841,20 @@ void R_DrawWorld( void )
+ 	GL_DepthMask( GL_TRUE );
+ 	GL_Blend( GL_FALSE );
+ 
++	IOS_WORLD_TRACE( "before-brush-list" );
+ 	std::sort( tr.draw_surfaces, tr.draw_surfaces + tr.num_draw_surfaces, R_SolidSurfaceCompare );
+ 
+ 	R_DrawBrushList();
++	IOS_WORLD_TRACE( "after-brush-list" );
+ 
+ 	end = Sys_DoubleTime();
+ 
+ 	r_stats.t_world_draw = end - start;
+ 
+ 	R_DrawSkyBox();
++	IOS_WORLD_TRACE( "end" );
++
++#undef IOS_WORLD_TRACE
+ }
+ 
+ void R_DrawWorldShadowPass( void )

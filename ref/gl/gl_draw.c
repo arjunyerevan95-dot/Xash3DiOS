@@ -126,6 +126,10 @@ R_Set2DMode
 */
 void R_Set2DMode( qboolean enable )
 {
+#if XASH_APPLE
+	if( enable )
+		R_IOSFramebufferTrace( "set2d-enter" );
+#endif
 	if( enable )
 	{
 		if( glState.in2DMode )
@@ -175,6 +179,9 @@ void R_Set2DMode( qboolean enable )
 		glState.in2DMode = true;
 		RI.currententity = NULL;
 		RI.currentmodel = NULL;
+#if XASH_APPLE
+		R_IOSFramebufferTrace( "set2d-ready" );
+#endif
 	}
 	else
 	{

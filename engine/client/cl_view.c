@@ -22,6 +22,42 @@ GNU General Public License for more details.
 #include "input.h" // touch
 #include "platform/platform.h" // GL_UpdateSwapInterval
 
+#if XASH_APPLE
+static int ios_post_trace_frames;
+static string ios_post_trace_map;
+
+static void V_IOSPostTrace( const char *stage )
+{
+	int checkpoint = 0;
+
+	if( ios_post_trace_frames <= 0 )
+		return;
+
+	if( !Q_strcmp( stage, "after-renderframe" )) checkpoint = 1;
+	else if( !Q_strcmp( stage, "post-enter" )) checkpoint = 2;
+	else if( !Q_strcmp( stage, "set-2d" )) checkpoint = 3;
+	else if( !Q_strcmp( stage, "hud-active" )) checkpoint = 4;
+	else if( !Q_strcmp( stage, "vgui" )) checkpoint = 5;
+	else if( !Q_strcmp( stage, "menu" )) checkpoint = 6;
+	else if( !Q_strcmp( stage, "touch" )) checkpoint = 7;
+	else if( !Q_strcmp( stage, "before-endframe" )) checkpoint = 8;
+
+	if( checkpoint )
+		REF_GET_PARM( PARM_DEBUG_FRAMEBUFFER_TRACE, checkpoint );
+}
+
+static void V_IOSPostTraceEnd( void )
+{
+	if( ios_post_trace_frames > 0 )
+		ios_post_trace_frames--;
+}
+
+#define IOS_POST_TRACE( stage ) V_IOSPostTrace( stage )
+#else
+#define IOS_POST_TRACE( stage ) ((void)0)
+#define V_IOSPostTraceEnd() ((void)0)
+#endif
+
 /*
 ===============
 V_CalcViewRect
@@ -326,12 +362,33 @@ V_PreRender
 */
 qboolean V_PreRender( void )
 {
+#if XASH_APPLE
+	static int ios_last_prerender_blocker = -1;
+#define IOS_PRERENDER_BLOCKED( blocker, reason ) \
+	do { \
+		if( ios_last_prerender_blocker != ( blocker )) \
+		{ \
+			Con_Printf( "iOS render gate: %s (state=%d signon=%d video=%d disable=%.3f host=%d)\n", \
+				reason, cls.state, cls.signon, cl.video_prepped, cls.disable_screen, host.status ); \
+			ios_last_prerender_blocker = ( blocker ); \
+		} \
+	} while( 0 )
+#else
+#define IOS_PRERENDER_BLOCKED( blocker, reason ) ((void)0)
+#endif
+
 	// too early
 	if( !ref.initialized )
+	{
+		IOS_PRERENDER_BLOCKED( 1, "renderer not initialized" );
 		return false;
+	}
 
 	if( host.status == HOST_SLEEP )
+	{
+		IOS_PRERENDER_BLOCKED( 2, "host sleeping" );
 		return false;
+	}
 
 	// if the screen is disabled (loading plaque is up)
 	if( cls.disable_screen )
@@ -341,8 +398,11 @@ qboolean V_PreRender( void )
 			Con_Reportf( "%s: loading plaque timed out\n", __func__ );
 			cls.disable_screen = 0.0f;
 		}
+		IOS_PRERENDER_BLOCKED( 3, "loading plaque" );
 		return false;
 	}
+
+	IOS_PRERENDER_BLOCKED( 0, "open" );
 
 	V_CheckGamma();
 
@@ -350,6 +410,7 @@ qboolean V_PreRender( void )
 
 	GL_UpdateSwapInterval( );
 
+#undef IOS_PRERENDER_BLOCKED
 	return true;
 }
 
@@ -391,9 +452,48 @@ void V_RenderView( void )
 	static ref_params_t	rp;
 	ref_viewpass_t	rvp;
 	int		viewnum = 0;
+#if XASH_APPLE
+	static string ios_trace_map;
+	static int ios_trace_frames;
+	const char *ios_world_name = cl.worldmodel ? cl.worldmodel->name : "<none>";
+
+	if( Q_stricmp( ios_trace_map, ios_world_name ))
+	{
+		Q_strncpy( ios_trace_map, ios_world_name, sizeof( ios_trace_map ));
+		ios_trace_frames = 3;
+		Con_Printf( "iOS map trace: world=%s state=%d signon=%d video=%d audio=%d background=%d ui=%d ui_renderworld=%.0f\n",
+			ios_trace_map, cls.state, cls.signon, cl.video_prepped, cl.audio_prepped,
+			cl.background, UI_IsVisible(), ui_renderworld.value );
+	}
+
+#define IOS_MAP_TRACE( stage ) \
+	do { if( ios_trace_frames > 0 ) Con_Printf( "iOS map trace[%d]: %s\n", 4 - ios_trace_frames, stage ); } while( 0 )
+#else
+#define IOS_MAP_TRACE( stage ) ((void)0)
+#endif
 
 	if( !cl.video_prepped || ( !ui_renderworld.value && UI_IsVisible() && !cl.background ))
+	{
+#if XASH_APPLE
+		if( ios_trace_frames > 0 )
+		{
+			Con_Printf( "iOS map trace[%d]: view blocked video=%d ui=%d ui_renderworld=%.0f background=%d\n",
+				4 - ios_trace_frames, cl.video_prepped, UI_IsVisible(), ui_renderworld.value, cl.background );
+			ios_trace_frames--;
+		}
+#endif
 		return; // still loading
+	}
+
+#if XASH_APPLE
+	// Arm only after the view is actually ready to render. V_PostRender can run
+	// during loading, which consumed the previous trace before the first 3D frame.
+	if( Q_stricmp( ios_post_trace_map, ios_world_name ))
+	{
+		Q_strncpy( ios_post_trace_map, ios_world_name, sizeof( ios_post_trace_map ));
+		ios_post_trace_frames = 3;
+	}
+#endif
 
 	V_CalcViewRect ();	// compute viewport rectangle
 	V_SetRefParams( &rp );
@@ -404,10 +504,29 @@ void V_RenderView( void )
 
 	do
 	{
+		IOS_MAP_TRACE( "before client view" );
+#if XASH_APPLE
+		if( ios_trace_frames > 0 )
+			Con_Printf( "iOS view input: simorg=(%.2f %.2f %.2f) height=(%.2f %.2f %.2f) angles=(%.2f %.2f %.2f) entity=%d viewport=%d,%d %dx%d\n",
+				rp.simorg[0], rp.simorg[1], rp.simorg[2], rp.viewheight[0], rp.viewheight[1], rp.viewheight[2],
+				rp.cl_viewangles[0], rp.cl_viewangles[1], rp.cl_viewangles[2], rp.viewentity,
+				rp.viewport[0], rp.viewport[1], rp.viewport[2], rp.viewport[3] );
+#endif
 		clgame.dllFuncs.pfnCalcRefdef( &rp );
+		IOS_MAP_TRACE( "after client view" );
 		V_GetRefParams( &rp, &rvp );
+		IOS_MAP_TRACE( "after ref params" );
+#if XASH_APPLE
+		if( ios_trace_frames > 0 )
+			Con_Printf( "iOS view output: origin=(%.2f %.2f %.2f) angles=(%.2f %.2f %.2f) fov=(%.2f %.2f) flags=0x%x onlyClient=%d next=%d\n",
+				rvp.vieworigin[0], rvp.vieworigin[1], rvp.vieworigin[2],
+				rvp.viewangles[0], rvp.viewangles[1], rvp.viewangles[2], rvp.fov_x, rvp.fov_y,
+				rvp.flags, rp.onlyClientDraw, rp.nextView );
+#endif
 		V_RefApplyOverview( &rvp );
+		IOS_MAP_TRACE( "after overview" );
 		V_ApplyRefUnderwater( &rvp );
+		IOS_MAP_TRACE( "before renderer" );
 
 		if( viewnum == 0 && FBitSet( rvp.flags, RF_ONLY_CLIENTDRAW ))
 		{
@@ -415,14 +534,27 @@ void V_RenderView( void )
 		}
 
 		GL_RenderFrame( &rvp );
+		IOS_MAP_TRACE( "after renderer" );
+		IOS_POST_TRACE( "after-renderframe" );
 		S_UpdateFrame( &rvp );
+		IOS_MAP_TRACE( "after audio" );
+		IOS_POST_TRACE( "after-audio" );
 		viewnum++;
 
 	} while( rp.nextView );
 
 	// draw debug triangles on a server
 	SV_DrawDebugTriangles ();
+	IOS_MAP_TRACE( "after debug triangles" );
+	IOS_POST_TRACE( "after-debug-tris" );
 	ref.dllFuncs.GL_BackendEndFrame ();
+	IOS_MAP_TRACE( "frame complete" );
+	IOS_POST_TRACE( "after-backend-end" );
+#if XASH_APPLE
+	if( ios_trace_frames > 0 )
+		ios_trace_frames--;
+#endif
+#undef IOS_MAP_TRACE
 }
 
 #define POINT_SIZE		16.0f
@@ -526,14 +658,20 @@ void V_PostRender( void )
 {
 	qboolean		draw_2d = false;
 
+	IOS_POST_TRACE( "post-enter" );
 	ref.dllFuncs.R_AllowFog( false );
+	IOS_POST_TRACE( "allow-fog-off" );
 	ref.dllFuncs.R_Set2DMode( true );
+	IOS_POST_TRACE( "set-2d" );
 
 	if( cls.state == ca_active && cls.signon == SIGNONS && cls.scrshot_action != scrshot_mapshot )
 	{
 		SCR_TileClear();
+		IOS_POST_TRACE( "tile-clear" );
 		CL_DrawHUD( CL_ACTIVE );
+		IOS_POST_TRACE( "hud-active" );
 		VGui_Paint();
+		IOS_POST_TRACE( "vgui" );
 	}
 
 	switch( cls.scrshot_action )
@@ -548,32 +686,56 @@ void V_PostRender( void )
 	if( draw_2d )
 	{
 		SCR_RSpeeds();
+		IOS_POST_TRACE( "r-speeds" );
 		SCR_NetSpeeds();
+		IOS_POST_TRACE( "net-speeds" );
 		SCR_DrawPos();
+		IOS_POST_TRACE( "draw-pos" );
 		SCR_DrawEnts();
+		IOS_POST_TRACE( "draw-ents" );
 		SCR_DrawNetGraph();
+		IOS_POST_TRACE( "net-graph" );
 		SCR_DrawUserCmd();
+		IOS_POST_TRACE( "user-cmd" );
 		Joy_DrawDebug();
+		IOS_POST_TRACE( "joy-debug" );
 		IN_GyroDrawDebug();
+		IOS_POST_TRACE( "gyro-debug" );
 		SV_DrawOrthoTriangles();
+		IOS_POST_TRACE( "server-ortho" );
 		CL_DrawDemoRecording();
+		IOS_POST_TRACE( "demo-recording" );
 		CL_DrawHUD( CL_CHANGELEVEL );
+		IOS_POST_TRACE( "hud-changelevel" );
 		ref.dllFuncs.R_ShowTextures();
+		IOS_POST_TRACE( "show-textures" );
 		R_ShowTree();
+		IOS_POST_TRACE( "show-tree" );
 		Con_DrawConsole();
+		IOS_POST_TRACE( "console" );
 		UI_UpdateMenu( host.realtime );
+		IOS_POST_TRACE( "menu" );
 		Con_DrawVersion();
+		IOS_POST_TRACE( "version" );
 		Con_DrawDebug(); // must be last
+		IOS_POST_TRACE( "debug" );
 		Touch_Draw();
+		IOS_POST_TRACE( "touch" );
 		OSK_Draw();
+		IOS_POST_TRACE( "osk" );
 
 		S_ExtraUpdate();
+		IOS_POST_TRACE( "extra-audio" );
 	}
 
 	SCR_MakeScreenShot();
+	IOS_POST_TRACE( "screenshot" );
 	ref.dllFuncs.R_AllowFog( true );
+	IOS_POST_TRACE( "allow-fog-on" );
 	Platform_SetTimer( 0.0f );
+	IOS_POST_TRACE( "before-endframe" );
 	ref.dllFuncs.R_EndFrame();
+	V_IOSPostTraceEnd();
 
 	V_CheckGammaEnd();
 }

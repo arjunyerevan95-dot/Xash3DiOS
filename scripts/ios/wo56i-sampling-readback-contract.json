@@ -1,0 +1,93 @@
+{
+  "schema": 1,
+  "workOrder": "56I",
+  "phaseHEvidence": {
+    "bundle": 114,
+    "candidatePrefix": "281eb237",
+    "logSha256": "2A0A70CC3005795626ADF1597E656FBE30FEBEFBF0EACE0D9342BD09399FB32B",
+    "boundedExit": true,
+    "hardCrash": false,
+    "observedError": "0x0502",
+    "observedChecksum": "a915906d"
+  },
+  "sourceProvenOrigin": {
+    "owner": "GL4ES src/gl/uniform.c",
+    "wrapperEntry": "gl4es_glUniform1i",
+    "failingHelper": "GoUniformiv",
+    "uniform": "u_Array",
+    "uniformType": "GL_SAMPLER_2D_ARRAY",
+    "missingBeforeCorrection": [
+      "uniformsize(GL_SAMPLER_2D_ARRAY)",
+      "is_uniform_int(GL_SAMPLER_2D_ARRAY)",
+      "n_uniform(GL_SAMPLER_2D_ARRAY)"
+    ],
+    "errorExpression": "size != n_uniform(m->type) || !is_uniform_int(m->type)",
+    "errorResult": "errorShim(GL_INVALID_OPERATION)",
+    "whyStageOwned": "object-routing drains all prior errors; glUniform1i(u_Array) occurs after the successful shader/reflection marker and before the sampling-readback drain",
+    "whyOutputStillMatched": "the native sampler2DArray default unit is zero, so the rejected wrapper update did not change the intended unit"
+  },
+  "framebuffer": {
+    "owner": "SDL iOS view framebuffer registered as GL4ES logical zero",
+    "target": "GL_FRAMEBUFFER",
+    "logicalRead": 0,
+    "logicalDraw": 0,
+    "nativeObject": "gl4es_external_default_state.registered_framebuffer",
+    "requiredStatus": "GL_FRAMEBUFFER_COMPLETE",
+    "attachment": "SDL-owned single-sample color renderbuffer",
+    "level": 0,
+    "drawBuffer": "GL_COLOR_ATTACHMENT0 implicit for the registered nonzero FBO",
+    "readBuffer": "GL_COLOR_ATTACHMENT0 implicit for the registered nonzero FBO",
+    "dimensions": "global.refState.drawableSize",
+    "samples": 0
+  },
+  "checksum": {
+    "algorithm": "FNV-1a-32",
+    "initial": "0x811c9dc5",
+    "prime": "0x01000193",
+    "format": "GL_RGBA",
+    "type": "GL_UNSIGNED_BYTE",
+    "origin": "lower-left",
+    "rowOrder": "one center pixel per quadrant in layer order; no multi-row ambiguity",
+    "quadrants": [
+      { "layer": 0, "viewport": "lower-left", "rgba": [255, 0, 0, 255] },
+      { "layer": 1, "viewport": "lower-right", "rgba": [0, 255, 0, 255] },
+      { "layer": 2, "viewport": "upper-left", "rgba": [255, 0, 255, 255] },
+      { "layer": 3, "viewport": "upper-right", "rgba": [255, 255, 0, 255] }
+    ],
+    "byteSequenceHex": "ff0000ff00ff00ffff00ffffffff00ff",
+    "expected": "a915906d",
+    "comparison": "both per-pixel tolerance and exact source-derived checksum"
+  },
+  "calls": [
+    { "order": 1, "call": "stage-entry", "entry": "gl4es_glGetError", "owner": "selftest-boundary", "behavior": "drain", "object": "program", "framebuffer": "registered", "preconditions": "object-routing drained and shader/reflection succeeded", "legal": true },
+    { "order": 2, "call": "gl4es_external_default_framebuffer_state", "entry": "native glGetIntegerv/glCheckFramebufferStatus", "owner": "direct-drawable", "behavior": "query", "object": "registered SDL view FBO", "framebuffer": "logical zero/native registered", "preconditions": "current context and registration generations match", "legal": true },
+    { "order": 3, "call": "glGetIntegerv state capture", "entry": "gl4es_glGetIntegerv", "owner": "GL4ES", "behavior": "cache/query", "object": "viewport/scissor/pack/array-buffer", "framebuffer": "registered", "preconditions": "context current", "legal": true },
+    { "order": 4, "call": "glUseProgram", "entry": "gl4es_glUseProgram", "owner": "GL4ES-program-cache", "behavior": "cache until draw realization", "object": "linked selftest program", "framebuffer": "registered", "preconditions": "link status true", "legal": true },
+    { "order": 5, "call": "glGetUniformLocation", "entry": "gl4es_glGetUniformLocation", "owner": "GL4ES-program-cache", "behavior": "cache lookup", "object": "u_Array/u_Layer", "framebuffer": "registered", "preconditions": "linked reflection cache exists", "legal": true },
+    { "order": 6, "call": "glUniform1i(u_Array)", "entry": "gl4es_glUniform1i -> GoUniformiv", "owner": "GL4ES-uniform-type-cache", "behavior": "validate/cache/native forward", "object": "sampler2DArray unit 0", "framebuffer": "registered", "preconditions": "uniformsize/is_uniform_int/n_uniform all recognize sampler2DArray", "legal": true },
+    { "order": 7, "call": "glActiveTexture/glEnable/glBindTexture", "entry": "GL4ES texture wrappers", "owner": "GL4ES-native-array-binding", "behavior": "cache and native GL_TEXTURE_2D_ARRAY bind", "object": "mutable array texture on unit 0", "framebuffer": "registered", "preconditions": "distinct array identity and native ES3 capability", "legal": true },
+    { "order": 8, "call": "glGenBuffers/glBindBuffer/glBufferData", "entry": "GL4ES buffer wrappers", "owner": "GL4ES-native-vbo", "behavior": "virtual object plus native VBO realization", "object": "quad vertex buffer", "framebuffer": "registered", "preconditions": "GL_ARRAY_BUFFER and GL_STATIC_DRAW", "legal": true },
+    { "order": 9, "call": "glEnableVertexAttribArray/glVertexAttribPointer", "entry": "GL4ES vertex wrappers -> native ES3", "owner": "GL4ES-native-vbo", "behavior": "cache then native VBO offset", "object": "attribute 0 vec2 float offset 0", "framebuffer": "registered", "preconditions": "nonzero native array buffer; client arrays forbidden on Apple ES3", "legal": true },
+    { "order": 10, "call": "glDisable(GL_SCISSOR_TEST)", "entry": "gl4es_glDisable", "owner": "GL4ES-raster-state", "behavior": "cache/native", "object": "scissor state", "framebuffer": "registered", "preconditions": "saved for restoration", "legal": true },
+    { "order": 11, "call": "glPixelStorei(GL_PACK_ALIGNMENT,1)", "entry": "gl4es_glPixelStorei", "owner": "GL4ES-pack-state", "behavior": "cache/native", "object": "pack alignment", "framebuffer": "registered", "preconditions": "destination is four bytes", "legal": true },
+    { "order": 12, "call": "glClearColor/glClear", "entry": "GL4ES raster wrappers -> native ES3", "owner": "direct-drawable", "behavior": "native forward", "object": "registered color attachment", "framebuffer": "registered", "preconditions": "complete single-sample framebuffer", "legal": true },
+    { "order": 13, "call": "glViewport(quadrant)", "entry": "gl4es_glViewport", "owner": "GL4ES-raster-state", "behavior": "cache/native", "object": "four nonempty drawable quadrants", "framebuffer": "registered", "preconditions": "drawable width and height at least four", "legal": true, "repeat": 4 },
+    { "order": 14, "call": "glUniform1f(u_Layer)", "entry": "gl4es_glUniform1f -> GoUniformfv", "owner": "GL4ES-uniform-type-cache", "behavior": "cache/native forward", "object": "layer coordinates 0,1,2,3", "framebuffer": "registered", "preconditions": "current realized program by first draw; scalar float location valid", "legal": true, "repeat": 4 },
+    { "order": 15, "call": "glDrawArrays(GL_TRIANGLE_STRIP)", "entry": "gl4es_glDrawArrays -> glDrawElementsCommon -> native glDrawArrays", "owner": "GL4ES-native-es3", "behavior": "realize program/textures/VBO and native draw", "object": "four vertices", "framebuffer": "registered", "preconditions": "linked program, array texture unit 0, VBO attribute 0, valid viewport", "legal": true, "repeat": 4 },
+    { "order": 16, "call": "glFinish", "entry": "gl4es_glFinish -> native glFinish", "owner": "GL4ES-native-es3", "behavior": "synchronize", "object": "all four draws", "framebuffer": "registered", "preconditions": "current context", "legal": true },
+    { "order": 17, "call": "glReadPixels(GL_RGBA,GL_UNSIGNED_BYTE)", "entry": "gl4es_glReadPixels -> readfboBegin -> native glReadPixels", "owner": "GL4ES-direct-readback", "behavior": "logical-zero read mapping and native read", "object": "one 4-byte center pixel", "framebuffer": "registered", "preconditions": "complete read FBO, valid coordinates, pack=1, buffer=4 bytes", "legal": true, "repeat": 4 },
+    { "order": 18, "call": "checksum", "entry": "R_IOSTextureArraySelftest", "owner": "harness", "behavior": "FNV-1a plus per-pixel compare", "object": "16 RGBA bytes", "framebuffer": "none", "preconditions": "all four reads succeeded", "legal": true },
+    { "order": 19, "call": "state restoration", "entry": "GL4ES wrappers", "owner": "harness/GL4ES", "behavior": "disable/delete/unbind/restore", "object": "attribute,VBO,array binding,program,scissor,pack,clear,viewport", "framebuffer": "registered unchanged", "preconditions": "test-owned objects deleted after readback", "legal": true },
+    { "order": 20, "call": "lifecycle continuation", "entry": "delete/recreate then terminal", "owner": "harness/context-owner", "behavior": "delete/recreate and bounded shutdown", "object": "array textures/program/shaders", "framebuffer": "embedder-owned and not deleted", "preconditions": "no Diffusion module/gameplay admission", "legal": true }
+  ],
+  "forbidden": [
+    "CPU sampling",
+    "ordinary 2D texture fallback",
+    "atlas fallback",
+    "layer-zero-only sampling",
+    "checksum weakening",
+    "skipped glReadPixels",
+    "terrain admission",
+    "Diffusion gameplay continuation"
+  ]
+}

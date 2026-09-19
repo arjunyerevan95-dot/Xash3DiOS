@@ -19,11 +19,39 @@ GNU General Public License for more details.
 #include "beamdef.h"
 #include "entity_types.h"
 
+#if XASH_IOS && XASH_GL4ES
+#include "gl4es/include/gl4esinit.h"
+#endif
+
 
 #define IsLiquidContents( cnt )	( cnt == CONTENTS_WATER || cnt == CONTENTS_SLIME || cnt == CONTENTS_LAVA )
 
 float		gldepthmin, gldepthmax;
 ref_instance_t	RI;
+
+#if XASH_APPLE
+static string ios_renderer_trace_map;
+static int ios_renderer_trace_frames;
+static int ios_present_trace_frames;
+
+void R_IOSFramebufferTrace( const char *stage )
+{
+	(void)stage;
+}
+
+void R_IOSFramebufferTraceCheckpoint( int checkpoint )
+{
+	const char *stages[] =
+	{
+		"invalid", "engine-return", "post-enter", "set2d-return",
+		"after-hud", "after-vgui", "after-menu", "after-touch", "before-endframe"
+	};
+
+	if( checkpoint > 0 && checkpoint < (int)( sizeof( stages ) / sizeof( stages[0] )))
+		R_IOSFramebufferTrace( stages[checkpoint] );
+}
+
+#endif
 
 static int R_RankForRenderMode( int rendermode )
 {
@@ -958,6 +986,18 @@ void R_RenderScene( void )
 
 	R_SetupFrustum();
 	R_SetupFrame();
+#if XASH_APPLE
+	if( ios_renderer_trace_frames > 0 )
+	{
+		int leaf_index = RI.viewleaf && WORLDMODEL->leafs ? (int)( RI.viewleaf - WORLDMODEL->leafs ) : -1;
+		int leaf_contents = RI.viewleaf ? RI.viewleaf->contents : 0;
+		gEngfuncs.Con_Printf( "iOS GLES trace: frame=%d origin=(%.2f %.2f %.2f) angles=(%.2f %.2f %.2f) leaf=%d contents=%d flags=0x%x\n",
+			4 - ios_renderer_trace_frames,
+			RI.rvp.vieworigin[0], RI.rvp.vieworigin[1], RI.rvp.vieworigin[2],
+			RI.rvp.viewangles[0], RI.rvp.viewangles[1], RI.rvp.viewangles[2],
+			leaf_index, leaf_contents, RI.rvp.flags );
+	}
+#endif
 	R_SetupGL( true );
 	R_Clear( ~0 );
 
@@ -968,6 +1008,13 @@ void R_RenderScene( void )
 
 	R_CheckGLFog();
 	R_DrawWorld();
+#if XASH_APPLE
+	if( ios_renderer_trace_frames > 0 )
+		gEngfuncs.Con_Printf( "iOS GLES trace: world draw polys=%u leafs=%u solid=%u trans=%u beams=%u\n",
+			r_stats.c_world_polys, r_stats.c_world_leafs,
+			tr.draw_list->num_solid_entities, tr.draw_list->num_trans_entities,
+			tr.draw_list->num_beam_entities );
+#endif
 	R_CheckFog();
 
 	gEngfuncs.CL_ExtraUpdate ();	// don't let sound get messed up if going slow
@@ -1075,8 +1122,31 @@ R_RenderFrame
 */
 void R_RenderFrame( const ref_viewpass_t *rvp )
 {
+#if XASH_APPLE
+	const char *world_name = WORLDMODEL ? WORLDMODEL->name : "<none>";
+	if( Q_stricmp( ios_renderer_trace_map, world_name ))
+	{
+		Q_strncpy( ios_renderer_trace_map, world_name, sizeof( ios_renderer_trace_map ));
+		ios_renderer_trace_frames = 3;
+		ios_present_trace_frames = 3;
+		gEngfuncs.Con_Printf( "iOS GLES map: %s surfaces=%d leafs=%d nodes=%d entities=%u norefresh=%.0f custom=%d\n",
+			ios_renderer_trace_map,
+			WORLDMODEL ? WORLDMODEL->numsurfaces : 0,
+			WORLDMODEL ? WORLDMODEL->numleafs : 0,
+			WORLDMODEL ? WORLDMODEL->numnodes : 0,
+			tr.draw_list ? r_numEntities : 0, r_norefresh->value,
+			gEngfuncs.drawFuncs->GL_RenderFrame != NULL );
+	}
+#endif
+
 	if( r_norefresh->value )
+	{
+#if XASH_APPLE
+		if( ios_renderer_trace_frames > 0 )
+			ios_renderer_trace_frames--;
+#endif
 		return;
+	}
 
 	// setup the initial render params
 	R_SetupRefParams( rvp );
@@ -1088,12 +1158,19 @@ void R_RenderFrame( const ref_viewpass_t *rvp )
 	if( gEngfuncs.drawFuncs->GL_RenderFrame != NULL )
 	{
 		tr.fCustomRendering = true;
+#if XASH_IOS && XASH_GL4ES
+		set_index_trace_context( tr.realframecount, world_name, "custom-render" );
+#endif
 
 		if( gEngfuncs.drawFuncs->GL_RenderFrame( rvp ))
 		{
 			R_GatherPlayerLight( tr.viewent );
 			tr.realframecount++;
 			tr.fResetVis = true;
+#if XASH_APPLE
+			if( ios_renderer_trace_frames > 0 )
+				ios_renderer_trace_frames--;
+#endif
 			return;
 		}
 	}
@@ -1104,6 +1181,12 @@ void R_RenderFrame( const ref_viewpass_t *rvp )
 
 	tr.realframecount++; // right called after viewmodel events
 	R_RenderScene();
+
+#if XASH_APPLE
+	R_IOSFramebufferTrace( "frame-return" );
+	if( ios_renderer_trace_frames > 0 )
+		ios_renderer_trace_frames--;
+#endif
 
 	return;
 }
@@ -1121,8 +1204,18 @@ void R_EndFrame( void )
 #if !defined( XASH_GL_STATIC )
 	GL2_ShimEndFrame();
 #endif
+#if XASH_APPLE
+	R_IOSFramebufferTrace( "endframe-enter" );
+#endif
 	// flush any remaining 2D bits
 	R_Set2DMode( false );
+#if XASH_APPLE
+	if( ios_present_trace_frames > 0 )
+	{
+		R_IOSFramebufferTrace( "before-swap" );
+		ios_present_trace_frames--;
+	}
+#endif
 	gEngfuncs.GL_SwapBuffers();
 }
 

@@ -352,6 +352,7 @@ typedef enum
 } rserr_t;
 
 struct vidmode_s;
+typedef struct ref_ios_direct_drawable_s ref_ios_direct_drawable_t;
 typedef enum window_mode_e window_mode_t;
 typedef enum ref_window_type_e ref_window_type_t;
 typedef enum ref_graphic_apis_e ref_graphic_apis_t;
@@ -368,6 +369,9 @@ void      GL_UpdateSwapInterval( void );
 int GL_SetAttribute( int attr, int val );
 int GL_GetAttribute( int attr, int *val );
 void GL_SwapBuffers( void );
+#if XASH_IOS
+int GL_GetDrawableInfo( ref_ios_direct_drawable_t *state, size_t stateSize );
+#endif
 void *SW_LockBuffer( void );
 void SW_UnlockBuffer( void );
 qboolean SW_CreateBuffer( int width, int height, uint *stride, uint *bpp, uint *r, uint *g, uint *b );

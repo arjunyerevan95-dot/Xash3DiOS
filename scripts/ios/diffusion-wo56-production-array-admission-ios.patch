@@ -1,0 +1,217 @@
+diff --git a/client/render/r_misc.cpp b/client/render/r_misc.cpp
+--- a/client/render/r_misc.cpp
++++ b/client/render/r_misc.cpp
+@@ -1656,7 +1656,7 @@ static bool LoadHeightMap( indexMap_t *im, int numLayers )
+ 
+ 	im->gl_heightmap_id = tex;
+ 
+-	return true;
++	return tex != 0;
+ }
+ 
+ /*
+@@ -1720,7 +1720,15 @@ static bool LoadTerrainLayers( layerMap_t* lm, int numLayers )
+ 
+ 	// make sure all layers have normalmaps
+ 	if( normalmap_count == numLayers )
++	{
+ 		lm->gl_normalmap_id = LOAD_TEXTURE_ARRAY( (const char **)normalmaps, TF_NORMALMAP );
++		if( lm->gl_normalmap_id == 0 )
++		{
++			FREE_TEXTURE( lm->gl_diffuse_id );
++			lm->gl_diffuse_id = 0;
++			return false;
++		}
++	}
+ 	else if( normalmap_count > 0 && normalmap_count < numLayers )
+ 		ConPrintf( "^3Warning:^7 not all landscape layers have normalmaps!\n" );
+ 
+@@ -1772,6 +1780,8 @@ load the landscape definitions
+ void R_LoadLandscapes( const char* filename )
+ {
+ 	char filepath[256];
++	if( !GL_Support( R_TEXTURE_ARRAY_EXT ))
++		return;
+ 
+ 	Q_snprintf( filepath, sizeof( filepath ), "maps/%s_land.txt", filename );
+ 
+@@ -1926,8 +1936,12 @@ void R_LoadLandscapes( const char* filename )
+ 		if( LoadHeightMap( &terra->indexmap, terra->numLayers ) )
+ 		{
+ 			// NOTE: layers may be missed
+-			LoadTerrainLayers( &terra->layermap, terra->numLayers );
+-			terra->valid = true; // all done
++			terra->valid = LoadTerrainLayers( &terra->layermap, terra->numLayers );
++			if( !terra->valid && terra->indexmap.gl_heightmap_id )
++			{
++				FREE_TEXTURE( terra->indexmap.gl_heightmap_id );
++				terra->indexmap.gl_heightmap_id = 0;
++			}
+ 		}
+ 	}
+ 
+diff --git a/client/render/r_opengl.cpp b/client/render/r_opengl.cpp
+--- a/client/render/r_opengl.cpp
++++ b/client/render/r_opengl.cpp
+@@ -21,6 +21,10 @@ Copyright (C) 2010 Uncle Mike
+ #include "r_weather.h"
+ #include "mathlib.h"
+ 
++#ifndef GL_MAX_ARRAY_TEXTURE_LAYERS_EXT
++#define GL_MAX_ARRAY_TEXTURE_LAYERS_EXT 0x88FF
++#endif
++
+ #define MAX_RESERVED_UNIFORMS		22	// dynamic lighting estimates 42 uniforms... 
+ 
+ glState_t		glState;
+@@ -670,6 +670,21 @@ static void GL_InitExtensions( void )
+ 
+ 	// 2d texture array support
+ 	GL_CheckExtension( "GL_EXT_texture_array", NULL, "gl_texture_2d_array", R_TEXTURE_ARRAY_EXT, true );
++	if( GL_Support( R_TEXTURE_ARRAY_EXT ))
++	{
++		const bool callbacks = gRenderfuncs.GL_LoadTextureArray != NULL && gRenderfuncs.GL_CreateTextureArray != NULL;
++		pglGetIntegerv( GL_MAX_ARRAY_TEXTURE_LAYERS_EXT, &glConfig.max_2d_texture_layers );
++		if( glConfig.max_2d_texture_layers < MAX_LANDSCAPE_LAYERS || !callbacks )
++			GL_SetExtension( R_TEXTURE_ARRAY_EXT, false );
++	}
++
++	#if XASH_IOS
++	ALERT( at_console, "iOS production texture array admission: extension=%d callbacks=%d max_layers=%d minimum=%d terrain_shaders=full enabled=%d\n",
++		GL_Support( R_TEXTURE_ARRAY_EXT ) ? 1 : 0,
++		( gRenderfuncs.GL_LoadTextureArray != NULL && gRenderfuncs.GL_CreateTextureArray != NULL ) ? 1 : 0,
++		glConfig.max_2d_texture_layers, MAX_LANDSCAPE_LAYERS,
++		GL_Support( R_TEXTURE_ARRAY_EXT ) ? 1 : 0 );
++	#endif
+ 
+ 	if( !GL_Support( R_TEXTURE_ARRAY_EXT ))
+ 		ALERT( at_warning, "GL_EXT_texture_array not supported. Landscapes will be unavailable\n" );
+diff --git a/client/render/r_shader.cpp b/client/render/r_shader.cpp
+--- a/client/render/r_shader.cpp
++++ b/client/render/r_shader.cpp
+@@ -279,12 +279,12 @@ static bool GL_ProcessShader( const char *filename, CVirtualFS *out, bool compat
+ 		out->Printf( "#extension GL_EXT_gpu_shader4 : require\n" ); // support bitwise ops
+ 		out->Printf( "#define GLSL_gpu_shader4\n" );
+ 		if( GL_Support( R_TEXTURE_ARRAY_EXT ))
+-			out->Printf( "#define GLSL_ALLOW_TEXTURE_ARRAY\n" );
++			out->Printf( "#define GLSL_ALLOW_TEXTURE_ARRAY 1\n" );
+ 	}
+ 	else if( GL_Support( R_TEXTURE_ARRAY_EXT ))
+ 	{
+ 	//	out->Printf( "#extension GL_EXT_texture_array : require\n" ); // support texture arrays
+-		out->Printf( "#define GLSL_ALLOW_TEXTURE_ARRAY\n" );
++		out->Printf( "#define GLSL_ALLOW_TEXTURE_ARRAY 1\n" );
+ 	}
+ 	if( defines )
+ 	{
+@@ -291,6 +291,7 @@ static bool GL_ProcessShader( const char *filename, CVirtualFS *out, bool compat
+ 	#if XASH_IOS
+ 		char mobileDefines[MAX_OPTIONS_LENGTH];
+ 		char *line, *next;
++		const bool terrainShader = Q_stristr( defines, "BMODEL_MULTI_LAYERS" ) != NULL;
+ 
+ 		Q_strncpy( mobileDefines, defines, sizeof( mobileDefines ) );
+ 		for( line = mobileDefines; line && *line; line = next )
+@@ -298,12 +299,12 @@ static bool GL_ProcessShader( const char *filename, CVirtualFS *out, bool compat
+ 			next = Q_strchr( line, '\n' );
+ 			if( next ) *next++ = '\0';
+ 
+-			if( Q_stristr( line, "MULTI_LAYERS" ) ||
++			if(( !terrainShader && ( Q_stristr( line, "MULTI_LAYERS" ) ||
+ 				Q_stristr( line, "EMBOSS" ) ||
++				Q_stristr( line, "SPECULAR" ) ||
++				Q_stristr( line, "BUMP" ))) ||
+ 				Q_stristr( line, "HAS_SHADOWS" ) ||
+ 				Q_stristr( line, "INTERIOR" ) ||
+-				Q_stristr( line, "SPECULAR" ) ||
+-				Q_stristr( line, "BUMP" ) ||
+ 				Q_stristr( line, "REFLECTION_CUBEMAP" ) )
+ 				continue;
+ 
+@@ -1082,6 +1083,11 @@ void GL_AddShaderDefine( char *options, const char *directive )
+ 	Q_strncat( options, directive, MAX_OPTIONS_LENGTH );
+ }
+ 
++static void GL_AddTerrainShaderDirective( char *options, const char *directive )
++{
++	Q_strncat( options, va( "#define %s\n", directive ), MAX_OPTIONS_LENGTH );
++}
++
+ bool GL_FindShaderDirective( glsl_program_t *shader, const char *directive )
+ {
+ 	if( Q_stristr( shader->options, directive ))
+@@ -2196,7 +2202,7 @@ word GL_UberShaderForSolidBmodel( msurface_t *s, bool translucent )
+ 		{
+ 			if( landscape && landscape->terrain && landscape->terrain->layermap.has_emboss )
+ 			{
+-				GL_AddShaderDirective( options, "BMODEL_EMBOSS" );
++				GL_AddTerrainShaderDirective( options, "BMODEL_EMBOSS" );
+ 				use_emboss = true;
+ 			}
+ 		}
+@@ -2205,7 +2211,7 @@ word GL_UberShaderForSolidBmodel( msurface_t *s, bool translucent )
+ 		{
+ 			if( landscape && landscape->terrain && landscape->terrain->layermap.has_specular )
+ 			{
+-				GL_AddShaderDirective( options, "BMODEL_SPECULAR" );
++				GL_AddTerrainShaderDirective( options, "BMODEL_SPECULAR" );
+ 				use_specular = true;
+ 			}
+ 		}
+@@ -2214,7 +2220,7 @@ word GL_UberShaderForSolidBmodel( msurface_t *s, bool translucent )
+ 		{
+ 			if( landscape && landscape->terrain && landscape->terrain->layermap.gl_normalmap_id > 0 )
+ 			{
+-				GL_AddShaderDirective( options, "BMODEL_BUMP" );
++				GL_AddTerrainShaderDirective( options, "BMODEL_BUMP" );
+ 				GL_EncodeNormal( options, landscape->terrain->layermap.gl_normalmap_id );
+ 				use_bump = true;
+ 			}
+@@ -2244,8 +2250,8 @@ word GL_UberShaderForSolidBmodel( msurface_t *s, bool translucent )
+ 	{
+ 		if( landscape && landscape->terrain && landscape->terrain->layermap.gl_diffuse_id != 0 )
+ 		{
+-			GL_AddShaderDirective( options, va( "TERRAIN_NUM_LAYERS %i", landscape->terrain->numLayers ));
+-			GL_AddShaderDirective( options, "BMODEL_MULTI_LAYERS" );
++			GL_AddTerrainShaderDirective( options, va( "TERRAIN_NUM_LAYERS %i", landscape->terrain->numLayers ));
++			GL_AddTerrainShaderDirective( options, "BMODEL_MULTI_LAYERS" );
+ 		}
+ 	}
+ 
+@@ -2365,15 +2371,15 @@ word GL_UberShaderForBmodelDlight( const plight_t *pl, msurface_t *s, bool trans
+ 	{
+ 		if( landscape && landscape->terrain && landscape->terrain->layermap.gl_diffuse_id != 0 )
+ 		{
+-			GL_AddShaderDirective( options, va( "TERRAIN_NUM_LAYERS %i", landscape->terrain->numLayers ) );
+-			GL_AddShaderDirective( options, "BMODEL_MULTI_LAYERS" );
++			GL_AddTerrainShaderDirective( options, va( "TERRAIN_NUM_LAYERS %i", landscape->terrain->numLayers ) );
++			GL_AddTerrainShaderDirective( options, "BMODEL_MULTI_LAYERS" );
+ 		}
+ 
+ 		if( gl_emboss->value > 0 )
+ 		{
+ 			if( landscape && landscape->terrain && landscape->terrain->layermap.has_emboss )
+ 			{
+-				GL_AddShaderDirective( options, "BMODEL_EMBOSS" );
++				GL_AddTerrainShaderDirective( options, "BMODEL_EMBOSS" );
+ 				use_emboss = true;
+ 			}
+ 		}
+@@ -2382,7 +2388,7 @@ word GL_UberShaderForBmodelDlight( const plight_t *pl, msurface_t *s, bool trans
+ 		{
+ 			if( landscape && landscape->terrain && landscape->terrain->layermap.has_specular )
+ 			{
+-				GL_AddShaderDirective( options, "BMODEL_SPECULAR" );
++				GL_AddTerrainShaderDirective( options, "BMODEL_SPECULAR" );
+ 				use_specular = true;
+ 			}
+ 		}
+@@ -2391,7 +2397,7 @@ word GL_UberShaderForBmodelDlight( const plight_t *pl, msurface_t *s, bool trans
+ 		{
+ 			if( landscape && landscape->terrain && landscape->terrain->layermap.gl_normalmap_id > 0 )
+ 			{
+-				GL_AddShaderDirective( options, "BMODEL_BUMP" );
++				GL_AddTerrainShaderDirective( options, "BMODEL_BUMP" );
+ 				GL_EncodeNormal( options, landscape->terrain->layermap.gl_normalmap_id );
+ 				use_bump = true;
+ 			}

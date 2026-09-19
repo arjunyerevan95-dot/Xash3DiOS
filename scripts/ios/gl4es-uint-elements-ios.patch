@@ -1,0 +1,957 @@
+diff --git a/src/gl/drawing.c b/src/gl/drawing.c
+index 498ecc5a..440a0f3a 100644
+--- a/src/gl/drawing.c
++++ b/src/gl/drawing.c
+@@ -182 +182 @@ static renderlist_t *arrays_add_renderlist(renderlist_t *a, GLenum mode,
+-                                        GLsizei skip, GLsizei count, GLushort* indices, int ilen_b) {
++                                        GLsizei skip, GLsizei count, GLuint* indices, int ilen_b) {
+@@ -274,0 +275,90 @@ static inline bool should_intercept_render(GLenum mode) {
++enum {
++    IOS_UINT_ROUTE_ORDINARY = 1u<<0,
++    IOS_UINT_ROUTE_RANGE = 1u<<1,
++    IOS_UINT_ROUTE_BASEVERTEX = 1u<<2,
++    IOS_UINT_ROUTE_INSTANCED = 1u<<3,
++    IOS_UINT_ROUTE_MULTIDRAW = 1u<<4,
++    IOS_UINT_ROUTE_RENDERLIST = 1u<<5,
++    IOS_UINT_ROUTE_INTERCEPT = 1u<<6
++};
++
++static const GLvoid *resolved_element_indices(const GLvoid *indices)
++{
++    return glstate->vao->elements
++        ? (const GLvoid*)((const char*)glstate->vao->elements->data + (uintptr_t)indices)
++        : indices;
++}
++
++static int require_uint_element_support(GLenum type, const char *route)
++{
++    static int logged_reject = 0;
++    if(type!=GL_UNSIGNED_INT || hardext.elementuint)
++        return 1;
++    if(!logged_reject) {
++        LOGE("iOS uint element first use: route=%s rejected=unsupported-es2 error=GL_INVALID_OPERATION\n", route);
++        logged_reject = 1;
++    }
++    errorShim(GL_INVALID_OPERATION);
++    return 0;
++}
++
++static void trace_uint_element_route(const char *route, unsigned route_bit, const GLuint *indices, GLsizei count, int deferred)
++{
++    static unsigned seen_routes = 0;
++    static unsigned seen_high = 0;
++    GLuint max = 0;
++    if(!indices || count<=0) return;
++    for(int i=0; i<count; ++i)
++        if(indices[i]>max) max=indices[i];
++    if(!(seen_routes&route_bit)) {
++        LOGD("iOS uint element first use: route=%s source=%s storage=%s submitted=GL_UNSIGNED_INT max=%u\n",
++            route, glstate->vao->elements?"ebo-offset":"client", deferred?"renderlist-uint32":"direct-uint32", max);
++        seen_routes |= route_bit;
++        LOGD("iOS uint element route summary: mask=0x%02x ordinary=%d range=%d basevertex=%d instanced=%d multidraw=%d renderlist=%d intercept=%d\n",
++            seen_routes,
++            !!(seen_routes&IOS_UINT_ROUTE_ORDINARY), !!(seen_routes&IOS_UINT_ROUTE_RANGE),
++            !!(seen_routes&IOS_UINT_ROUTE_BASEVERTEX), !!(seen_routes&IOS_UINT_ROUTE_INSTANCED),
++            !!(seen_routes&IOS_UINT_ROUTE_MULTIDRAW), !!(seen_routes&IOS_UINT_ROUTE_RENDERLIST),
++            !!(seen_routes&IOS_UINT_ROUTE_INTERCEPT));
++    }
++    if(max>65535 && !(seen_high&route_bit)) {
++        LOGD("iOS uint element high index: route=%s source=%s max=%u submitted=GL_UNSIGNED_INT\n",
++            route, glstate->vao->elements?"ebo-offset":"client", max);
++        seen_high |= route_bit;
++    }
++}
++
++static void prepare_element_indices(GLenum type, const GLvoid *indices, GLsizei count,
++    int list_path, int force_copy, GLushort **sindices, GLuint **iindices,
++    int *owned, GLuint *old_index)
++{
++    const GLvoid *src = resolved_element_indices(indices);
++    *sindices = NULL;
++    *iindices = NULL;
++    *owned = 0;
++    *old_index = 0;
++    if(list_path || force_copy) {
++        const GLenum target = (list_path || type==GL_UNSIGNED_INT)?GL_UNSIGNED_INT:GL_UNSIGNED_SHORT;
++        GLvoid *copy = copy_gl_array(src, type, 1, 0, target, 1, 0, count, NULL);
++        if(target==GL_UNSIGNED_INT) *iindices = copy;
++        else *sindices = copy;
++        *owned = 1;
++        *old_index = wantBufferIndex(0);
++    } else if(type==GL_UNSIGNED_INT) {
++        *iindices = (GLuint*)src;
++    } else if(type==GL_UNSIGNED_SHORT) {
++        *sindices = (GLushort*)src;
++    } else {
++        *sindices = copy_gl_array(src, type, 1, 0, GL_UNSIGNED_SHORT, 1, 0, count, NULL);
++        *owned = 1;
++        *old_index = wantBufferIndex(0);
++    }
++}
++
++static void release_element_indices(GLushort *sindices, GLuint *iindices, int owned, GLuint old_index)
++{
++    if(!owned) return;
++    free(iindices?(void*)iindices:(void*)sindices);
++    wantBufferIndex(old_index);
++}
++
+@@ -358 +447,0 @@ if(count>500000) return;
+-        // TODO handling uint indices
+@@ -469,0 +559,3 @@ void APIENTRY_GL4ES gl4es_glDrawRangeElements(GLenum mode, GLuint start, GLuint
++    if(!require_uint_element_support(type, "range"))
++        return;
++
+@@ -486,12 +578,10 @@ void APIENTRY_GL4ES gl4es_glDrawRangeElements(GLenum mode, GLuint start, GLuint
+-    bool need_free = !(
+-        (type==GL_UNSIGNED_SHORT) || 
+-        (!compiling && !intercept && type==GL_UNSIGNED_INT && hardext.elementuint)
+-        );
+-    if(need_free) {
+-        sindices = copy_gl_array((glstate->vao->elements)?(void*)((char*)glstate->vao->elements->data + (uintptr_t)indices):indices,
+-            type, 1, 0, GL_UNSIGNED_SHORT, 1, 0, count, NULL);
+-    } else {
+-        if(type==GL_UNSIGNED_INT)
+-            iindices = (glstate->vao->elements)?((void*)((char*)glstate->vao->elements->data + (uintptr_t)indices)):(GLvoid*)indices;
+-        else
+-            sindices = (glstate->vao->elements)?((void*)((char*)glstate->vao->elements->data + (uintptr_t)indices)):(GLvoid*)indices;
++    int owned_indices = 0;
++    GLuint old_index = 0;
++    prepare_element_indices(type, indices, count, compiling||intercept, 0,
++        &sindices, &iindices, &owned_indices, &old_index);
++    if(type==GL_UNSIGNED_INT) {
++        trace_uint_element_route("range", IOS_UINT_ROUTE_RANGE, (const GLuint*)resolved_element_indices(indices), count, compiling||intercept);
++        if(compiling)
++            trace_uint_element_route("renderlist", IOS_UINT_ROUTE_RENDERLIST, (const GLuint*)resolved_element_indices(indices), count, 1);
++        if(intercept)
++            trace_uint_element_route("intercept", IOS_UINT_ROUTE_INTERCEPT, (const GLuint*)resolved_element_indices(indices), count, 1);
+@@ -501 +590,0 @@ void APIENTRY_GL4ES gl4es_glDrawRangeElements(GLenum mode, GLuint start, GLuint
+-        // TODO, handle uint indices
+@@ -502,0 +592 @@ void APIENTRY_GL4ES gl4es_glDrawRangeElements(GLenum mode, GLuint start, GLuint
++        for (int i=0; i<count; i++) iindices[i]-=start; // normalized against copied vertex span
+@@ -504,8 +594 @@ void APIENTRY_GL4ES gl4es_glDrawRangeElements(GLenum mode, GLuint start, GLuint
+-        if(!need_free) {
+-            GLushort *tmp = sindices;
+-            sindices = (GLushort*)malloc(count*sizeof(GLushort));
+-            memcpy(sindices, tmp, count*sizeof(GLushort));
+-        }
+-        for (int i=0; i<count; i++) sindices[i]-=start; //TODO: should be optimizable
+-
+-        if(globals4es.mergelist && list->stage>=STAGE_DRAW && is_list_compatible(list) && !list->use_glstate && sindices) {
++        if(globals4es.mergelist && list->stage>=STAGE_DRAW && is_list_compatible(list) && !list->use_glstate && iindices) {
+@@ -514 +597,2 @@ void APIENTRY_GL4ES gl4es_glDrawRangeElements(GLenum mode, GLuint start, GLuint
+-                glstate->list.active = arrays_add_renderlist(list, mode, start, end + 1, sindices, count);
++                glstate->list.active = arrays_add_renderlist(list, mode, start, end + 1, iindices, count);
++                release_element_indices(sindices, iindices, owned_indices, old_index);
+@@ -523 +607 @@ void APIENTRY_GL4ES gl4es_glDrawRangeElements(GLenum mode, GLuint start, GLuint
+-        list->indices = sindices;
++        list->indices = iindices;
+@@ -527,0 +612 @@ void APIENTRY_GL4ES gl4es_glDrawRangeElements(GLenum mode, GLuint start, GLuint
++        wantBufferIndex(old_index);
+@@ -533 +617,0 @@ void APIENTRY_GL4ES gl4es_glDrawRangeElements(GLenum mode, GLuint start, GLuint
+-         //TODO handling uint indices
+@@ -535,7 +619 @@ void APIENTRY_GL4ES gl4es_glDrawRangeElements(GLenum mode, GLuint start, GLuint
+-
+-        if(!need_free) {
+-            GLushort *tmp = sindices;
+-            sindices = (GLushort*)malloc(count*sizeof(GLushort));
+-            memcpy(sindices, tmp, count*sizeof(GLushort));
+-        }
+-        for (int i=0; i<count; i++) sindices[i]-=start;
++        for (int i=0; i<count; i++) iindices[i]-=start;
+@@ -543 +621 @@ void APIENTRY_GL4ES gl4es_glDrawRangeElements(GLenum mode, GLuint start, GLuint
+-        list->indices = sindices;
++        list->indices = iindices;
+@@ -548,0 +627 @@ void APIENTRY_GL4ES gl4es_glDrawRangeElements(GLenum mode, GLuint start, GLuint
++        wantBufferIndex(old_index);
+@@ -553,2 +632 @@ void APIENTRY_GL4ES gl4es_glDrawRangeElements(GLenum mode, GLuint start, GLuint
+-        if(need_free)
+-            free(sindices);
++        release_element_indices(sindices, iindices, owned_indices, old_index);
+@@ -575,0 +654,3 @@ void APIENTRY_GL4ES gl4es_glDrawElements(GLenum mode, GLsizei count, GLenum type
++    if(!require_uint_element_support(type, "ordinary"))
++        return;
++
+@@ -591,0 +673 @@ void APIENTRY_GL4ES gl4es_glDrawElements(GLenum mode, GLsizei count, GLenum type
++    int owned_indices = 0;
+@@ -593,13 +675,8 @@ void APIENTRY_GL4ES gl4es_glDrawElements(GLenum mode, GLsizei count, GLenum type
+-    bool need_free = !(
+-        (type==GL_UNSIGNED_SHORT) || 
+-        (!compiling && !intercept && type==GL_UNSIGNED_INT && hardext.elementuint)
+-        );
+-    if(need_free) {
+-        sindices = copy_gl_array((glstate->vao->elements)?(void*)((char*)glstate->vao->elements->data + (uintptr_t)indices):indices,
+-            type, 1, 0, GL_UNSIGNED_SHORT, 1, 0, count, NULL);
+-        old_index = wantBufferIndex(0);
+-    } else {
+-        if(type==GL_UNSIGNED_INT)
+-            iindices = (glstate->vao->elements)?((void*)((char*)glstate->vao->elements->data + (uintptr_t)indices)):(GLvoid*)indices;
+-        else
+-            sindices = (glstate->vao->elements)?((void*)((char*)glstate->vao->elements->data + (uintptr_t)indices)):(GLvoid*)indices;
++    prepare_element_indices(type, indices, count, compiling||intercept, 0,
++        &sindices, &iindices, &owned_indices, &old_index);
++    if(type==GL_UNSIGNED_INT) {
++        trace_uint_element_route("ordinary", IOS_UINT_ROUTE_ORDINARY, (const GLuint*)resolved_element_indices(indices), count, compiling||intercept);
++        if(compiling)
++            trace_uint_element_route("renderlist", IOS_UINT_ROUTE_RENDERLIST, (const GLuint*)resolved_element_indices(indices), count, 1);
++        if(intercept)
++            trace_uint_element_route("intercept", IOS_UINT_ROUTE_INTERCEPT, (const GLuint*)resolved_element_indices(indices), count, 1);
+@@ -609 +685,0 @@ void APIENTRY_GL4ES gl4es_glDrawElements(GLenum mode, GLsizei count, GLenum type
+-        // TODO, handle uint indices
+@@ -611,0 +688 @@ void APIENTRY_GL4ES gl4es_glDrawElements(GLenum mode, GLsizei count, GLenum type
++        normalize_indices_ui(iindices, &max, &min, count);
+@@ -613,9 +690 @@ void APIENTRY_GL4ES gl4es_glDrawElements(GLenum mode, GLsizei count, GLenum type
+-        if(!need_free) {
+-            GLushort *tmp = sindices;
+-            sindices = (GLushort*)malloc(count*sizeof(GLushort));
+-            memcpy(sindices, tmp, count*sizeof(GLushort));
+-        }
+-
+-        normalize_indices_us(sindices, &max, &min, count);
+-
+-        if(globals4es.mergelist && list->stage>=STAGE_DRAW && is_list_compatible(list) && !list->use_glstate && sindices) {
++        if(globals4es.mergelist && list->stage>=STAGE_DRAW && is_list_compatible(list) && !list->use_glstate && iindices) {
+@@ -623 +692,2 @@ void APIENTRY_GL4ES gl4es_glDrawElements(GLenum mode, GLsizei count, GLenum type
+-            glstate->list.active = arrays_add_renderlist(list, mode, min, max + 1, sindices, count);
++            glstate->list.active = arrays_add_renderlist(list, mode, min, max + 1, iindices, count);
++            release_element_indices(sindices, iindices, owned_indices, old_index);
+@@ -631 +701 @@ void APIENTRY_GL4ES gl4es_glDrawElements(GLenum mode, GLsizei count, GLenum type
+-        list->indices = sindices;
++        list->indices = iindices;
+@@ -635,0 +706 @@ void APIENTRY_GL4ES gl4es_glDrawElements(GLenum mode, GLsizei count, GLenum type
++        wantBufferIndex(old_index);
+@@ -641 +711,0 @@ void APIENTRY_GL4ES gl4es_glDrawElements(GLenum mode, GLsizei count, GLenum type
+-         //TODO handling uint indices
+@@ -644,7 +714 @@ void APIENTRY_GL4ES gl4es_glDrawElements(GLenum mode, GLsizei count, GLenum type
+-
+-        if(!need_free) {
+-            GLushort *tmp = sindices;
+-            sindices = (GLushort*)malloc(count*sizeof(GLushort));
+-            memcpy(sindices, tmp, count*sizeof(GLushort));
+-        }
+-        normalize_indices_us(sindices, &max, &min, count);
++        normalize_indices_ui(iindices, &max, &min, count);
+@@ -652 +716 @@ void APIENTRY_GL4ES gl4es_glDrawElements(GLenum mode, GLsizei count, GLenum type
+-        list->indices = sindices;
++        list->indices = iindices;
+@@ -657,0 +722 @@ void APIENTRY_GL4ES gl4es_glDrawElements(GLenum mode, GLsizei count, GLenum type
++        wantBufferIndex(old_index);
+@@ -661,4 +726 @@ void APIENTRY_GL4ES gl4es_glDrawElements(GLenum mode, GLsizei count, GLenum type
+-        if(need_free) {
+-            free(sindices);
+-            wantBufferIndex(old_index);
+-        }
++        release_element_indices(sindices, iindices, owned_indices, old_index);
+@@ -897,0 +960,2 @@ void APIENTRY_GL4ES gl4es_glMultiDrawElements( GLenum mode, GLsizei *counts, GLe
++    if(!require_uint_element_support(type, "multidraw"))
++        return;
+@@ -933,0 +998 @@ void APIENTRY_GL4ES gl4es_glMultiDrawElements( GLenum mode, GLsizei *counts, GLe
++        int owned_indices = 0;
+@@ -935,28 +1000,8 @@ void APIENTRY_GL4ES gl4es_glMultiDrawElements( GLenum mode, GLsizei *counts, GLe
+-        bool need_free = !(
+-            (type==GL_UNSIGNED_SHORT) || 
+-            (!compiling && !intercept && type==GL_UNSIGNED_INT && hardext.elementuint)
+-            );
+-        if(need_free) {
+-              GLvoid *src;
+-              if (glstate->vao->elements) {
+-                  src = (void*)((char*)glstate->vao->elements->data + (uintptr_t)indices[i]);
+-              } else {
+-                  src = (GLvoid *) indices[i];
+-              }
+-              sindices = copy_gl_array(src, type, 1, 0, GL_UNSIGNED_SHORT, 1, 0, count, NULL);  
+-          old_index = wantBufferIndex(0);
+-        } else {
+-              if(type==GL_UNSIGNED_INT) {
+-                  if (glstate->vao->elements) {
+-                      iindices = (void*)((char*)glstate->vao->elements->data + (uintptr_t)indices[i]);
+-                  } else {
+-                      iindices = (GLuint *) indices[i];
+-                  }
+-              }
+-              else {
+-                  if (glstate->vao->elements) {
+-                      sindices = (void*)((char*)glstate->vao->elements->data + (uintptr_t)indices[i]);
+-                  } else {
+-                      sindices = (GLushort *) indices[i];
+-                  }
+-              }
++        prepare_element_indices(type, indices[i], count, compiling||intercept, 0,
++            &sindices, &iindices, &owned_indices, &old_index);
++        if(type==GL_UNSIGNED_INT) {
++            trace_uint_element_route("multidraw", IOS_UINT_ROUTE_MULTIDRAW, (const GLuint*)resolved_element_indices(indices[i]), count, compiling||intercept);
++            if(compiling)
++                trace_uint_element_route("renderlist", IOS_UINT_ROUTE_RENDERLIST, (const GLuint*)resolved_element_indices(indices[i]), count, 1);
++            if(intercept)
++                trace_uint_element_route("intercept", IOS_UINT_ROUTE_INTERCEPT, (const GLuint*)resolved_element_indices(indices[i]), count, 1);
+@@ -966,2 +1011 @@ void APIENTRY_GL4ES gl4es_glMultiDrawElements( GLenum mode, GLsizei *counts, GLe
+-            // TODO, handle uint indices
+-            renderlist_t *list = NULL;
++            renderlist_t *draw = NULL;
+@@ -971,12 +1015,7 @@ void APIENTRY_GL4ES gl4es_glMultiDrawElements( GLenum mode, GLsizei *counts, GLe
+-            list = glstate->list.active;
+-
+-            if(!need_free) {
+-                GLushort *tmp = sindices;
+-                sindices = (GLushort*)malloc(count*sizeof(GLushort));
+-                memcpy(sindices, tmp, count*sizeof(GLushort));
+-            }
+-            normalize_indices_us(sindices, &max, &min, count);
+-            list = arrays_to_renderlist(list, mode, min, max + 1);
+-            list->indices = sindices;
+-            list->ilen = count;
+-            list->indice_cap = count;
++            draw = glstate->list.active;
++            normalize_indices_ui(iindices, &max, &min, count);
++            draw = arrays_to_renderlist(draw, mode, min, max + 1);
++            draw->indices = iindices;
++            draw->ilen = count;
++            draw->indice_cap = count;
++            wantBufferIndex(old_index);
+@@ -988 +1027 @@ void APIENTRY_GL4ES gl4es_glMultiDrawElements( GLenum mode, GLsizei *counts, GLe
+-                glstate->list.active = extend_renderlist(list);
++                glstate->list.active = extend_renderlist(draw);
+@@ -994,2 +1032,0 @@ void APIENTRY_GL4ES gl4es_glMultiDrawElements( GLenum mode, GLsizei *counts, GLe
+-            //TODO handling uint indices
+-            renderlist_t *list = NULL;
+@@ -997,7 +1034 @@ void APIENTRY_GL4ES gl4es_glMultiDrawElements( GLenum mode, GLsizei *counts, GLe
+-
+-            if(!need_free) {
+-                GLushort *tmp = sindices;
+-                sindices = (GLushort*)malloc(count*sizeof(GLushort));
+-                memcpy(sindices, tmp, count*sizeof(GLushort));
+-            }
+-            normalize_indices_us(sindices, &max, &min, count);
++            normalize_indices_ui(iindices, &max, &min, count);
+@@ -1008 +1039 @@ void APIENTRY_GL4ES gl4es_glMultiDrawElements( GLenum mode, GLsizei *counts, GLe
+-            list->indices = sindices;
++            list->indices = iindices;
+@@ -1010,0 +1042 @@ void APIENTRY_GL4ES gl4es_glMultiDrawElements( GLenum mode, GLsizei *counts, GLe
++            wantBufferIndex(old_index);
+@@ -1014,4 +1046 @@ void APIENTRY_GL4ES gl4es_glMultiDrawElements( GLenum mode, GLsizei *counts, GLe
+-            if(need_free) {
+-                free(sindices);
+-                wantBufferIndex(old_index);
+-            }
++            release_element_indices(sindices, iindices, owned_indices, old_index);
+@@ -1029,0 +1059,6 @@ void APIENTRY_GL4ES gl4es_glMultiDrawElementsBaseVertex( GLenum mode, GLsizei *c
++    if(!primcount) {
++        noerrorShim();
++        return;
++    }
++    if(!require_uint_element_support(type, "multidraw-basevertex"))
++        return;
+@@ -1066,7 +1101,12 @@ void APIENTRY_GL4ES gl4es_glMultiDrawElementsBaseVertex( GLenum mode, GLsizei *c
+-
+-        if(type==GL_UNSIGNED_INT && hardext.elementuint && !compiling && !intercept)
+-            iindices = copy_gl_array((glstate->vao->elements)?(void*)((char*)glstate->vao->elements->data + (uintptr_t)indices):indices,
+-                type, 1, 0, GL_UNSIGNED_INT, 1, 0, count, NULL);
+-        else
+-            sindices = copy_gl_array((glstate->vao->elements)?(void*)((char*)glstate->vao->elements->data + (uintptr_t)indices):indices,
+-                type, 1, 0, GL_UNSIGNED_SHORT, 1, 0, count, NULL);
++        int owned_indices = 0;
++        GLuint old_index = 0;
++        prepare_element_indices(type, indices[i], count, compiling||intercept, 1,
++            &sindices, &iindices, &owned_indices, &old_index);
++        if(type==GL_UNSIGNED_INT) {
++            trace_uint_element_route("multidraw", IOS_UINT_ROUTE_MULTIDRAW, (const GLuint*)resolved_element_indices(indices[i]), count, compiling||intercept);
++            trace_uint_element_route("basevertex", IOS_UINT_ROUTE_BASEVERTEX, (const GLuint*)resolved_element_indices(indices[i]), count, compiling||intercept);
++            if(compiling)
++                trace_uint_element_route("renderlist", IOS_UINT_ROUTE_RENDERLIST, (const GLuint*)resolved_element_indices(indices[i]), count, 1);
++            if(intercept)
++                trace_uint_element_route("intercept", IOS_UINT_ROUTE_INTERCEPT, (const GLuint*)resolved_element_indices(indices[i]), count, 1);
++        }
+@@ -1075,2 +1115 @@ void APIENTRY_GL4ES gl4es_glMultiDrawElementsBaseVertex( GLenum mode, GLsizei *c
+-            // TODO, handle uint indices
+-            renderlist_t *list = NULL;
++            renderlist_t *draw = NULL;
+@@ -1080 +1119 @@ void APIENTRY_GL4ES gl4es_glMultiDrawElementsBaseVertex( GLenum mode, GLsizei *c
+-            list = glstate->list.active;
++            draw = glstate->list.active;
+@@ -1082,5 +1121,6 @@ void APIENTRY_GL4ES gl4es_glMultiDrawElementsBaseVertex( GLenum mode, GLsizei *c
+-            normalize_indices_us(sindices, &max, &min, count);
+-            list = arrays_to_renderlist(list, mode, min + basevertex[i], max + basevertex[i] + 1);
+-            list->indices = sindices;
+-            list->ilen = count;
+-            list->indice_cap = count;
++            normalize_indices_ui(iindices, &max, &min, count);
++            draw = arrays_to_renderlist(draw, mode, min + basevertex[i], max + basevertex[i] + 1);
++            draw->indices = iindices;
++            draw->ilen = count;
++            draw->indice_cap = count;
++            wantBufferIndex(old_index);
+@@ -1092 +1132 @@ void APIENTRY_GL4ES gl4es_glMultiDrawElementsBaseVertex( GLenum mode, GLsizei *c
+-                glstate->list.active = extend_renderlist(list);
++                glstate->list.active = extend_renderlist(draw);
+@@ -1098 +1137,0 @@ void APIENTRY_GL4ES gl4es_glMultiDrawElementsBaseVertex( GLenum mode, GLsizei *c
+-            //TODO handling uint indices
+@@ -1101 +1140 @@ void APIENTRY_GL4ES gl4es_glMultiDrawElementsBaseVertex( GLenum mode, GLsizei *c
+-            normalize_indices_us(sindices, &max, &min, count);
++            normalize_indices_ui(iindices, &max, &min, count);
+@@ -1106 +1145 @@ void APIENTRY_GL4ES gl4es_glMultiDrawElementsBaseVertex( GLenum mode, GLsizei *c
+-            list->indices = sindices;
++            list->indices = iindices;
+@@ -1108,0 +1148 @@ void APIENTRY_GL4ES gl4es_glMultiDrawElementsBaseVertex( GLenum mode, GLsizei *c
++            wantBufferIndex(old_index);
+@@ -1112 +1152 @@ void APIENTRY_GL4ES gl4es_glMultiDrawElementsBaseVertex( GLenum mode, GLsizei *c
+-                for(int i=0; i<count; i++) iindices[i]+=basevertex[i];
++                for(int k=0; k<count; k++) iindices[k]+=basevertex[i];
+@@ -1114,2 +1154 @@ void APIENTRY_GL4ES gl4es_glMultiDrawElementsBaseVertex( GLenum mode, GLsizei *c
+-                for(int i=0; i<count; i++) sindices[i]+=basevertex[i];
+-            GLuint old_index = wantBufferIndex(0);
++                for(int k=0; k<count; k++) sindices[k]+=basevertex[i];
+@@ -1117,5 +1156 @@ void APIENTRY_GL4ES gl4es_glMultiDrawElementsBaseVertex( GLenum mode, GLsizei *c
+-            if(iindices)
+-                free(iindices);
+-            else
+-                free(sindices);
+-            wantBufferIndex(old_index);
++            release_element_indices(sindices, iindices, owned_indices, old_index);
+@@ -1148,0 +1184,3 @@ void APIENTRY_GL4ES gl4es_glDrawElementsBaseVertex(GLenum mode, GLsizei count, G
++        if(!require_uint_element_support(type, "basevertex"))
++            return;
++
+@@ -1167,7 +1205,11 @@ void APIENTRY_GL4ES gl4es_glDrawElementsBaseVertex(GLenum mode, GLsizei count, G
+-
+-        if(type==GL_UNSIGNED_INT && hardext.elementuint && !compiling && !intercept)
+-            iindices = copy_gl_array((glstate->vao->elements)?(void*)((char*)glstate->vao->elements->data + (uintptr_t)indices):indices,
+-                type, 1, 0, GL_UNSIGNED_INT, 1, 0, count, NULL);
+-        else
+-            sindices = copy_gl_array((glstate->vao->elements)?(void*)((char*)glstate->vao->elements->data + (uintptr_t)indices):indices,
+-                type, 1, 0, GL_UNSIGNED_SHORT, 1, 0, count, NULL);
++        int owned_indices = 0;
++        GLuint old_index = 0;
++        prepare_element_indices(type, indices, count, compiling||intercept, 1,
++            &sindices, &iindices, &owned_indices, &old_index);
++        if(type==GL_UNSIGNED_INT) {
++            trace_uint_element_route("basevertex", IOS_UINT_ROUTE_BASEVERTEX, (const GLuint*)resolved_element_indices(indices), count, compiling||intercept);
++            if(compiling)
++                trace_uint_element_route("renderlist", IOS_UINT_ROUTE_RENDERLIST, (const GLuint*)resolved_element_indices(indices), count, 1);
++            if(intercept)
++                trace_uint_element_route("intercept", IOS_UINT_ROUTE_INTERCEPT, (const GLuint*)resolved_element_indices(indices), count, 1);
++        }
+@@ -1176 +1217,0 @@ void APIENTRY_GL4ES gl4es_glDrawElementsBaseVertex(GLenum mode, GLsizei count, G
+-            // TODO, handle uint indices
+@@ -1183 +1224 @@ void APIENTRY_GL4ES gl4es_glDrawElementsBaseVertex(GLenum mode, GLsizei count, G
+-            normalize_indices_us(sindices, &max, &min, count);
++            normalize_indices_ui(iindices, &max, &min, count);
+@@ -1185 +1226 @@ void APIENTRY_GL4ES gl4es_glDrawElementsBaseVertex(GLenum mode, GLsizei count, G
+-            list->indices = sindices;
++            list->indices = iindices;
+@@ -1187,0 +1229 @@ void APIENTRY_GL4ES gl4es_glDrawElementsBaseVertex(GLenum mode, GLsizei count, G
++            wantBufferIndex(old_index);
+@@ -1199 +1240,0 @@ void APIENTRY_GL4ES gl4es_glDrawElementsBaseVertex(GLenum mode, GLsizei count, G
+-            //TODO handling uint indices
+@@ -1203 +1244 @@ void APIENTRY_GL4ES gl4es_glDrawElementsBaseVertex(GLenum mode, GLsizei count, G
+-            normalize_indices_us(sindices, &max, &min, count);
++            normalize_indices_ui(iindices, &max, &min, count);
+@@ -1205 +1246 @@ void APIENTRY_GL4ES gl4es_glDrawElementsBaseVertex(GLenum mode, GLsizei count, G
+-            list->indices = sindices;
++            list->indices = iindices;
+@@ -1207,0 +1249 @@ void APIENTRY_GL4ES gl4es_glDrawElementsBaseVertex(GLenum mode, GLsizei count, G
++            wantBufferIndex(old_index);
+@@ -1218,4 +1260 @@ void APIENTRY_GL4ES gl4es_glDrawElementsBaseVertex(GLenum mode, GLsizei count, G
+-            if(iindices)
+-                free(iindices);
+-            else
+-                free(sindices);
++            release_element_indices(sindices, iindices, owned_indices, old_index);
+@@ -1244,0 +1284,3 @@ void APIENTRY_GL4ES gl4es_glDrawRangeElementsBaseVertex(GLenum mode, GLuint star
++        if(!require_uint_element_support(type, "range-basevertex"))
++            return;
++
+@@ -1263,6 +1305,12 @@ void APIENTRY_GL4ES gl4es_glDrawRangeElementsBaseVertex(GLenum mode, GLuint star
+-        if(type==GL_UNSIGNED_INT && hardext.elementuint && !compiling && !intercept)
+-            iindices = copy_gl_array((glstate->vao->elements)?(void*)((char*)glstate->vao->elements->data + (uintptr_t)indices):indices,
+-                type, 1, 0, GL_UNSIGNED_INT, 1, 0, count, NULL);
+-        else
+-            sindices = copy_gl_array((glstate->vao->elements)?(void*)((char*)glstate->vao->elements->data + (uintptr_t)indices):indices,
+-                type, 1, 0, GL_UNSIGNED_SHORT, 1, 0, count, NULL);
++        int owned_indices = 0;
++        GLuint old_index = 0;
++        prepare_element_indices(type, indices, count, compiling||intercept, 1,
++            &sindices, &iindices, &owned_indices, &old_index);
++        if(type==GL_UNSIGNED_INT) {
++            trace_uint_element_route("range", IOS_UINT_ROUTE_RANGE, (const GLuint*)resolved_element_indices(indices), count, compiling||intercept);
++            trace_uint_element_route("basevertex", IOS_UINT_ROUTE_BASEVERTEX, (const GLuint*)resolved_element_indices(indices), count, compiling||intercept);
++            if(compiling)
++                trace_uint_element_route("renderlist", IOS_UINT_ROUTE_RENDERLIST, (const GLuint*)resolved_element_indices(indices), count, 1);
++            if(intercept)
++                trace_uint_element_route("intercept", IOS_UINT_ROUTE_INTERCEPT, (const GLuint*)resolved_element_indices(indices), count, 1);
++        }
+@@ -1271 +1318,0 @@ void APIENTRY_GL4ES gl4es_glDrawRangeElementsBaseVertex(GLenum mode, GLuint star
+-            // TODO, handle uint indices
+@@ -1277 +1324 @@ void APIENTRY_GL4ES gl4es_glDrawRangeElementsBaseVertex(GLenum mode, GLuint star
+-            for (int i=0; i<count; i++) sindices[i]-=start;
++            for (int i=0; i<count; i++) iindices[i]-=start;
+@@ -1279 +1326 @@ void APIENTRY_GL4ES gl4es_glDrawRangeElementsBaseVertex(GLenum mode, GLuint star
+-            list->indices = sindices;
++            list->indices = iindices;
+@@ -1281,0 +1329 @@ void APIENTRY_GL4ES gl4es_glDrawRangeElementsBaseVertex(GLenum mode, GLuint star
++            wantBufferIndex(old_index);
+@@ -1293 +1340,0 @@ void APIENTRY_GL4ES gl4es_glDrawRangeElementsBaseVertex(GLenum mode, GLuint star
+-            //TODO handling uint indices
+@@ -1296 +1343 @@ void APIENTRY_GL4ES gl4es_glDrawRangeElementsBaseVertex(GLenum mode, GLuint star
+-            for (int i=0; i<count; i++) sindices[i]-=start;
++            for (int i=0; i<count; i++) iindices[i]-=start;
+@@ -1298 +1345 @@ void APIENTRY_GL4ES gl4es_glDrawRangeElementsBaseVertex(GLenum mode, GLuint star
+-            list->indices = sindices;
++            list->indices = iindices;
+@@ -1300,0 +1348 @@ void APIENTRY_GL4ES gl4es_glDrawRangeElementsBaseVertex(GLenum mode, GLuint star
++            wantBufferIndex(old_index);
+@@ -1311 +1358,0 @@ void APIENTRY_GL4ES gl4es_glDrawRangeElementsBaseVertex(GLenum mode, GLuint star
+-            GLuint old_index = wantBufferIndex(0);
+@@ -1313,5 +1360 @@ void APIENTRY_GL4ES gl4es_glDrawRangeElementsBaseVertex(GLenum mode, GLuint star
+-            if(iindices)
+-                free(iindices);
+-            else
+-                free(sindices);
+-            wantBufferIndex(old_index);
++            release_element_indices(sindices, iindices, owned_indices, old_index);
+@@ -1433,0 +1477,3 @@ void APIENTRY_GL4ES gl4es_glDrawElementsInstanced(GLenum mode, GLsizei count, GL
++    if(!require_uint_element_support(type, "instanced"))
++        return;
++
+@@ -1449,0 +1496 @@ void APIENTRY_GL4ES gl4es_glDrawElementsInstanced(GLenum mode, GLsizei count, GL
++    int owned_indices = 0;
+@@ -1451,13 +1498,8 @@ void APIENTRY_GL4ES gl4es_glDrawElementsInstanced(GLenum mode, GLsizei count, GL
+-    bool need_free = !(
+-        (type==GL_UNSIGNED_SHORT) || 
+-        (!compiling && !intercept && type==GL_UNSIGNED_INT && hardext.elementuint)
+-        );
+-    if(need_free) {
+-        sindices = copy_gl_array((glstate->vao->elements)?((void*)((char*)glstate->vao->elements->data + (uintptr_t)indices)):indices,
+-            type, 1, 0, GL_UNSIGNED_SHORT, 1, 0, count, NULL);
+-        old_index = wantBufferIndex(0);
+-    } else {
+-        if(type==GL_UNSIGNED_INT)
+-            iindices = (glstate->vao->elements)?((void*)((char*)glstate->vao->elements->data + (uintptr_t)indices)):(GLvoid*)indices;
+-        else
+-            sindices = (glstate->vao->elements)?((void*)((char*)glstate->vao->elements->data + (uintptr_t)indices)):(GLvoid*)indices;
++    prepare_element_indices(type, indices, count, compiling||intercept, 0,
++        &sindices, &iindices, &owned_indices, &old_index);
++    if(type==GL_UNSIGNED_INT) {
++        trace_uint_element_route("instanced", IOS_UINT_ROUTE_INSTANCED, (const GLuint*)resolved_element_indices(indices), count, compiling||intercept);
++        if(compiling)
++            trace_uint_element_route("renderlist", IOS_UINT_ROUTE_RENDERLIST, (const GLuint*)resolved_element_indices(indices), count, 1);
++        if(intercept)
++            trace_uint_element_route("intercept", IOS_UINT_ROUTE_INTERCEPT, (const GLuint*)resolved_element_indices(indices), count, 1);
+@@ -1467 +1508,0 @@ void APIENTRY_GL4ES gl4es_glDrawElementsInstanced(GLenum mode, GLsizei count, GL
+-        // TODO, handle uint indices
+@@ -1474,6 +1515 @@ void APIENTRY_GL4ES gl4es_glDrawElementsInstanced(GLenum mode, GLsizei count, GL
+-        if(!need_free) {
+-            GLushort *tmp = sindices;
+-            sindices = (GLushort*)malloc(count*sizeof(GLushort));
+-            memcpy(sindices, tmp, count*sizeof(GLushort));
+-        }
+-        normalize_indices_us(sindices, &max, &min, count);
++        normalize_indices_ui(iindices, &max, &min, count);
+@@ -1481 +1517 @@ void APIENTRY_GL4ES gl4es_glDrawElementsInstanced(GLenum mode, GLsizei count, GL
+-        list->indices = sindices;
++        list->indices = iindices;
+@@ -1484,0 +1521 @@ void APIENTRY_GL4ES gl4es_glDrawElementsInstanced(GLenum mode, GLsizei count, GL
++        wantBufferIndex(old_index);
+@@ -1496 +1532,0 @@ void APIENTRY_GL4ES gl4es_glDrawElementsInstanced(GLenum mode, GLsizei count, GL
+-         //TODO handling uint indices
+@@ -1500,6 +1536 @@ void APIENTRY_GL4ES gl4es_glDrawElementsInstanced(GLenum mode, GLsizei count, GL
+-        if(!need_free) {
+-            GLushort *tmp = sindices;
+-            sindices = (GLushort*)malloc(count*sizeof(GLushort));
+-            memcpy(sindices, tmp, count*sizeof(GLushort));
+-        }
+-        normalize_indices_us(sindices, &max, &min, count);
++        normalize_indices_ui(iindices, &max, &min, count);
+@@ -1507 +1538 @@ void APIENTRY_GL4ES gl4es_glDrawElementsInstanced(GLenum mode, GLsizei count, GL
+-        list->indices = sindices;
++        list->indices = iindices;
+@@ -1510,0 +1542 @@ void APIENTRY_GL4ES gl4es_glDrawElementsInstanced(GLenum mode, GLsizei count, GL
++        wantBufferIndex(old_index);
+@@ -1517,4 +1549 @@ void APIENTRY_GL4ES gl4es_glDrawElementsInstanced(GLenum mode, GLsizei count, GL
+-        if(need_free) {
+-            free(sindices);
+-            wantBufferIndex(old_index);
+-        }
++        release_element_indices(sindices, iindices, owned_indices, old_index);
+@@ -1541,0 +1571,3 @@ void APIENTRY_GL4ES gl4es_glDrawElementsInstancedBaseVertex(GLenum mode, GLsizei
++        if(!require_uint_element_support(type, "instanced-basevertex"))
++            return;
++
+@@ -1560,7 +1592,12 @@ void APIENTRY_GL4ES gl4es_glDrawElementsInstancedBaseVertex(GLenum mode, GLsizei
+-
+-        if(type==GL_UNSIGNED_INT && hardext.elementuint && !compiling && !intercept)
+-            iindices = copy_gl_array((glstate->vao->elements)?(void*)((char*)glstate->vao->elements->data + (uintptr_t)indices):indices,
+-                type, 1, 0, GL_UNSIGNED_INT, 1, 0, count, NULL);
+-        else
+-            sindices = copy_gl_array((glstate->vao->elements)?(void*)((char*)glstate->vao->elements->data + (uintptr_t)indices):indices,
+-                type, 1, 0, GL_UNSIGNED_SHORT, 1, 0, count, NULL);
++        int owned_indices = 0;
++        GLuint old_index = 0;
++        prepare_element_indices(type, indices, count, compiling||intercept, 1,
++            &sindices, &iindices, &owned_indices, &old_index);
++        if(type==GL_UNSIGNED_INT) {
++            trace_uint_element_route("instanced", IOS_UINT_ROUTE_INSTANCED, (const GLuint*)resolved_element_indices(indices), count, compiling||intercept);
++            trace_uint_element_route("basevertex", IOS_UINT_ROUTE_BASEVERTEX, (const GLuint*)resolved_element_indices(indices), count, compiling||intercept);
++            if(compiling)
++                trace_uint_element_route("renderlist", IOS_UINT_ROUTE_RENDERLIST, (const GLuint*)resolved_element_indices(indices), count, 1);
++            if(intercept)
++                trace_uint_element_route("intercept", IOS_UINT_ROUTE_INTERCEPT, (const GLuint*)resolved_element_indices(indices), count, 1);
++        }
+@@ -1569 +1605,0 @@ void APIENTRY_GL4ES gl4es_glDrawElementsInstancedBaseVertex(GLenum mode, GLsizei
+-            // TODO, handle uint indices
+@@ -1576 +1612 @@ void APIENTRY_GL4ES gl4es_glDrawElementsInstancedBaseVertex(GLenum mode, GLsizei
+-            normalize_indices_us(sindices, &max, &min, count);
++            normalize_indices_ui(iindices, &max, &min, count);
+@@ -1578 +1614 @@ void APIENTRY_GL4ES gl4es_glDrawElementsInstancedBaseVertex(GLenum mode, GLsizei
+-            list->indices = sindices;
++            list->indices = iindices;
+@@ -1581,0 +1618 @@ void APIENTRY_GL4ES gl4es_glDrawElementsInstancedBaseVertex(GLenum mode, GLsizei
++            wantBufferIndex(old_index);
+@@ -1593 +1629,0 @@ void APIENTRY_GL4ES gl4es_glDrawElementsInstancedBaseVertex(GLenum mode, GLsizei
+-            //TODO handling uint indices
+@@ -1597 +1633 @@ void APIENTRY_GL4ES gl4es_glDrawElementsInstancedBaseVertex(GLenum mode, GLsizei
+-            normalize_indices_us(sindices, &max, &min, count);
++            normalize_indices_ui(iindices, &max, &min, count);
+@@ -1599 +1635 @@ void APIENTRY_GL4ES gl4es_glDrawElementsInstancedBaseVertex(GLenum mode, GLsizei
+-            list->indices = sindices;
++            list->indices = iindices;
+@@ -1602,0 +1639 @@ void APIENTRY_GL4ES gl4es_glDrawElementsInstancedBaseVertex(GLenum mode, GLsizei
++            wantBufferIndex(old_index);
+@@ -1612 +1648,0 @@ void APIENTRY_GL4ES gl4es_glDrawElementsInstancedBaseVertex(GLenum mode, GLsizei
+-            GLuint old_index = wantBufferIndex(0);
+@@ -1614,5 +1650 @@ void APIENTRY_GL4ES gl4es_glDrawElementsInstancedBaseVertex(GLenum mode, GLsizei
+-            if(iindices)
+-                free(iindices);
+-            else
+-                free(sindices);
+-            wantBufferIndex(old_index);
++            release_element_indices(sindices, iindices, owned_indices, old_index);
+diff --git a/src/gl/glstate.h b/src/gl/glstate.h
+index 147e7e28..02f4d2a6 100644
+--- a/src/gl/glstate.h
++++ b/src/gl/glstate.h
+@@ -102 +102 @@ struct glstate_s {
+-    GLushort*           merger_indices;
++    GLuint*             merger_indices;
+diff --git a/src/gl/line.c b/src/gl/line.c
+index 603f329f..4bfc191d 100644
+--- a/src/gl/line.c
++++ b/src/gl/line.c
+@@ -73 +73 @@ void bind_stipple_tex() {
+-GLfloat *gen_stipple_tex_coords(GLfloat *vert, GLushort *sindices, modeinit_t *modes, int stride, int length, GLfloat* noalloctex) {
++GLfloat *gen_stipple_tex_coords(GLfloat *vert, GLuint *indices, modeinit_t *modes, int stride, int length, GLfloat* noalloctex) {
+@@ -100,2 +100,2 @@ GLfloat *gen_stipple_tex_coords(GLfloat *vert, GLushort *sindices, modeinit_t *m
+-                if(sindices)
+-                    vertPos = vert+stride*sindices[i];
++                if(indices)
++                    vertPos = vert+stride*indices[i];
+@@ -103,2 +103,2 @@ GLfloat *gen_stipple_tex_coords(GLfloat *vert, GLushort *sindices, modeinit_t *m
+-                if(sindices)
+-                    vertPos = vert+stride*sindices[i+1];
++                if(indices)
++                    vertPos = vert+stride*indices[i+1];
+@@ -123,2 +123,2 @@ GLfloat *gen_stipple_tex_coords(GLfloat *vert, GLushort *sindices, modeinit_t *m
+-                if(sindices)
+-                    texPos = tex+texstride*sindices[i+0];   // it gets written 2*, but that should be ok, it's the same value
++                if(indices)
++                    texPos = tex+texstride*indices[i+0];   // it gets written 2*, but that should be ok, it's the same value
+@@ -127,2 +127,2 @@ GLfloat *gen_stipple_tex_coords(GLfloat *vert, GLushort *sindices, modeinit_t *m
+-                if(sindices)
+-                    texPos = tex+texstride*sindices[i+1];
++                if(indices)
++                    texPos = tex+texstride*indices[i+1];
+@@ -137,2 +137,2 @@ GLfloat *gen_stipple_tex_coords(GLfloat *vert, GLushort *sindices, modeinit_t *m
+-            if(sindices)
+-                vertPos = vert+stride*sindices[i];
++            if(indices)
++                vertPos = vert+stride*indices[i];
+@@ -149,2 +149,2 @@ GLfloat *gen_stipple_tex_coords(GLfloat *vert, GLushort *sindices, modeinit_t *m
+-                if(sindices)
+-                    vertPos = vert+stride*sindices[i];
++                if(indices)
++                    vertPos = vert+stride*indices[i];
+@@ -156,2 +156,2 @@ GLfloat *gen_stipple_tex_coords(GLfloat *vert, GLushort *sindices, modeinit_t *m
+-                if(sindices)
+-                    texPos = tex+texstride*sindices[i];
++                if(indices)
++                    texPos = tex+texstride*indices[i];
+diff --git a/src/gl/line.h b/src/gl/line.h
+index b5413cab..0c29a413 100644
+--- a/src/gl/line.h
++++ b/src/gl/line.h
+@@ -8 +8 @@ void APIENTRY_GL4ES gl4es_glLineStipple(GLuint factor, GLushort pattern);
+-GLfloat *gen_stipple_tex_coords(GLfloat *vert, GLushort *sindices, modeinit_t *modes, int stride, int length, GLfloat* noalloctex);
++GLfloat *gen_stipple_tex_coords(GLfloat *vert, GLuint *indices, modeinit_t *modes, int stride, int length, GLfloat* noalloctex);
+diff --git a/src/gl/list.c b/src/gl/list.c
+index 63d4d0cc..dc6984df 100644
+--- a/src/gl/list.c
++++ b/src/gl/list.c
+@@ -166 +166 @@ bool islistscompatible_renderlist(renderlist_t *a, renderlist_t *b) {
+-void renderlist_createindices(int ilen, GLushort *indices, int count) {
++void renderlist_createindices(int ilen, GLuint *indices, int count) {
+@@ -174 +174 @@ void renderlist_createindices(int ilen, GLushort *indices, int count) {
+-void renderlist_lineloop_lines(GLushort *ind, int len, GLushort *indices, int count) {
++void renderlist_lineloop_lines(GLuint *ind, int len, GLuint *indices, int count) {
+@@ -191 +191 @@ void renderlist_lineloop_lines(GLushort *ind, int len, GLushort *indices, int co
+-void renderlist_linestrip_lines(GLushort *ind, int len, GLushort *indices, int count) {
++void renderlist_linestrip_lines(GLuint *ind, int len, GLuint *indices, int count) {
+@@ -205 +205 @@ void renderlist_linestrip_lines(GLushort *ind, int len, GLushort *indices, int c
+-void renderlist_trianglestrip_triangles(GLushort *ind, int len, GLushort *indices, int count) {
++void renderlist_trianglestrip_triangles(GLuint *ind, int len, GLuint *indices, int count) {
+@@ -215 +215 @@ void renderlist_trianglestrip_triangles(GLushort *ind, int len, GLushort *indice
+-void renderlist_trianglefan_triangles(GLushort *ind, int len, GLushort *indices, int count) {
++void renderlist_trianglefan_triangles(GLuint *ind, int len, GLuint *indices, int count) {
+@@ -225 +225 @@ void renderlist_trianglefan_triangles(GLushort *ind, int len, GLushort *indices,
+-void renderlist_quads_triangles(GLushort *ind, int len, GLushort *indices, int count) {
++void renderlist_quads_triangles(GLuint *ind, int len, GLuint *indices, int count) {
+@@ -242 +242 @@ void renderlist_quads2triangles(renderlist_t *a) {
+-    GLushort *ind = a->indices;
++    GLuint *ind = a->indices;
+@@ -249,2 +249,2 @@ void renderlist_quads2triangles(renderlist_t *a) {
+-            ind = (GLushort*)malloc(len*sizeof(GLushort));
+-            memcpy(ind, glstate->merger_indices, len*sizeof(GLushort));
++            ind = (GLuint*)malloc(len*sizeof(GLuint));
++            memcpy(ind, glstate->merger_indices, len*sizeof(GLuint));
+@@ -256 +256 @@ void renderlist_quads2triangles(renderlist_t *a) {
+-        a->indices = (GLushort*)malloc(ilen*sizeof(GLushort));
++        a->indices = (GLuint*)malloc(ilen*sizeof(GLuint));
+@@ -381 +381 @@ void unsharedindices_renderlist(renderlist_t* a, int cap)
+-            GLushort* tmpi = a->indices;
++            GLuint* tmpi = a->indices;
+@@ -384,2 +384,2 @@ void unsharedindices_renderlist(renderlist_t* a, int cap)
+-            a->indices = (GLushort*)malloc(a->indice_cap*sizeof(GLushort));
+-            memcpy(a->indices, tmpi, a->ilen*sizeof(GLushort));
++            a->indices = (GLuint*)malloc(a->indice_cap*sizeof(GLuint));
++            memcpy(a->indices, tmpi, a->ilen*sizeof(GLuint));
+@@ -413 +413 @@ void prepareadd_renderlist(renderlist_t* a, int size_to_add)
+-    newind=(GLushort*)malloc(capindices*sizeof(GLushort))
++    newind=(GLuint*)malloc(capindices*sizeof(GLuint))
+@@ -420 +420 @@ void prepareadd_renderlist(renderlist_t* a, int size_to_add)
+-    GLushort *newind=NULL;
++    GLuint *newind=NULL;
+@@ -463 +463 @@ void prepareadd_renderlist(renderlist_t* a, int size_to_add)
+-                    a->indices = (GLushort*)realloc(a->indices, capindices*sizeof(GLushort));
++                    a->indices = (GLuint*)realloc(a->indices, capindices*sizeof(GLuint));
+@@ -475 +475 @@ void prepareadd_renderlist(renderlist_t* a, int size_to_add)
+-void doadd_renderlist(renderlist_t* a, GLenum mode, GLushort* indices, int count, int size_to_add)
++void doadd_renderlist(renderlist_t* a, GLenum mode, GLuint* indices, int count, int size_to_add)
+@@ -503 +503 @@ void doadd_renderlist(renderlist_t* a, GLenum mode, GLushort* indices, int count
+-                GLushort* newind = a->indices+a->ilen;
++                GLuint* newind = a->indices+a->ilen;
+@@ -809 +809 @@ void resize_merger_indices(int cap) {
+-    glstate->merger_indices = (GLushort*)realloc(glstate->merger_indices, glstate->merger_indice_cap*sizeof(GLushort));
++    glstate->merger_indices = (GLuint*)realloc(glstate->merger_indices, glstate->merger_indice_cap*sizeof(GLuint));
+@@ -822 +822 @@ void resize_indices_renderlist(renderlist_t *list, int n) {
+-        list->indices = (GLushort*)realloc(list->indices, list->indice_cap*sizeof(GLushort));
++        list->indices = (GLuint*)realloc(list->indices, list->indice_cap*sizeof(GLuint));
+@@ -903 +903 @@ renderlist_t* recycle_renderlist(renderlist_t *list, GLenum mode) {
+-    GLushort *indices = NULL;
++    GLuint *indices = NULL;
+@@ -909 +909 @@ renderlist_t* recycle_renderlist(renderlist_t *list, GLenum mode) {
+-                indices = (GLushort*)malloc(sizeof(GLushort)*list->indice_cap);\
++                indices = (GLuint*)malloc(sizeof(GLuint)*list->indice_cap);\
+diff --git a/src/gl/list.h b/src/gl/list.h
+index 1efc143f..8893d380 100644
+--- a/src/gl/list.h
++++ b/src/gl/list.h
+@@ -186 +186 @@ typedef struct _renderlist_t {
+-    GLushort *indices;
++    GLuint *indices;
+@@ -224 +224 @@ typedef struct _renderlist_t {
+-    GLushort    *ind_lines;
++    GLuint      *ind_lines;
+@@ -289,8 +289,8 @@ void prepareadd_renderlist(renderlist_t* a, int size_to_add);
+-void doadd_renderlist(renderlist_t* a, GLenum mode, GLushort* indices, int count, int size_to_add);
+-
+-void renderlist_createindices(int ilen, GLushort *indices, int count);
+-void renderlist_lineloop_lines(GLushort *ind, int len, GLushort *indices, int count);
+-void renderlist_linestrip_lines(GLushort *ind, int len, GLushort *indices, int count);
+-void renderlist_trianglestrip_triangles(GLushort *ind, int len, GLushort *indices, int count);
+-void renderlist_trianglefan_triangles(GLushort *ind, int len, GLushort *indices, int count);
+-void renderlist_quads_triangles(GLushort *ind, int len, GLushort *indices, int count);
++void doadd_renderlist(renderlist_t* a, GLenum mode, GLuint* indices, int count, int size_to_add);
++
++void renderlist_createindices(int ilen, GLuint *indices, int count);
++void renderlist_lineloop_lines(GLuint *ind, int len, GLuint *indices, int count);
++void renderlist_linestrip_lines(GLuint *ind, int len, GLuint *indices, int count);
++void renderlist_trianglestrip_triangles(GLuint *ind, int len, GLuint *indices, int count);
++void renderlist_trianglefan_triangles(GLuint *ind, int len, GLuint *indices, int count);
++void renderlist_quads_triangles(GLuint *ind, int len, GLuint *indices, int count);
+diff --git a/src/gl/listdraw.c b/src/gl/listdraw.c
+index d616b3b8..28b65eae 100644
+--- a/src/gl/listdraw.c
++++ b/src/gl/listdraw.c
+@@ -242 +242 @@ void listInactiveVBO(renderlist_t* list, save_vbo_t* saved) {
+-int fill_lineIndices(modeinit_t *modes, int length, GLenum mode, GLushort* indices, GLushort *ind_line)
++int fill_lineIndices(modeinit_t *modes, int length, GLenum mode, GLuint* indices, GLuint *ind_line)
+@@ -361,0 +362,39 @@ int fill_lineIndices(modeinit_t *modes, int length, GLenum mode, GLushort* indic
++static int prepare_renderlist_indices(const GLuint *indices, GLsizei count, GLenum *type, const GLvoid **data, GLushort **fallback)
++{
++    static int logged_first = 0;
++    static int logged_high = 0;
++    static int logged_reject = 0;
++    GLuint max = 0;
++    *fallback = NULL;
++    for(int i=0; i<count; ++i)
++        if(indices[i]>max) max=indices[i];
++    if(hardext.elementuint) {
++        *type = GL_UNSIGNED_INT;
++        *data = indices;
++        *fallback = NULL;
++        if(!logged_first) {
++            LOGD("iOS uint element first use: route=renderlist storage=uint32 submitted=GL_UNSIGNED_INT max=%u\n", max);
++            LOGD("iOS uint element route summary: renderlist=uint32 intercept=uint32 native-submit=GL_UNSIGNED_INT es2-fallback=checked-or-reject\n");
++            logged_first = 1;
++        }
++        if(max>65535 && !logged_high) {
++            LOGD("iOS uint element high index: route=renderlist max=%u submitted=GL_UNSIGNED_INT\n", max);
++            logged_high = 1;
++        }
++        return 1;
++    }
++    if(max>65535) {
++        if(!logged_reject) {
++            LOGE("iOS uint element high index: route=renderlist max=%u rejected=unsupported-es2\n", max);
++            logged_reject = 1;
++        }
++        errorShim(GL_INVALID_OPERATION);
++        return 0;
++    }
++    *fallback = (GLushort*)malloc(count*sizeof(GLushort));
++    for(int i=0; i<count; ++i) (*fallback)[i] = (GLushort)indices[i];
++    *type = GL_UNSIGNED_SHORT;
++    *data = *fallback;
++    return 1;
++}
++
+@@ -379 +418 @@ void draw_renderlist(renderlist_t *list) {
+-    GLushort *indices;
++    GLuint *indices;
+@@ -738 +777 @@ void draw_renderlist(renderlist_t *list) {
+-                select_glDrawElements(&vtx, list->mode, list->ilen, GL_UNSIGNED_SHORT, indices);
++                select_glDrawElements(&vtx, list->mode, list->ilen, GL_UNSIGNED_INT, indices);
+@@ -745 +784 @@ void draw_renderlist(renderlist_t *list) {
+-                        GLushort *ind_line = list->ind_lines = (GLushort*)malloc(sizeof(GLushort)*ilen*4+2);
++                        GLuint *ind_line = list->ind_lines = (GLuint*)malloc(sizeof(GLuint)*(ilen*4+2));
+@@ -751 +790,6 @@ void draw_renderlist(renderlist_t *list) {
+-                    gles_glDrawElements(mode, list->ind_line, GL_UNSIGNED_SHORT, list->ind_lines);
++                    GLenum index_type;
++                    const GLvoid *index_data;
++                    GLushort *index_fallback;
++                    if(prepare_renderlist_indices(list->ind_lines, list->ind_line, &index_type, &index_data, &index_fallback))
++                        gles_glDrawElements(mode, list->ind_line, index_type, index_data);
++                    free(index_fallback);
+@@ -755 +799,5 @@ void draw_renderlist(renderlist_t *list) {
+-                    if(!use_vbo_indices) {
++                    GLenum index_type;
++                    const GLvoid *index_data;
++                    GLushort *index_fallback;
++                    const int prepared = prepare_renderlist_indices(indices, list->ilen, &index_type, &index_data, &index_fallback);
++                    if(prepared && !use_vbo_indices) {
+@@ -761 +809 @@ void draw_renderlist(renderlist_t *list) {
+-                        gles_glBufferData(GL_ELEMENT_ARRAY_BUFFER, list->ilen*sizeof(GLushort), indices, GL_STATIC_DRAW);
++                        gles_glBufferData(GL_ELEMENT_ARRAY_BUFFER, list->ilen*((index_type==GL_UNSIGNED_INT)?sizeof(GLuint):sizeof(GLushort)), index_data, GL_STATIC_DRAW);
+@@ -764 +812 @@ void draw_renderlist(renderlist_t *list) {
+-                    } else if(use_vbo_indices==2) {
++                    } else if(prepared && use_vbo_indices==2) {
+@@ -767 +815 @@ void draw_renderlist(renderlist_t *list) {
+-                    } else
++                    } else if(prepared)
+@@ -769,3 +817,3 @@ void draw_renderlist(renderlist_t *list) {
+-                    if(list->instanceCount==1)
+-                        gles_glDrawElements(mode, list->ilen, GL_UNSIGNED_SHORT, vbo_indices?NULL:indices);
+-                    else {
++                    if(prepared && list->instanceCount==1)
++                        gles_glDrawElements(mode, list->ilen, index_type, vbo_indices?NULL:index_data);
++                    else if(prepared) {
+@@ -773 +821 @@ void draw_renderlist(renderlist_t *list) {
+-                            gles_glDrawElements(mode, list->ilen, GL_UNSIGNED_SHORT, vbo_indices?NULL:indices);
++                            gles_glDrawElements(mode, list->ilen, index_type, vbo_indices?NULL:index_data);
+@@ -775,0 +824 @@ void draw_renderlist(renderlist_t *list) {
++                    free(index_fallback);
+@@ -792 +841 @@ void draw_renderlist(renderlist_t *list) {
+-                        GLushort *ind_line = list->ind_lines = (GLushort*)malloc(sizeof(GLushort)*len*4+2);
++                        GLuint *ind_line = list->ind_lines = (GLuint*)malloc(sizeof(GLuint)*(len*4+2));
+@@ -798 +847,6 @@ void draw_renderlist(renderlist_t *list) {
+-					gles_glDrawElements(mode, list->ind_line, GL_UNSIGNED_SHORT, list->ind_lines);
++                    GLenum index_type;
++                    const GLvoid *index_data;
++                    GLushort *index_fallback;
++                    if(prepare_renderlist_indices(list->ind_lines, list->ind_line, &index_type, &index_data, &index_fallback))
++					    gles_glDrawElements(mode, list->ind_line, index_type, index_data);
++                    free(index_fallback);
+diff --git a/src/gl/texgen.c b/src/gl/texgen.c
+index d193ad05..8e9117a6 100644
+--- a/src/gl/texgen.c
++++ b/src/gl/texgen.c
+@@ -175 +175 @@ void APIENTRY_GL4ES gl4es_glGetTexGenfv(GLenum coord,GLenum pname,GLfloat *param
+-void dot_loop(const GLfloat *verts, const GLfloat *params, GLfloat *out, GLint count, GLushort *indices) {
++void dot_loop(const GLfloat *verts, const GLfloat *params, GLfloat *out, GLint count, GLuint *indices) {
+@@ -177 +177 @@ void dot_loop(const GLfloat *verts, const GLfloat *params, GLfloat *out, GLint c
+-	GLushort k = indices?indices[i]:i;
++	GLuint k = indices?indices[i]:i;
+@@ -182 +182 @@ void dot_loop(const GLfloat *verts, const GLfloat *params, GLfloat *out, GLint c
+-void sphere_loop(const GLfloat *verts, const GLfloat *norm, GLfloat *out, GLint count, GLushort *indices) {
++void sphere_loop(const GLfloat *verts, const GLfloat *norm, GLfloat *out, GLint count, GLuint *indices) {
+@@ -195 +195 @@ void sphere_loop(const GLfloat *verts, const GLfloat *norm, GLfloat *out, GLint
+-	GLushort k = indices?indices[i]:i;
++	GLuint k = indices?indices[i]:i;
+@@ -213 +213 @@ void sphere_loop(const GLfloat *verts, const GLfloat *norm, GLfloat *out, GLint
+-void reflection_loop(const GLfloat *verts, const GLfloat *norm, GLfloat *out, GLint count, GLushort *indices) {
++void reflection_loop(const GLfloat *verts, const GLfloat *norm, GLfloat *out, GLint count, GLuint *indices) {
+@@ -225 +225 @@ void reflection_loop(const GLfloat *verts, const GLfloat *norm, GLfloat *out, GL
+-	GLushort k = indices?indices[i]:i;
++	GLuint k = indices?indices[i]:i;
+@@ -239 +239 @@ void reflection_loop(const GLfloat *verts, const GLfloat *norm, GLfloat *out, GL
+-void eye_loop(const GLfloat *verts, const GLfloat *param, GLfloat *out, GLint count, GLushort *indices) {
++void eye_loop(const GLfloat *verts, const GLfloat *param, GLfloat *out, GLint count, GLuint *indices) {
+@@ -245 +245 @@ void eye_loop(const GLfloat *verts, const GLfloat *param, GLfloat *out, GLint co
+-	GLushort k = indices?indices[i]:i;
++	GLuint k = indices?indices[i]:i;
+@@ -251 +251 @@ void eye_loop(const GLfloat *verts, const GLfloat *param, GLfloat *out, GLint co
+-void eye_loop_dual(const GLfloat *verts, const GLfloat *param1, const GLfloat* param2, GLfloat *out, GLint count, GLushort *indices) {
++void eye_loop_dual(const GLfloat *verts, const GLfloat *param1, const GLfloat* param2, GLfloat *out, GLint count, GLuint *indices) {
+@@ -262 +262 @@ void eye_loop_dual(const GLfloat *verts, const GLfloat *param1, const GLfloat* p
+-	GLushort k = indices?indices[i]:i;
++	GLuint k = indices?indices[i]:i;
+@@ -269 +269 @@ void eye_loop_dual(const GLfloat *verts, const GLfloat *param1, const GLfloat* p
+-static inline void tex_coord_loop(GLfloat *verts, GLfloat *norm, GLfloat *out, GLint count, GLenum type, GLfloat *param_o, GLfloat *param_e, GLushort *indices) {
++static inline void tex_coord_loop(GLfloat *verts, GLfloat *norm, GLfloat *out, GLint count, GLenum type, GLfloat *param_o, GLfloat *param_e, GLuint *indices) {
+@@ -283 +283 @@ static inline void tex_coord_loop(GLfloat *verts, GLfloat *norm, GLfloat *out, G
+-void gen_tex_coords(GLfloat *verts, GLfloat *norm, GLfloat **coords, GLint count, GLint *needclean, int texture, GLushort *indices, GLuint ilen) {
++void gen_tex_coords(GLfloat *verts, GLfloat *norm, GLfloat **coords, GLint count, GLint *needclean, int texture, GLuint *indices, GLuint ilen) {
+@@ -396 +396 @@ void gen_tex_coords(GLfloat *verts, GLfloat *norm, GLfloat **coords, GLint count
+-            GLushort k = indices?indices[i]:i;
++            GLuint k = indices?indices[i]:i;
+@@ -403 +403 @@ void gen_tex_coords(GLfloat *verts, GLfloat *norm, GLfloat **coords, GLint count
+-            GLushort k = indices?indices[i]:i;
++            GLuint k = indices?indices[i]:i;
+diff --git a/src/gl/texgen.h b/src/gl/texgen.h
+index 682cbc41..42473c17 100644
+--- a/src/gl/texgen.h
++++ b/src/gl/texgen.h
+@@ -8 +8 @@ void APIENTRY_GL4ES gl4es_glTexGeni(GLenum coord, GLenum pname, GLint param);
+-void gen_tex_coords(GLfloat *verts, GLfloat *norm, GLfloat **coords, GLint count, GLint *needclean, int texture, GLushort* indices, GLuint ilen);
++void gen_tex_coords(GLfloat *verts, GLfloat *norm, GLfloat **coords, GLint count, GLint *needclean, int texture, GLuint* indices, GLuint ilen);
+diff --git a/src/glx/hardext.c b/src/glx/hardext.c
+index 3e703b35..9944eaaf 100644
+--- a/src/glx/hardext.c
++++ b/src/glx/hardext.c
+@@ -332 +332,17 @@ void GetHardwareExtensions(int notest)
+-    S("GL_OES_element_index_uint ", elementuint, 1);
++    // GL_UNSIGNED_INT element indices are core in native OpenGL ES 3.x.
++    // Some ES3 drivers correctly omit the legacy OES token, so use the live
++    // context version as the authority and retain extension gating for ES2.
++    int native_es_major = 0;
++    if(Version) {
++        const char *p = strstr(Version, "OpenGL ES");
++        if(p) {
++            p += strlen("OpenGL ES");
++            while(*p && (*p<'0' || *p>'9')) ++p;
++            if(*p>='0' && *p<='9') native_es_major = *p-'0';
++        }
++    }
++    const int elementuint_extension = (Exts && strstr(Exts, "GL_OES_element_index_uint "))?1:0;
++    hardext.elementuint = (native_es_major>=3 || elementuint_extension)?1:0;
++    SHUT_LOGD("iOS uint element policy: version=\"%s\" native_es_major=%d extension=%d enabled=%d reason=%s\n",
++        Version?Version:"(null)", native_es_major, elementuint_extension, hardext.elementuint,
++        (native_es_major>=3)?"native-es3-core":(elementuint_extension?"oes-extension":"unsupported"));

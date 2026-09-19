@@ -147,8 +147,10 @@ R_StudioInit
 void R_StudioInit( void )
 {
 
-#if XASH_PSVITA
-	// don't do the same array-building work twice since that's what our FFP shim does anyway
+#if XASH_PSVITA || XASH_IOS
+	// Don't build a whole-model draw array inside another fixed-function shim.
+	// Diffusion models can expand beyond MAXSTUDIOVERTS while NanoGL safely
+	// batches each individual strip or fan through the immediate-mode path.
 	gEngfuncs.Cvar_FullSet( "r_studio_drawelements", "0", FCVAR_READ_ONLY );
 #endif
 

@@ -1,0 +1,694 @@
+diff --git a/include/gl4esinit.h b/include/gl4esinit.h
+index 5cbe66a6..06a3fb46 100644
+--- a/include/gl4esinit.h
++++ b/include/gl4esinit.h
+@@ -25,6 +25,11 @@ void close_gl4es(void);
+ // wrapped GetProcAddress
+ void* APIENTRY_GL4ES gl4es_GetProcAddress(const char *name);
+ 
++// Embedder-owned engine-log bridge for bounded iOS index-stream diagnostics.
++// The callback receives a complete line without a trailing newline.
++void set_index_trace_logger(void (APIENTRY_GL4ES *callback)(const char *line));
++void set_index_trace_context(unsigned long long frame, const char *map, const char *phase);
++
+ #define GL4ES_EXTERNAL_DEFAULT_STATE_VERSION 1
+ typedef struct gl4es_external_default_state_s {
+     unsigned int version;
+diff --git a/src/gl/drawing.c b/src/gl/drawing.c
+index 440a0f3a..61ffd77d 100644
+--- a/src/gl/drawing.c
++++ b/src/gl/drawing.c
+@@ -6,6 +6,7 @@
+ #include "gles.h"
+ #include "glstate.h"
+ #include "init.h"
++#include "indextrace.h"
+ #include "list.h"
+ #include "loader.h"
+ #include "render.h"
+@@ -515,14 +516,24 @@ if(count>500000) return;
+         if(instancecount==1 || hardext.esversion==1) {
+             if(!iindices && !sindices)
+                 gles_glDrawArrays(mode, first, count);
+-            else
++            else {
++                const void *native_indices = sindices ? (const void *)sindices : (const void *)iindices;
++                GLuint native_ebo = glstate->bind_buffer.want_index;
++                ios_index_trace_native(0, "glDrawElements", mode, count,
++                    sindices ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT, native_indices,
++                    native_ebo, native_ebo ? NULL : (const GLuint *)iindices, 0, count);
+                 gles_glDrawElements(mode, count, (sindices)?GL_UNSIGNED_SHORT:GL_UNSIGNED_INT, (sindices?((void*)sindices):((void*)iindices)));
++            }
+         } else {
+             if(!iindices && !sindices)
+                 fpe_glDrawArraysInstanced(mode, first, count,instancecount);
+             else {
+                 void* tmp=(sindices?((void*)sindices):((void*)iindices));
+                 GLenum t = (sindices)?GL_UNSIGNED_SHORT:GL_UNSIGNED_INT;
++                GLuint native_ebo = glstate->bind_buffer.want_index;
++                ios_index_trace_native(0, "glDrawElementsInstanced", mode, count,
++                    t, tmp, native_ebo, native_ebo ? NULL : (const GLuint *)iindices,
++                    0, count);
+                 fpe_glDrawElementsInstanced(mode, count, t, tmp, instancecount);
+             }
+         }
+@@ -579,6 +590,9 @@ void APIENTRY_GL4ES gl4es_glDrawRangeElements(GLenum mode, GLuint start, GLuint
+     GLuint old_index = 0;
+     prepare_element_indices(type, indices, count, compiling||intercept, 0,
+         &sindices, &iindices, &owned_indices, &old_index);
++    unsigned long long ios_trace_id = ios_index_trace_ingress("glDrawRangeElements",
++        mode, count, type, indices, (const GLuint *)resolved_element_indices(indices),
++        start, end, 0, compiling||intercept, intercept);
+     if(type==GL_UNSIGNED_INT) {
+         trace_uint_element_route("range", IOS_UINT_ROUTE_RANGE, (const GLuint*)resolved_element_indices(indices), count, compiling||intercept);
+         if(compiling)
+@@ -590,11 +604,21 @@ void APIENTRY_GL4ES gl4es_glDrawRangeElements(GLenum mode, GLuint start, GLuint
+     if (compiling) {
+         renderlist_t *list = glstate->list.active;
+         for (int i=0; i<count; i++) iindices[i]-=start; // normalized against copied vertex span
++        ios_index_trace_deferred(ios_trace_id, iindices, count, start, end - start + 1, 0);
+ 
+         if(globals4es.mergelist && list->stage>=STAGE_DRAW && is_list_compatible(list) && !list->use_glstate && iindices) {
+             list = NewDrawStage(list, mode);
+             if(list->vert) {
++                GLuint ios_trace_offset = list->ilen;
+                 glstate->list.active = arrays_add_renderlist(list, mode, start, end + 1, iindices, count);
++                if(ios_trace_id && !glstate->list.active->ios_index_trace_id) {
++                    glstate->list.active->ios_index_trace_id = ios_trace_id;
++                    glstate->list.active->ios_index_trace_offset = ios_trace_offset;
++                    glstate->list.active->ios_index_trace_count = count;
++                    ios_index_trace_deferred(ios_trace_id,
++                        glstate->list.active->indices + ios_trace_offset,
++                        count, start, end - start + 1, 1);
++                }
+                 release_element_indices(sindices, iindices, owned_indices, old_index);
+                 NewStage(glstate->list.active, STAGE_POSTDRAW);
+                 return;
+@@ -607,6 +631,9 @@ void APIENTRY_GL4ES gl4es_glDrawRangeElements(GLenum mode, GLuint start, GLuint
+         list->indices = iindices;
+         list->ilen = count;
+         list->indice_cap = count;
++        list->ios_index_trace_id = ios_trace_id;
++        list->ios_index_trace_offset = 0;
++        list->ios_index_trace_count = ios_trace_id ? count : 0;
+         //end_renderlist(list);
+         
+         wantBufferIndex(old_index);
+@@ -617,10 +644,14 @@ void APIENTRY_GL4ES gl4es_glDrawRangeElements(GLenum mode, GLuint start, GLuint
+     if (intercept) {
+         renderlist_t *list = NULL;
+         for (int i=0; i<count; i++) iindices[i]-=start;
++        ios_index_trace_deferred(ios_trace_id, iindices, count, start, end - start + 1, 0);
+         list = arrays_to_renderlist(list, mode, start, end + 1);
+         list->indices = iindices;
+         list->ilen = count;
+         list->indice_cap = count;
++        list->ios_index_trace_id = ios_trace_id;
++        list->ios_index_trace_offset = 0;
++        list->ios_index_trace_count = ios_trace_id ? count : 0;
+         list = end_renderlist(list);
+         draw_renderlist(list);
+         free_renderlist(list);
+@@ -628,6 +659,7 @@ void APIENTRY_GL4ES gl4es_glDrawRangeElements(GLenum mode, GLuint start, GLuint
+         
+         return;
+     } else {
++        ios_index_trace_set_active(ios_trace_id, indices);
+         glDrawElementsCommon(mode, 0, count, end+1, sindices, iindices, 1);
+         release_element_indices(sindices, iindices, owned_indices, old_index);
+     }
+@@ -674,6 +706,9 @@ void APIENTRY_GL4ES gl4es_glDrawElements(GLenum mode, GLsizei count, GLenum type
+     GLuint old_index = 0;
+     prepare_element_indices(type, indices, count, compiling||intercept, 0,
+         &sindices, &iindices, &owned_indices, &old_index);
++    unsigned long long ios_trace_id = ios_index_trace_ingress("glDrawElements",
++        mode, count, type, indices, (const GLuint *)resolved_element_indices(indices),
++        0, 0, 0, compiling||intercept, intercept);
+     if(type==GL_UNSIGNED_INT) {
+         trace_uint_element_route("ordinary", IOS_UINT_ROUTE_ORDINARY, (const GLuint*)resolved_element_indices(indices), count, compiling||intercept);
+         if(compiling)
+@@ -686,10 +721,20 @@ void APIENTRY_GL4ES gl4es_glDrawElements(GLenum mode, GLsizei count, GLenum type
+         renderlist_t *list = glstate->list.active;
+         GLsizei min, max;
+         normalize_indices_ui(iindices, &max, &min, count);
++        ios_index_trace_deferred(ios_trace_id, iindices, count, min, max - min + 1, 0);
+ 
+         if(globals4es.mergelist && list->stage>=STAGE_DRAW && is_list_compatible(list) && !list->use_glstate && iindices) {
+             list = NewDrawStage(list, mode);
++            GLuint ios_trace_offset = list->ilen;
+             glstate->list.active = arrays_add_renderlist(list, mode, min, max + 1, iindices, count);
++            if(ios_trace_id && !glstate->list.active->ios_index_trace_id) {
++                glstate->list.active->ios_index_trace_id = ios_trace_id;
++                glstate->list.active->ios_index_trace_offset = ios_trace_offset;
++                glstate->list.active->ios_index_trace_count = count;
++                ios_index_trace_deferred(ios_trace_id,
++                    glstate->list.active->indices + ios_trace_offset,
++                    count, min, max - min + 1, 1);
++            }
+             release_element_indices(sindices, iindices, owned_indices, old_index);
+             NewStage(glstate->list.active, STAGE_POSTDRAW);
+             return;
+@@ -701,6 +746,9 @@ void APIENTRY_GL4ES gl4es_glDrawElements(GLenum mode, GLsizei count, GLenum type
+         list->indices = iindices;
+         list->ilen = count;
+         list->indice_cap = count;
++        list->ios_index_trace_id = ios_trace_id;
++        list->ios_index_trace_offset = 0;
++        list->ios_index_trace_count = ios_trace_id ? count : 0;
+         //end_renderlist(list);
+         
+         wantBufferIndex(old_index);
+@@ -712,16 +760,21 @@ void APIENTRY_GL4ES gl4es_glDrawElements(GLenum mode, GLsizei count, GLenum type
+         renderlist_t *list = NULL;
+         GLsizei min, max;
+         normalize_indices_ui(iindices, &max, &min, count);
++        ios_index_trace_deferred(ios_trace_id, iindices, count, min, max - min + 1, 0);
+         list = arrays_to_renderlist(list, mode, min, max + 1);
+         list->indices = iindices;
+         list->ilen = count;
+         list->indice_cap = count;
++        list->ios_index_trace_id = ios_trace_id;
++        list->ios_index_trace_offset = 0;
++        list->ios_index_trace_count = ios_trace_id ? count : 0;
+         list = end_renderlist(list);
+         draw_renderlist(list);
+         free_renderlist(list);
+         wantBufferIndex(old_index);
+         return;
+     } else {
++        ios_index_trace_set_active(ios_trace_id, indices);
+         glDrawElementsCommon(mode, 0, count, 0, sindices, iindices, 1);
+         release_element_indices(sindices, iindices, owned_indices, old_index);
+     }
+diff --git a/src/gl/list.c b/src/gl/list.c
+index dc6984df..f7492688 100644
+--- a/src/gl/list.c
++++ b/src/gl/list.c
+@@ -5,6 +5,7 @@
+ #include "gl4es.h"
+ #include "glstate.h"
+ #include "init.h"
++#include "indextrace.h"
+ #include "loader.h"
+ #include "buffers.h"
+ 
+@@ -540,6 +541,15 @@ void append_renderlist(renderlist_t *a, renderlist_t *b) {
+         // then append b
+         doadd_renderlist(a, b->mode, b->indices, b->indices?b->ilen:b->len, ilen_b);
+     }
++    if(!a->ios_index_trace_id && b->ios_index_trace_id) {
++        a->ios_index_trace_id = b->ios_index_trace_id;
++        a->ios_index_trace_offset = ilen_a + b->ios_index_trace_offset;
++        a->ios_index_trace_count = b->ios_index_trace_count;
++        if(a->indices && a->ios_index_trace_count)
++            ios_index_trace_deferred(a->ios_index_trace_id,
++                a->indices + a->ios_index_trace_offset,
++                a->ios_index_trace_count, 0, b->len, 1);
++    }
+     // lenghts
+     a->len += b->len;
+     if(a->mode_inits) list_add_modeinit(a, b->mode);
+diff --git a/src/gl/list.h b/src/gl/list.h
+index 8893d380..9f8fc86f 100644
+--- a/src/gl/list.h
++++ b/src/gl/list.h
+@@ -225,6 +225,12 @@ typedef struct _renderlist_t {
+     int         ind_line;
+     GLfloat      *final_colors;
+ 
++    // Diagnostics only: identifies one sampled ingress segment through list
++    // append/merge and replay. These fields never participate in rendering.
++    unsigned long long ios_index_trace_id;
++    GLuint       ios_index_trace_offset;
++    GLuint       ios_index_trace_count;
++
+     int         instanceCount;
+     
+     khash_t(material) *material;
+diff --git a/src/gl/listdraw.c b/src/gl/listdraw.c
+index 28b65eae..4074e27b 100644
+--- a/src/gl/listdraw.c
++++ b/src/gl/listdraw.c
+@@ -1,4 +1,5 @@
+ #include "list.h"
++#include "indextrace.h"
+ 
+ #include "../glx/hardext.h"
+ #include "wrap/gl4es.h"
+@@ -814,6 +815,14 @@ void draw_renderlist(renderlist_t *list) {
+                         vbo_indices = 1;
+                     } else if(prepared)
+                         realize_bufferIndex();
++                    if(prepared)
++                        ios_index_trace_native(list->ios_index_trace_id,
++                            "glDrawElements(renderlist)", mode, list->ilen,
++                            index_type, vbo_indices ? NULL : index_data,
++                            vbo_indices ? list->vbo_indices : 0,
++                            (const GLuint *)indices,
++                            list->ios_index_trace_offset,
++                            list->ios_index_trace_count);
+                     if(prepared && list->instanceCount==1)
+                         gles_glDrawElements(mode, list->ilen, index_type, vbo_indices?NULL:index_data);
+                     else if(prepared) {
+diff --git a/src/gl/indextrace.c b/src/gl/indextrace.c
+new file mode 100644
+index 00000000..9aba847f
+--- /dev/null
++++ b/src/gl/indextrace.c
+@@ -0,0 +1,412 @@
++#include "indextrace.h"
++#include "state.h"
++#include "buffers.h"
++#include "gl4es.h"
++#include "glstate.h"
++#include "../glx/hardext.h"
++#include "../../include/gl4esinit.h"
++
++#include <stdarg.h>
++#include <stdint.h>
++#include <stdio.h>
++#include <string.h>
++
++#define IOS_INDEX_TRACE_WINDOW 64u
++#define IOS_INDEX_TRACE_RECORDS 5u
++#define IOS_INDEX_TRACE_GL_LINES 15u
++
++enum {
++    IOS_INDEX_FAMILY_WORLD = 1,
++    IOS_INDEX_FAMILY_STUDIO_EBO = 2,
++    IOS_INDEX_FAMILY_STUDIO_DECAL = 3
++};
++
++typedef struct {
++    unsigned long long id;
++    unsigned int family;
++    GLenum mode;
++    GLsizei count;
++    GLuint min_index;
++    GLuint max_index;
++    uint32_t checksum;
++    GLuint expected_min;
++    GLuint expected_max;
++    uint32_t expected_checksum;
++    GLuint start;
++    GLuint end;
++    GLint basevertex;
++    uintptr_t caller_pointer;
++    GLuint logical_ebo;
++    GLuint native_ebo;
++    GLsizeiptr ebo_size;
++    GLuint logical_vao;
++    GLuint position_buffer;
++    GLuint position_native_buffer;
++    GLsizeiptr position_size;
++    GLint position_size_components;
++    GLenum position_type;
++    GLsizei position_stride;
++    uintptr_t position_offset;
++    long long highest_legal_vertex;
++    int deferred;
++    int intercept;
++    int deferred_seen;
++    int native_seen;
++} ios_index_trace_record_t;
++
++static void (APIENTRY_GL4ES *ios_index_logger)(const char *);
++static int ios_index_logger_busy;
++static unsigned int ios_index_lines;
++static unsigned long long ios_index_next_id;
++static unsigned long long ios_index_frame;
++static char ios_index_map[64] = "<none>";
++static char ios_index_phase[32] = "startup";
++static unsigned int ios_index_ingress_count;
++static unsigned int ios_index_family_counts[4];
++static unsigned int ios_index_native_count;
++static unsigned int ios_index_deferred_count;
++static unsigned int ios_index_append_count;
++static unsigned int ios_index_seen_families;
++static int ios_index_seen_high;
++static int ios_index_seen_deferred;
++static int ios_index_first_divergence;
++static int ios_index_summary_emitted;
++static ios_index_trace_record_t ios_index_records[IOS_INDEX_TRACE_RECORDS];
++static unsigned int ios_index_record_count;
++static unsigned long long ios_index_active_id;
++static const void *ios_index_active_caller;
++
++static const char *ios_index_family_name(unsigned int family)
++{
++    switch(family) {
++        case IOS_INDEX_FAMILY_WORLD: return "world-client";
++        case IOS_INDEX_FAMILY_STUDIO_EBO: return "studio-ebo";
++        case IOS_INDEX_FAMILY_STUDIO_DECAL: return "studio-decal-client";
++        default: return "unknown";
++    }
++}
++
++static const char *ios_index_type_name(GLenum type)
++{
++    switch(type) {
++        case GL_UNSIGNED_BYTE: return "GL_UNSIGNED_BYTE";
++        case GL_UNSIGNED_SHORT: return "GL_UNSIGNED_SHORT";
++        case GL_UNSIGNED_INT: return "GL_UNSIGNED_INT";
++        default: return "other";
++    }
++}
++
++static unsigned int ios_index_type_bytes(GLenum type)
++{
++    switch(type) {
++        case GL_BYTE:
++        case GL_UNSIGNED_BYTE: return 1;
++        case GL_SHORT:
++        case GL_UNSIGNED_SHORT:
++        case GL_HALF_FLOAT: return 2;
++        case GL_INT:
++        case GL_UNSIGNED_INT:
++        case GL_FLOAT: return 4;
++        case GL_DOUBLE: return 8;
++        default: return 0;
++    }
++}
++
++static uint32_t ios_index_checksum(const GLuint *indices, GLsizei count)
++{
++    uint32_t hash = 2166136261u;
++    const unsigned char *bytes = (const unsigned char *)indices;
++    size_t size = (count > 0) ? (size_t)count * sizeof(GLuint) : 0;
++    for(size_t i = 0; i < size; ++i) {
++        hash ^= bytes[i];
++        hash *= 16777619u;
++    }
++    return hash;
++}
++
++static void ios_index_minmax(const GLuint *indices, GLsizei count, GLuint *minimum, GLuint *maximum)
++{
++    GLuint lo = 0, hi = 0;
++    if(indices && count > 0) {
++        lo = hi = indices[0];
++        for(GLsizei i = 1; i < count; ++i) {
++            if(indices[i] < lo) lo = indices[i];
++            if(indices[i] > hi) hi = indices[i];
++        }
++    }
++    *minimum = lo;
++    *maximum = hi;
++}
++
++static void ios_index_emit(int summary, const char *format, ...)
++{
++    char buffer[1024];
++    va_list args;
++    if(!ios_index_logger || ios_index_logger_busy)
++        return;
++    if((!summary && ios_index_lines >= IOS_INDEX_TRACE_GL_LINES - 1) ||
++       (summary && ios_index_lines >= IOS_INDEX_TRACE_GL_LINES))
++        return;
++    va_start(args, format);
++    vsnprintf(buffer, sizeof(buffer), format, args);
++    va_end(args);
++    buffer[sizeof(buffer) - 1] = '\0';
++    ios_index_logger_busy = 1;
++    ios_index_logger(buffer);
++    ios_index_logger_busy = 0;
++    ++ios_index_lines;
++}
++
++void set_index_trace_logger(void (APIENTRY_GL4ES *callback)(const char *))
++{
++    ios_index_logger = callback;
++    if(callback && ios_index_lines == 0) {
++        ios_index_emit(0, "iOS index trace logger: installed=1 sink=engine-console owner=libref_gl4es reentrant=guarded allocation=none");
++        ios_index_emit(0, "iOS index trace policy: window=%u records<=16 families=world-client,studio-ebo,studio-decal-client mutation=none error_queue=untouched",
++            IOS_INDEX_TRACE_WINDOW);
++    }
++}
++
++void set_index_trace_context(unsigned long long frame, const char *map, const char *phase)
++{
++    ios_index_frame = frame;
++    if(map) {
++        strncpy(ios_index_map, map, sizeof(ios_index_map) - 1);
++        ios_index_map[sizeof(ios_index_map) - 1] = '\0';
++    }
++    if(phase) {
++        strncpy(ios_index_phase, phase, sizeof(ios_index_phase) - 1);
++        ios_index_phase[sizeof(ios_index_phase) - 1] = '\0';
++    }
++}
++
++static unsigned int ios_index_family(void)
++{
++    vertexattrib_t *position = &glstate->vao->vertexattrib[ATT_VERTEX];
++    if(glstate->vao->elements)
++        return IOS_INDEX_FAMILY_STUDIO_EBO;
++    if(position->buffer)
++        return IOS_INDEX_FAMILY_WORLD;
++    return IOS_INDEX_FAMILY_STUDIO_DECAL;
++}
++
++static void ios_index_capture_vertex(ios_index_trace_record_t *record)
++{
++    vertexattrib_t *position = &glstate->vao->vertexattrib[ATT_VERTEX];
++    unsigned int scalar = ios_index_type_bytes(position->type);
++    GLsizei stride = position->stride ? position->stride : position->size * scalar;
++    record->logical_vao = glstate->vao->array;
++    record->position_size_components = position->size;
++    record->position_type = position->type;
++    record->position_stride = stride;
++    record->position_offset = (uintptr_t)position->pointer;
++    record->position_buffer = position->buffer ? position->buffer->buffer : 0;
++    record->position_native_buffer = position->buffer ? position->buffer->real_buffer : position->real_buffer;
++    record->position_size = position->buffer ? position->buffer->size : 0;
++    record->highest_legal_vertex = -1;
++    if(position->buffer && stride > 0 && scalar > 0) {
++        unsigned long long footprint = (unsigned long long)position->size * scalar;
++        unsigned long long offset = record->position_offset;
++        unsigned long long bytes = (unsigned long long)position->buffer->size;
++        if(offset + footprint <= bytes)
++            record->highest_legal_vertex = (long long)((bytes - offset - footprint) / (unsigned long long)stride);
++    }
++}
++
++static ios_index_trace_record_t *ios_index_find(unsigned long long id)
++{
++    for(unsigned int i = 0; i < ios_index_record_count; ++i)
++        if(ios_index_records[i].id == id)
++            return &ios_index_records[i];
++    return NULL;
++}
++
++unsigned long long ios_index_trace_ingress(const char *function, GLenum mode,
++    GLsizei count, GLenum type, const void *caller_indices, const GLuint *resolved,
++    GLuint start, GLuint end, GLint basevertex, int deferred, int intercept)
++{
++    unsigned long long id = ++ios_index_next_id;
++    unsigned int family;
++    GLuint minimum, maximum;
++    uint32_t checksum;
++    int first_family, first_high, first_deferred, sample;
++    ios_index_trace_record_t *record;
++    glbuffer_t *ebo;
++
++    if(type != GL_UNSIGNED_INT || !resolved || count <= 0)
++        return 0;
++    ++ios_index_ingress_count;
++    family = ios_index_family();
++    if(family <= IOS_INDEX_FAMILY_STUDIO_DECAL)
++        ++ios_index_family_counts[family];
++    ios_index_minmax(resolved, count, &minimum, &maximum);
++    checksum = ios_index_checksum(resolved, count);
++    first_family = !(ios_index_seen_families & (1u << family));
++    first_high = maximum > 65535u && !ios_index_seen_high;
++    first_deferred = deferred && !ios_index_seen_deferred;
++    sample = ios_index_ingress_count <= IOS_INDEX_TRACE_WINDOW &&
++        (first_family || first_high || first_deferred) &&
++        ios_index_record_count < IOS_INDEX_TRACE_RECORDS;
++    ios_index_seen_families |= 1u << family;
++    if(first_high) ios_index_seen_high = 1;
++    if(first_deferred) ios_index_seen_deferred = 1;
++    if(!sample) {
++        ios_index_trace_summary_if_ready();
++        return 0;
++    }
++
++    record = &ios_index_records[ios_index_record_count++];
++    memset(record, 0, sizeof(*record));
++    record->id = id;
++    record->family = family;
++    record->mode = mode;
++    record->count = count;
++    record->min_index = minimum;
++    record->max_index = maximum;
++    record->checksum = checksum;
++    record->expected_min = minimum + basevertex;
++    record->expected_max = maximum + basevertex;
++    record->expected_checksum = checksum;
++    record->start = start;
++    record->end = end;
++    record->basevertex = basevertex;
++    record->caller_pointer = (uintptr_t)caller_indices;
++    record->deferred = deferred;
++    record->intercept = intercept;
++    ebo = glstate->vao->elements;
++    if(ebo) {
++        record->logical_ebo = ebo->buffer;
++        record->native_ebo = ebo->real_buffer;
++        record->ebo_size = ebo->size;
++    }
++    ios_index_capture_vertex(record);
++    ios_index_emit(0,
++        "iOS index trace ingress: id=%llu frame=%llu map=%s phase=%s family=%s route=%s function=%s mode=0x%04x count=%d type=%s start=%u end=%u source=%s logical_vao=%u ebo=%u native_ebo=%u ebo_size=%lld offset_or_pointer=0x%llx min=%u max=%u checksum=%08x base=%d pos_enabled=%d pos_type=0x%04x pos_components=%d pos_stride=%d pos_offset=%llu pos_buffer=%u pos_native=%u pos_bytes=%lld highest_legal=%lld",
++        record->id, ios_index_frame, ios_index_map, ios_index_phase,
++        ios_index_family_name(family), deferred ? (intercept ? "intercept" : "deferred") : "direct",
++        function, mode, count, ios_index_type_name(type), start, end,
++        ebo ? "ebo-offset" : "client", record->logical_vao, record->logical_ebo,
++        record->native_ebo, (long long)record->ebo_size,
++        (unsigned long long)record->caller_pointer, minimum, maximum, checksum,
++        basevertex, glstate->vao->vertexattrib[ATT_VERTEX].enabled,
++        record->position_type, record->position_size_components, record->position_stride,
++        (unsigned long long)record->position_offset, record->position_buffer,
++        record->position_native_buffer, (long long)record->position_size,
++        record->highest_legal_vertex);
++    return id;
++}
++
++void ios_index_trace_deferred(unsigned long long id, const GLuint *indices,
++    GLsizei count, GLuint vertex_first, GLuint vertex_count, int appended)
++{
++    ios_index_trace_record_t *record = ios_index_find(id);
++    GLuint minimum, maximum;
++    uint32_t checksum;
++    if(!record || !indices || count <= 0)
++        return;
++    ios_index_minmax(indices, count, &minimum, &maximum);
++    checksum = ios_index_checksum(indices, count);
++    record->expected_min = minimum;
++    record->expected_max = maximum;
++    record->expected_checksum = checksum;
++    ++ios_index_deferred_count;
++    if(appended)
++        ++ios_index_append_count;
++    if(!record->deferred_seen) {
++        record->deferred_seen = 1;
++        ios_index_emit(0,
++            "iOS index trace deferred: id=%llu family=%s route=%s width=32 count=%d normalized_min=%u normalized_max=%u checksum=%08x copied_vertex_first=%u copied_vertex_count=%u ownership=renderlist append_merge=%d append_tracking=enabled lifetime=replay",
++            id, ios_index_family_name(record->family), record->intercept ? "intercept" : "deferred",
++            count, minimum, maximum, checksum, vertex_first, vertex_count, appended);
++    }
++}
++
++void ios_index_trace_set_active(unsigned long long id, const void *caller_indices)
++{
++    ios_index_active_id = id;
++    ios_index_active_caller = caller_indices;
++}
++
++void ios_index_trace_native(unsigned long long id, const char *function,
++    GLenum mode, GLsizei count, GLenum type, const void *indices,
++    GLuint native_ebo, const GLuint *owned_indices, GLuint segment_offset,
++    GLuint segment_count)
++{
++    ios_index_trace_record_t *record;
++    const GLuint *segment;
++    GLuint minimum = 0, maximum = 0;
++    uint32_t checksum = 0;
++    int mismatch = 0;
++    const char *reason = "none";
++    if(!id)
++        id = ios_index_active_id;
++    record = ios_index_find(id);
++    if(!record)
++        return;
++    if(record->native_seen)
++        return;
++    segment = owned_indices ? owned_indices + segment_offset : NULL;
++    if(!segment && native_ebo && glstate->vao->elements &&
++       (uintptr_t)indices <= (uintptr_t)glstate->vao->elements->size &&
++       (unsigned long long)(uintptr_t)indices +
++           (unsigned long long)record->count * sizeof(GLuint) <=
++           (unsigned long long)glstate->vao->elements->size) {
++        segment = (const GLuint *)((const unsigned char *)glstate->vao->elements->data +
++            (uintptr_t)indices);
++        segment_count = record->count;
++        segment_offset = 0;
++    }
++    if(segment && segment_count > 0) {
++        ios_index_minmax(segment, (GLsizei)segment_count, &minimum, &maximum);
++        checksum = ios_index_checksum(segment, (GLsizei)segment_count);
++    }
++    ++ios_index_native_count;
++    record->native_seen = 1;
++    if(type != GL_UNSIGNED_INT) { mismatch = 1; reason = "width"; }
++    else if(segment_count && segment_count != (GLuint)record->count) { mismatch = 1; reason = "count"; }
++    else if(segment && (minimum != record->expected_min || maximum != record->expected_max)) { mismatch = 1; reason = "minmax"; }
++    else if(segment && checksum != record->expected_checksum) { mismatch = 1; reason = "checksum"; }
++    else if(!record->deferred && record->logical_ebo &&
++        (!native_ebo || (uintptr_t)indices != record->caller_pointer)) { mismatch = 1; reason = "ebo-offset-pair"; }
++    else if(!record->deferred && !record->logical_ebo && native_ebo) { mismatch = 1; reason = "client-with-native-ebo"; }
++
++    ios_index_emit(0,
++        "iOS index trace native: id=%llu family=%s function=%s mode=0x%04x type=%s count=%d source=%s pointer_or_offset=0x%llx native_ebo=%u segment_offset=%u segment_count=%u min=%u max=%u checksum=%08x logical_vao=%u pos_buffer=%u pos_native=%u pos_stride=%d pos_offset=%llu expected_count=%d expected_min=%u expected_max=%u expected_checksum=%08x match=%d",
++        id, ios_index_family_name(record->family), function, mode, ios_index_type_name(type), count,
++        native_ebo ? "ebo-offset" : "client", (unsigned long long)(uintptr_t)indices,
++        native_ebo, segment_offset, segment_count, minimum, maximum, checksum,
++        glstate->vao->array, record->position_buffer, record->position_native_buffer,
++        record->position_stride, (unsigned long long)record->position_offset,
++        record->count, record->expected_min, record->expected_max,
++        record->expected_checksum, !mismatch);
++    if(mismatch && !ios_index_first_divergence) {
++        ios_index_first_divergence = 1;
++        ios_index_emit(0,
++            "iOS index trace first divergence: id=%llu family=%s field=%s ingress_type=GL_UNSIGNED_INT native_type=%s ingress_count=%d native_count=%d ingress_pointer=0x%llx native_pointer=0x%llx ingress_ebo=%u native_ebo=%u",
++            id, ios_index_family_name(record->family), reason, ios_index_type_name(type),
++            record->count, count, (unsigned long long)record->caller_pointer,
++            (unsigned long long)(uintptr_t)indices, record->logical_ebo, native_ebo);
++    }
++    if(id == ios_index_active_id) {
++        ios_index_active_id = 0;
++        ios_index_active_caller = NULL;
++    }
++    ios_index_trace_summary_if_ready();
++}
++
++void ios_index_trace_summary_if_ready(void)
++{
++    if(ios_index_summary_emitted || ios_index_ingress_count < IOS_INDEX_TRACE_WINDOW)
++        return;
++    ios_index_summary_emitted = 1;
++    ios_index_emit(1,
++        "iOS index trace summary: window=%u ingress=%u native=%u deferred=%u append_merge=%u world=%u studio_ebo=%u studio_decal=%u high=%d first_divergence=%d covered_mask=0x%02x uncovered=%s records=%u cap=16",
++        IOS_INDEX_TRACE_WINDOW, ios_index_ingress_count, ios_index_native_count,
++        ios_index_deferred_count, ios_index_append_count,
++        ios_index_family_counts[IOS_INDEX_FAMILY_WORLD],
++        ios_index_family_counts[IOS_INDEX_FAMILY_STUDIO_EBO],
++        ios_index_family_counts[IOS_INDEX_FAMILY_STUDIO_DECAL], ios_index_seen_high,
++        ios_index_first_divergence, ios_index_seen_families,
++        (ios_index_seen_families & 0x0eu) == 0x0eu ? "none" : "one-or-more-families",
++        ios_index_lines + 1);
++}
+diff --git a/src/gl/indextrace.h b/src/gl/indextrace.h
+new file mode 100644
+index 00000000..40d97a2b
+--- /dev/null
++++ b/src/gl/indextrace.h
+@@ -0,0 +1,18 @@
++#ifndef _GL4ES_INDEXTRACE_H_
++#define _GL4ES_INDEXTRACE_H_
++
++#include "gles.h"
++
++unsigned long long ios_index_trace_ingress(const char *function, GLenum mode,
++    GLsizei count, GLenum type, const void *caller_indices, const GLuint *resolved,
++    GLuint start, GLuint end, GLint basevertex, int deferred, int intercept);
++void ios_index_trace_deferred(unsigned long long id, const GLuint *indices,
++    GLsizei count, GLuint vertex_first, GLuint vertex_count, int appended);
++void ios_index_trace_set_active(unsigned long long id, const void *caller_indices);
++void ios_index_trace_native(unsigned long long id, const char *function,
++    GLenum mode, GLsizei count, GLenum type, const void *indices,
++    GLuint native_ebo, const GLuint *owned_indices, GLuint segment_offset,
++    GLuint segment_count);
++void ios_index_trace_summary_if_ready(void);
++
++#endif

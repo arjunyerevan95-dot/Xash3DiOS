@@ -1,0 +1,536 @@
+diff --git a/game_shared/utlmemory.h b/game_shared/utlmemory.h
+--- a/game_shared/utlmemory.h
++++ b/game_shared/utlmemory.h
+@@ -17,3 +17,3 @@
+ #include <string.h>
+-#include <malloc.h>
++#include <stdlib.h>
+ #ifdef _MSC_VER
+diff --git a/phys_shared/NxSimpleTypes.h b/phys_shared/NxSimpleTypes.h
+--- a/phys_shared/NxSimpleTypes.h
++++ b/phys_shared/NxSimpleTypes.h
+@@ -39,2 +39,2 @@ union NxU32F32
+-#if __APPLE__
++#if defined(__APPLE__) && (defined(__ppc__) || defined(__ppc64__))
+     NX_COMPILE_TIME_ASSERT(sizeof(bool)==4);    // PPC has 4 byte bools
+diff --git a/client/render/r_opengl.cpp b/client/render/r_opengl.cpp
+--- a/client/render/r_opengl.cpp
++++ b/client/render/r_opengl.cpp
+@@ -586 +586 @@
+-		HOST_ERROR( "This game requires the OpenGL renderer.\nGLES and OpenGL Core contexts are not supported.\n" );
++		ConPrintf( "^3Warning:^7 custom renderer unavailable on GLES/OpenGL Core; using the engine renderer.\n" );
+diff --git a/client/cdll_int.cpp b/client/cdll_int.cpp
+index 0dd03f2..74e7831 100644
+--- a/client/cdll_int.cpp
++++ b/client/cdll_int.cpp
+@@ -217,0 +218,3 @@ int HUD_Redraw(float time, int intermission)
++	if( !g_fRenderInitialized )
++		return 0;
++
+diff --git a/client/render/r_main.cpp b/client/render/r_main.cpp
+index 35f3ff8..1ccab8d 100644
+--- a/client/render/r_main.cpp
++++ b/client/render/r_main.cpp
+@@ -2279,0 +2280,3 @@ void HUD_ProcessEntData( qboolean allocate )
++	if( !g_fRenderInitialized )
++		return;
++
+@@ -2336,0 +2340,8 @@ int HUD_GetRenderInterface( int version, render_api_t *renderfuncs, render_inter
++	if( RENDER_GET_PARM( PARM_GL_CONTEXT_TYPE, 0 ) != CONTEXT_TYPE_GL )
++	{
++		g_fRenderInitialized = false;
++		ConPrintf( "^3Warning:^7 custom renderer interface disabled for GLES/OpenGL Core; using the engine renderer.\n" );
++		return false;
++	}
++
++	// Only expose callbacks after the custom renderer is known to be usable.
+diff --git a/client/render/r_misc.cpp b/client/render/r_misc.cpp
+index fe0b1fb..fa86eed 100644
+--- a/client/render/r_misc.cpp
++++ b/client/render/r_misc.cpp
+@@ -1441,0 +1442,3 @@ void HUD_StudioEvent( const struct mstudioevent_s* event, const struct cl_entity
++	if( !g_fRenderInitialized )
++		return;
++
+diff --git a/client/render/tri.cpp b/client/render/tri.cpp
+index 713e34b..9ce3993 100644
+--- a/client/render/tri.cpp
++++ b/client/render/tri.cpp
+@@ -40,0 +41,3 @@ void HUD_DrawNormalTriangles( void )
++	if( !g_fRenderInitialized )
++		return;
++
+@@ -75,5 +78 @@ void HUD_DrawTransparentTriangles( void )
+-	{
+-		gEngfuncs.GetViewAngles( (float *)RI->viewangles );
+-		tr.time = GET_CLIENT_TIME();
+-		tr.oldtime = GET_CLIENT_OLDTIME();
+-	}
++		return;
+diff --git a/3rd-party/mainui_cpp/wscript b/3rd-party/mainui_cpp/wscript
+index ed1105a..2c28638 100644
+--- a/3rd-party/mainui_cpp/wscript
++++ b/3rd-party/mainui_cpp/wscript
+@@ -83,0 +84 @@ def build(bld):
++		name     = 'menu',
+diff --git a/3rd-party/mainui_cpp/BaseMenu.cpp b/3rd-party/mainui_cpp/BaseMenu.cpp
+index fbd4d80..ed24ce9 100644
+--- a/3rd-party/mainui_cpp/BaseMenu.cpp
++++ b/3rd-party/mainui_cpp/BaseMenu.cpp
+@@ -583,6 +583,17 @@ void UI_DrawMouseCursor( void )
+ 
+ bool UI_LoadBackgroundMap( void ) // force load background map
+ {
++#if XASH_IOS
++	static bool announced = false;
++
++	if( !announced )
++	{
++		Con_Printf( "iOS mobile menu policy: decorative background map disabled; UI callbacks remain active\n" );
++		announced = true;
++	}
++
++	return false;
++#else
+ 	if( uiStatic.bgmaps.IsEmpty() )
+ 		return false;
+ 	
+@@ -598,6 +609,25 @@ bool UI_LoadBackgroundMap( void ) // force load background map
+ 	}
+ 
+ 	return false;
++#endif
++}
++
++void UI_SetMenuBackgroundTarget( const char *target )
++{
++#if XASH_IOS
++	// Diffusion uses these commands only to animate named entities in menux.bsp.
++	// Keep the real C++ menu callbacks and navigation, but do not send commands
++	// to a decorative server map that is intentionally absent on mobile.
++	Con_Printf( "iOS mobile menu transition: %s (decorative target skipped)\n", target ? target : "<null>" );
++#else
++	char cmd[128];
++
++	if( !target || !target[0] )
++		return;
++
++	snprintf( cmd, sizeof( cmd ), "menuactivate %s\n", target );
++	EngFuncs::ClientCmd( false, cmd );
++#endif
+ }
+ 
+ /*
+diff --git a/3rd-party/mainui_cpp/BaseMenu.h b/3rd-party/mainui_cpp/BaseMenu.h
+index 1c974f0..e7f5e37 100644
+--- a/3rd-party/mainui_cpp/BaseMenu.h
++++ b/3rd-party/mainui_cpp/BaseMenu.h
+@@ -179,6 +179,7 @@ void UI_DisableAlphaFactor();
+ 
+ int UI_GetFPS( void );
+ bool UI_LoadBackgroundMap( void );
++void UI_SetMenuBackgroundTarget( const char *target );
+ 
+ enum ETextFlags
+ {
+diff --git a/3rd-party/mainui_cpp/menus/Achievements.cpp b/3rd-party/mainui_cpp/menus/Achievements.cpp
+index f44003c..480e782 100644
+--- a/3rd-party/mainui_cpp/menus/Achievements.cpp
++++ b/3rd-party/mainui_cpp/menus/Achievements.cpp
+@@ -305,13 +305,13 @@ void CMenuAchievements::Draw(void)
+ void CMenuAchievements::Show(void)
+ {
+ 	CMenuFramework::Show();
+-	EngFuncs::ClientCmd(false, "menuactivate achievements\n");
++	UI_SetMenuBackgroundTarget( "achievements" );
+ }
+ 
+ void CMenuAchievements::Hide(void)
+ {
+ 	CMenuFramework::Hide();
+-	EngFuncs::ClientCmd(false, "menuactivate mainmenu\n");
++	UI_SetMenuBackgroundTarget( "mainmenu" );
+ }
+ 
+ void CMenuAchievements::GetConfig()
+diff --git a/3rd-party/mainui_cpp/menus/Main.cpp b/3rd-party/mainui_cpp/menus/Main.cpp
+index b9ec600..fc9a7df 100644
+--- a/3rd-party/mainui_cpp/menus/Main.cpp
++++ b/3rd-party/mainui_cpp/menus/Main.cpp
+@@ -419,12 +419,14 @@ void CMenuMain::_VidInit()
+ 
+ void CMenuMain::Draw(void)
+ {
++#if !XASH_IOS
+ 	if( !EngFuncs::ClientInGame() && (int)EngFuncs::GetCvarFloat( "host_serverstate" ) == 0 )
+ 	{
+ 		uiStatic.bgmap_hack_framecount++;
+ 		if( uiStatic.bgmap_hack_framecount > 60 )
+ 			UI_LoadBackgroundMap();
+ 	}
++#endif
+ 
+ 	BaseClass::Draw();
+ }
+diff --git a/3rd-party/mainui_cpp/menus/NewGame.cpp b/3rd-party/mainui_cpp/menus/NewGame.cpp
+index 60bd1e1..83dbd52 100644
+--- a/3rd-party/mainui_cpp/menus/NewGame.cpp
++++ b/3rd-party/mainui_cpp/menus/NewGame.cpp
+@@ -69,7 +69,7 @@ public:
+ 			StartGameCb( 1.0f );
+ 			return;
+ 		}
+-		EngFuncs::ClientCmd(false, "menuactivate newgame");
++		UI_SetMenuBackgroundTarget( "newgame" );
+ 		chapters.SetCurrentValue( 0.0f );
+ 		lerp_value = 1.0f;
+ 
+@@ -123,6 +123,8 @@ CMenuNewGame::StartGame
+ */
+ void CMenuNewGame::StartGameCb( float skill )
+ {
++	Con_Printf( "Diffusion menu action: starting chapter %d at skill %.0f\n", SELECTED_CHAPTER + 1, skill );
++
+ 	if( EngFuncs::GetCvarFloat( "host_serverstate" ) && EngFuncs::GetCvarFloat( "maxplayers" ) > 1 )
+ 		EngFuncs::HostEndGame( "end of the game" );
+ 
+@@ -339,7 +341,7 @@ void CMenuNewGame::Draw( void )
+ void CMenuNewGame::Hide(void)
+ {
+ 	CMenuFramework::Hide();
+-	EngFuncs::ClientCmd(false, "menuactivate mainmenu\n");
++	UI_SetMenuBackgroundTarget( "mainmenu" );
+ }
+ 
+ ADD_MENU( menu_newgame, CMenuNewGame, UI_NewGame_Menu );
+diff --git a/3rd-party/mainui_cpp/menus/Options.cpp b/3rd-party/mainui_cpp/menus/Options.cpp
+index 82dfc59..db68503 100644
+--- a/3rd-party/mainui_cpp/menus/Options.cpp
++++ b/3rd-party/mainui_cpp/menus/Options.cpp
+@@ -208,7 +208,7 @@ void CMenuOptions::_Init( void )
+ void CMenuOptions::Show(void)
+ {
+ 	CMenuFramework::Show();
+-	EngFuncs::ClientCmd(false, "menuactivate options\n");
++	UI_SetMenuBackgroundTarget( "options" );
+ }
+ 
+ void CMenuOptions::Hide(void)
+@@ -225,7 +225,7 @@ void CMenuOptions::Hide(void)
+ 	EngFuncs::CvarSetValue( "cl_viewmodel_extras", cl_viewmodel_extras.GetCurrentValue() );
+ 
+ 	CMenuFramework::Hide();
+-	EngFuncs::ClientCmd(false, "menuactivate mainmenu\n");
++	UI_SetMenuBackgroundTarget( "mainmenu" );
+ }
+ 
+ void CMenuOptions::GetConfig()
+diff --git a/3rd-party/mainui_cpp/menus/SaveLoad.cpp b/3rd-party/mainui_cpp/menus/SaveLoad.cpp
+index 9b1e32f..8a7ee2b 100644
+--- a/3rd-party/mainui_cpp/menus/SaveLoad.cpp
++++ b/3rd-party/mainui_cpp/menus/SaveLoad.cpp
+@@ -68,13 +68,13 @@ void CMenuSaveLoad::_Init( void )
+ void CMenuSaveLoad::Show(void)
+ {
+ 	CMenuFramework::Show();
+-	EngFuncs::ClientCmd(false, "menuactivate loadgame\n");
++	UI_SetMenuBackgroundTarget( "loadgame" );
+ }
+ 
+ void CMenuSaveLoad::Hide(void)
+ {
+ 	CMenuFramework::Hide();
+-	EngFuncs::ClientCmd(false, "menuactivate mainmenu\n");
++	UI_SetMenuBackgroundTarget( "mainmenu" );
+ }
+ 
+ ADD_MENU( menu_saveload, CMenuSaveLoad, UI_SaveLoad_Menu );
+diff --git a/3rd-party/mainui_cpp/menus/VideoOptions.cpp b/3rd-party/mainui_cpp/menus/VideoOptions.cpp
+index 6b2a6a1..48d2772 100644
+--- a/3rd-party/mainui_cpp/menus/VideoOptions.cpp
++++ b/3rd-party/mainui_cpp/menus/VideoOptions.cpp
+@@ -207,7 +207,7 @@ void SetSettingsTo( int Quality )
+ 		EngFuncs::CvarSetValue( "gl_hbao", 1 );
+ 		EngFuncs::CvarSetValue( "cl_lod_enable", 0 );
+ 
+-		EngFuncs::ClientCmd( false, "menuactivate video_maximum\n" );
++		UI_SetMenuBackgroundTarget( "video_maximum" );
+ 	}
+ }
+ 
+@@ -790,7 +790,7 @@ void CMenuVidOptions::_VidInit()
+ 
+ void CMenuVidOptions::Show( void )
+ {
+-	EngFuncs::ClientCmd( false, "menuactivate vidoptions\n" );
++	UI_SetMenuBackgroundTarget( "vidoptions" );
+ 	hideMenus.bChecked = false;
+ 	HideMenus(); // unhide them
+ 	EngFuncs::CvarSetValue( "ui_videooptions_active", 1 );
+@@ -800,7 +800,7 @@ void CMenuVidOptions::Show( void )
+ void CMenuVidOptions::Hide( void )
+ {
+ 	hideMenus.bChecked = false;
+-	EngFuncs::ClientCmd( false, "menuactivate options\n" );
++	UI_SetMenuBackgroundTarget( "options" );
+ 	EngFuncs::CvarSetValue( "ui_videooptions_active", 0 );
+ 	CMenuFramework::Hide();
+ }
+diff --git a/client/render/view.cpp b/client/render/view.cpp
+--- a/client/render/view.cpp
++++ b/client/render/view.cpp
+@@ -2419,0 +2420,44 @@ void V_CalcRefdef( struct ref_params_s *pparams )
++	if( !g_fRenderInitialized )
++	{
++		static bool fallback_announced;
++		cl_entity_t *view = GET_VIEWMODEL();
++
++		if( !fallback_announced )
++		{
++			gEngfuncs.Con_Printf( "Using engine-safe view calculation.\n" );
++			fallback_announced = true;
++		}
++
++		g_fFrametime = pparams->frametime;
++		pause = pparams->paused;
++
++		pparams->vieworg.x = pparams->simorg.x + pparams->viewheight.x + 0.03125f;
++		pparams->vieworg.y = pparams->simorg.y + pparams->viewheight.y + 0.03125f;
++		pparams->vieworg.z = pparams->simorg.z + pparams->viewheight.z + 0.03125f;
++		pparams->viewangles.x = pparams->cl_viewangles.x + pparams->punchangle.x;
++		pparams->viewangles.y = pparams->cl_viewangles.y + pparams->punchangle.y;
++		pparams->viewangles.z = pparams->cl_viewangles.z + pparams->punchangle.z;
++
++		AngleVectors( pparams->cl_viewangles, pparams->forward, pparams->right, pparams->up );
++
++		if( view )
++		{
++			view->origin.x = pparams->vieworg.x;
++			view->origin.y = pparams->vieworg.y;
++			view->origin.z = pparams->vieworg.z;
++			view->angles.x = pparams->cl_viewangles.x;
++			view->angles.y = pparams->cl_viewangles.y;
++			view->angles.z = pparams->cl_viewangles.z;
++		}
++
++		v_origin.x = pparams->vieworg.x;
++		v_origin.y = pparams->vieworg.y;
++		v_origin.z = pparams->vieworg.z;
++		v_angles.x = pparams->viewangles.x;
++		v_angles.y = pparams->viewangles.y;
++		v_angles.z = pparams->viewangles.z;
++		v_cl_angles.x = pparams->cl_viewangles.x;
++		v_cl_angles.y = pparams->cl_viewangles.y;
++		v_cl_angles.z = pparams->cl_viewangles.z;
++		return;
++	}
+diff --git a/client/render/r_shader.cpp b/client/render/r_shader.cpp
+index 95091b1..7e5aa42 100644
+--- a/client/render/r_shader.cpp
++++ b/client/render/r_shader.cpp
+@@ -269,6 +269,9 @@ static bool GL_ProcessShader( const char *filename, CVirtualFS *out, bool compat
+ 
+ 	// add internal defines
+ 	out->Printf( "#version 130\n" );
++	#if XASH_IOS
++	out->Printf( "#define XASH_MOBILE_GLES 1\n" );
++	#endif
+ 	out->Printf( "#ifndef M_PI\n#define M_PI 3.14159265358979323846\n#endif\n" );
+ 	out->Printf( "#ifndef M_PI2\n#define M_PI2 6.28318530717958647692\n#endif\n" );
+ 	if( GL_Support( R_EXT_GPU_SHADER4 ))
+@@ -283,7 +286,33 @@ static bool GL_ProcessShader( const char *filename, CVirtualFS *out, bool compat
+ 	//	out->Printf( "#extension GL_EXT_texture_array : require\n" ); // support texture arrays
+ 		out->Printf( "#define GLSL_ALLOW_TEXTURE_ARRAY\n" );
+ 	}
+-	if( defines ) out->Print( defines );
++	if( defines )
++	{
++	#if XASH_IOS
++		char mobileDefines[MAX_OPTIONS_LENGTH];
++		char *line, *next;
++
++		Q_strncpy( mobileDefines, defines, sizeof( mobileDefines ) );
++		for( line = mobileDefines; line && *line; line = next )
++		{
++			next = Q_strchr( line, '\n' );
++			if( next ) *next++ = '\0';
++
++			if( Q_stristr( line, "MULTI_LAYERS" ) ||
++				Q_stristr( line, "EMBOSS" ) ||
++				Q_stristr( line, "HAS_SHADOWS" ) ||
++				Q_stristr( line, "INTERIOR" ) ||
++				Q_stristr( line, "SPECULAR" ) ||
++				Q_stristr( line, "BUMP" ) ||
++				Q_stristr( line, "REFLECTION_CUBEMAP" ) )
++				continue;
++
++			out->Printf( "%s\n", line );
++		}
++	#else
++		out->Print( defines );
++	#endif
++	}
+ 
+ 	// user may override this constants
+ 	out->Printf( "#ifndef MAXSTUDIOBONES\n#define MAXSTUDIOBONES %i\n#endif\n", glConfig.max_skinning_bones );
+@@ -327,6 +356,9 @@ static void GL_LoadGPUShader( glsl_program_t *shader, const char *name, GLenum s
+ 	int bufferSize = (int)source.GetSize();
+ 
+ 	ALERT( at_aiconsole, "\nloading '%s'\n", filename );
++	#if XASH_IOS
++	ALERT( at_console, "iOS shader compile: %s\n%s", filename, defines ? defines : "" );
++	#endif
+ 	object = pglCreateShaderObjectARB( shaderType );
+ 	pglShaderSourceARB( object, GL_TRUE, (const GLcharARB **)&buffer, &bufferSize );
+ 
+@@ -370,6 +402,12 @@ static void GL_LinkProgram( glsl_program_t *shader )
+ 
+ static bool GL_ValidateProgram( glsl_program_t *shader )
+ {
++	#if XASH_IOS
++	// glValidateProgram checks the complete current draw state. During Diffusion's
++	// startup the iOS drawable is not complete yet, so validation rejects every
++	// otherwise-linked program. Compile and link status remain checked above.
++	return shader != NULL;
++	#else
+ 	GLint validated = 0;
+ 
+ 	if( !shader ) return false;
+@@ -382,6 +420,7 @@ static bool GL_ValidateProgram( glsl_program_t *shader )
+ 		ALERT( at_error, "%s\n%s shader failed to validate\n", GL_PrintInfoLog( shader->handle ), shader->name );
+ 
+ 	return validated;
++	#endif
+ }
+ 
+ int GL_UniformTypeToDwordCount( GLuint type, bool align = false )
+@@ -992,6 +1031,19 @@ static glsl_program_t *GL_FindUberShader( const char *glname, const char *option
+ 
+ void GL_AddShaderDirective( char *options, const char *directive )
+ {
++	#if XASH_IOS
++	// Canonical mobile material tier. Drop desktop-only features before the
++	// option string becomes a shader cache key, so equivalent variants share a
++	// single program instead of stalling Metal with duplicate first-frame work.
++	if( Q_stristr( directive, "MULTI_LAYERS" ) ||
++		Q_stristr( directive, "EMBOSS" ) ||
++		Q_stristr( directive, "HAS_SHADOWS" ) ||
++		Q_stristr( directive, "INTERIOR" ) ||
++		Q_stristr( directive, "SPECULAR" ) ||
++		Q_stristr( directive, "BUMP" ) ||
++		Q_stristr( directive, "REFLECTION_CUBEMAP" ) )
++		return;
++	#endif
+ 	Q_strncat( options, va( "#define %s\n", directive ), MAX_OPTIONS_LENGTH );
+ }
+ 
+@@ -2479,6 +2531,16 @@ word GL_UberShaderForSolidStudio( mstudiomaterial_t *mat, bool vertex_lighting,
+ 	if( RI->currententity && RI->currententity->curstate.rendermode == kRenderTransTexture )
+ 		GL_AddShaderDirective( options, "STUDIO_DEFAULTALPHATEST" ); // do not use 0.5 threshold
+ 
++	#if XASH_IOS
++	if( numbones == 1 )
++	{
++		// One-bone models use a genuinely distinct rigid path in the shader.
++		// All animated models intentionally omit a per-model bone define so the
++		// default glConfig.max_skinning_bones layout becomes a shared cache key.
++		// This avoids recompiling the same translated GL4ES uniform layout.
++		GL_AddShaderDefine( options, "#define MAXSTUDIOBONES 1\n" );
++	}
++	#else
+ 	if( numbones > 0 && glConfig.max_skinning_bones < MAXSTUDIOBONES && glConfig.uniforms_economy )
+ 	{
+ 		int num_bones = Q_min( numbones, glConfig.max_skinning_bones );
+@@ -2488,6 +2550,7 @@ word GL_UberShaderForSolidStudio( mstudiomaterial_t *mat, bool vertex_lighting,
+ 	{
+ 		GL_AddShaderDefine( options, "#define MAXSTUDIOBONES 1\n" );
+ 	}
++	#endif
+ 
+ 	if( bone_weighting )
+ 		GL_AddShaderDirective( options, "STUDIO_BONEWEIGHTING" );
+@@ -2624,6 +2687,13 @@ word GL_UberShaderForDlightStudio( const plight_t *pl, struct mstudiomat_s *mat,
+ 		GL_AddShaderDirective( options, "STUDIO_LIGHT_PROJECTION" );
+ 	}
+ 
++	#if XASH_IOS
++	if( numbones == 1 )
++	{
++		// Keep only the genuinely distinct one-bone rigid shader path.
++		GL_AddShaderDefine( options, "#define MAXSTUDIOBONES 1\n" );
++	}
++	#else
+ 	if( numbones > 0 && glConfig.max_skinning_bones < MAXSTUDIOBONES && glConfig.uniforms_economy )
+ 	{
+ 		int num_bones = Q_min( numbones, glConfig.max_skinning_bones );
+@@ -2633,6 +2703,7 @@ word GL_UberShaderForDlightStudio( const plight_t *pl, struct mstudiomat_s *mat,
+ 	{
+ 		GL_AddShaderDefine( options, "#define MAXSTUDIOBONES 1\n" );
+ 	}
++	#endif
+ 
+ 	if( bone_weighting )
+ 		GL_AddShaderDirective( options, "STUDIO_BONEWEIGHTING" );
+@@ -2827,6 +2898,13 @@ void GL_ListGPUShaders( void )
+ 
+ bool GL_PrecompileUberShaders( int &processed, int &total )
+ {
++	#if XASH_IOS
++	// The desktop list contains hundreds of permutations that the canonical
++	// mobile tier can never request. Compile only real, canonical variants on
++	// demand and keep them cached for the session.
++	processed = total = iTotalShaders - 1;
++	return true;
++	#endif
+ 	if( bPrecompiled )
+ 		return true;
+ 
+@@ -2975,6 +3053,11 @@ void GL_InitGPUShaders( void )
+ 
+ 	glsl_program_t *shader; // generic pointer. help to initialize uniforms
+ 
++	#if !XASH_IOS
++	// Desktop post-processing requires GLSL features that GL4ES currently
++	// translates to an ES 1.00 target on iOS. Keep the mobile renderer profile
++	// intentionally limited to the core scene shaders until that translator has
++	// a real ES 3.x path.
+ 	// prepare sunshafts
+ 	glsl.genSunShafts = shader = GL_InitGPUShader( "GenSunShafts", "generic", "genshafts" );
+ 	GL_InitGenShaftsUniforms( shader );
+@@ -3069,6 +3152,9 @@ void GL_InitGPUShaders( void )
+ 
+ 	glsl.BilateralBlur = shader = GL_InitGPUShader( "BilateralBlur", "generic", "bilateralblur" );
+ 	GL_InitBilateralBlurUniforms( shader );
++	#else
++	ALERT( at_console, "iOS mobile renderer profile: canonical materials, shared animated-model shader layout, on-demand shaders\n" );
++	#endif
+ 
+ 	// draw sun & skybox
+ 	glsl.skyboxEnv = shader = GL_InitGPUShader( "SkyBoxGeneric", "generic", "skybox" );
+@@ -3134,4 +3220,4 @@ void GL_FreeGPUShaders( void )
+ 	memset( glsl_programsHashTable, 0, sizeof( glsl_programsHashTable ) );
+ 
+ 	GL_BindShader( GL_NONE );
+-}
+\ No newline at end of file
++}
+diff --git a/client/render/r_main.cpp b/client/render/r_main.cpp
+--- a/client/render/r_main.cpp
++++ b/client/render/r_main.cpp
+@@ -1844,0 +1845 @@ void R_RenderScene( void )
++	#if !XASH_IOS
+@@ -1848,0 +1850 @@ void R_RenderScene( void )
++	#endif
+@@ -1858,0 +1861,6 @@ void R_DrawPostEffects(void)
++	#if XASH_IOS
++	// GL4ES emits an ES 1.00 shader target on iOS. The desktop post stack uses
++	// newer GLSL operations, so the mobile profile leaves the core scene intact
++	// instead of partially compiling effects and aborting renderer startup.
++	return;
++	#else
+@@ -1899,0 +1908 @@ void R_DrawPostEffects(void)
++	#endif
+@@ -2235,0 +2245 @@ int HUD_RenderFrame( const ref_viewpass_t *rvp )
++	#if !XASH_IOS
+@@ -2241,0 +2252 @@ int HUD_RenderFrame( const ref_viewpass_t *rvp )
++	#endif

@@ -108,6 +108,7 @@ static void IOS_PrepareView( void )
 
 void IOS_LaunchDialog( void )
 {
+	static NSString *const ordinaryBootstrapArgs = @"-dev 2 -log -game diffusion -ref gl4es";
 	NSLog(@"System Version is %@",[[UIDevice currentDevice] systemVersion]);
 	NSString *ver = [[UIDevice currentDevice] systemVersion];
 	g_iOSVer = [ver floatValue];
@@ -132,18 +133,13 @@ void IOS_LaunchDialog( void )
 	{
 		ret = fread( &settings, sizeof( settings ), 1, settingsfile ) == 1;
 	}
+	(void)ret;
 
 
 	[alert addTextFieldWithConfigurationHandler:^(UITextField *textField) {
 		[textField setPlaceholder:@"Launch Options"];
-		if (ret && ( settings.magic == SETTINGS_MAGIC ))
-		{
-			[textField setText:@(settings.args)];
-		}
-		else
-		{
-			[textField setText:@"-dev 2 -log"];
-		}
+		[textField setText:ordinaryBootstrapArgs];
+		[textField setEnabled:NO];
 		[textField setAutocapitalizationType:UITextAutocapitalizationTypeNone];
 	}];
 

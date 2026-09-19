@@ -1,3 +1,4 @@
 *.c	text eol=lf diff=cpp
 *.h	text eol=lf diff=cpp
 wscript text eol=lf diff=python
+scripts/ios/*.patch text eol=lf whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab

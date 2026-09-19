@@ -1,0 +1,503 @@
+diff --git a/engine/studio.h b/engine/studio.h
+index daaa8866..9838ee82 100644
+--- a/engine/studio.h
++++ b/engine/studio.h
+@@ -678,6 +678,19 @@ typedef struct vbomesh_s
+ 	unsigned int vbo, vao, ibo; // buffer objects
+ 
+ 	unsigned int cacheSize;	// debug info: uploaded cache size for this buffer
++
++#if defined( XASH_IOS )
++	// Work Order 49 diagnostics only. These immutable producer facts are
++	// populated while the per-mesh buffers are built and never affect draws.
++	unsigned int wo49_aggregateVerts;
++	unsigned int wo49_layout;
++	unsigned int wo49_stride;
++	unsigned int wo49_indexMin;
++	unsigned int wo49_indexMax;
++	unsigned int wo49_indexChecksum;
++	unsigned int wo49_vertexChecksum;
++	unsigned int wo49_positionChecksum;
++#endif
+ } vbomesh_t;
+ 
+ // each mstudiotexture_t has a material
+@@ -724,4 +737,4 @@ typedef struct mposebone_s
+ 	matrix3x4		posetobone[MAXSTUDIOBONES];
+ } mposetobone_t;
+ 
+-#endif//STUDIO_H
+\ No newline at end of file
++#endif//STUDIO_H
+diff --git a/client/render/r_studio.h b/client/render/r_studio.h
+index 116f1431..0d97fdf1 100644
+--- a/client/render/r_studio.h
++++ b/client/render/r_studio.h
+@@ -197,6 +197,9 @@ typedef struct
+ 	cl_entity_t *parent;		// pointer to parent entity
+ 	model_t *model;
+ 	bool additive;		// additive mesh
++#if defined( XASH_IOS )
++	unsigned long long wo49_token;	// diagnostics-only producer correlation
++#endif
+ } gl_studiomesh_t;
+ 
+ class CBaseBoneSetup : public CStudioBoneSetup
+@@ -324,7 +327,15 @@ class CStudioModelRenderer
+ 
+ 	virtual void AddBodyPartToDrawList( studiohdr_t *phdr, mbodypart_t *bodyparts, int bodypart, bool lightpass, bool solid );
+ 
+-	inline void DrawMeshFromBuffer( const vbomesh_t *mesh );
++#if defined( XASH_IOS )
++	unsigned long long WO49ProduceTopology( const vbomesh_t *mesh );
++#endif
++
++	inline void DrawMeshFromBuffer( const vbomesh_t *mesh
++#if defined( XASH_IOS )
++		, unsigned long long wo49_token
++#endif
++	);
+ 
+ //	inline void QSortStudioMeshes( gl_studiomesh_t *meshes, int Li, int Ri );
+ 
+diff --git a/client/render/r_studio.cpp b/client/render/r_studio.cpp
+index 4fd723ee..a0357213 100644
+--- a/client/render/r_studio.cpp
++++ b/client/render/r_studio.cpp
+@@ -42,6 +42,149 @@ CStudioModelRenderer g_StudioRenderer;
+ 
+ #define MAX_STUDIO_SCALE 32.0f
+ 
++#if defined( XASH_IOS )
++#define WO49_TOPOLOGY_VERSION 1u
++#define WO49_TOPOLOGY_ATTR_CAP 16u
++
++typedef struct wo49_topology_attr_desc_s
++{
++	unsigned int index;
++	unsigned int enabled;
++	unsigned int size;
++	unsigned int type;
++	unsigned int normalized;
++	unsigned int integer;
++	unsigned int stride;
++	unsigned long long offset;
++} wo49_topology_attr_desc_t;
++
++typedef struct wo49_topology_producer_desc_s
++{
++	unsigned int version;
++	unsigned int size;
++	unsigned long long frame;
++	const char *producer;
++	const char *model;
++	unsigned long long cacheIdentity;
++	unsigned long long instanceIdentity;
++	unsigned long long meshIdentity;
++	unsigned int aggregateVerts;
++	unsigned int numVerts;
++	unsigned int numElems;
++	unsigned int mode;
++	unsigned int indexType;
++	unsigned int indexSource;
++	unsigned int indexMin;
++	unsigned int indexMax;
++	unsigned int indexChecksum;
++	int baseVertex;
++	unsigned int rangeStart;
++	unsigned int rangeEnd;
++	unsigned int layout;
++	unsigned int stride;
++	unsigned int vao;
++	unsigned int vbo;
++	unsigned int ebo;
++	unsigned long long vboBytes;
++	unsigned long long eboBytes;
++	unsigned long long vertexUploadOffset;
++	unsigned long long indexUploadOffset;
++	unsigned int vertexChecksum;
++	unsigned int positionChecksum;
++	unsigned long long highestLocalVertex;
++	unsigned long long highestPackedVertexByte;
++	unsigned int attrCount;
++	wo49_topology_attr_desc_t attrs[WO49_TOPOLOGY_ATTR_CAP];
++} wo49_topology_producer_desc_t;
++
++typedef unsigned long long (*wo49_topology_producer_fn)( const wo49_topology_producer_desc_t *desc );
++typedef void (*wo49_topology_token_fn)( unsigned long long token );
++typedef void (*wo49_topology_absence_fn)( unsigned long long token, const char *reason );
++
++static wo49_topology_producer_fn pWO49TopologyProducer;
++static wo49_topology_token_fn pWO49TopologyArm;
++static wo49_topology_token_fn pWO49TopologyFinish;
++static wo49_topology_absence_fn pWO49TopologyAbsence;
++static bool wo49_topology_resolved;
++
++static unsigned int WO49Checksum( const void *data, size_t bytes )
++{
++	const byte *cursor = (const byte *)data;
++	unsigned int hash = 2166136261u;
++	for( size_t i = 0; i < bytes; ++i )
++	{
++		hash ^= cursor[i];
++		hash *= 16777619u;
++	}
++	return hash;
++}
++
++static unsigned int WO49PositionChecksum( const void *data, size_t stride, unsigned int count )
++{
++	const byte *cursor = (const byte *)data;
++	unsigned int hash = 2166136261u;
++	for( unsigned int vertex = 0; vertex < count; ++vertex )
++	{
++		for( size_t i = 0; i < sizeof( float ) * 3; ++i )
++		{
++			hash ^= cursor[vertex * stride + i];
++			hash *= 16777619u;
++		}
++	}
++	return hash;
++}
++
++static void WO49ResolveTopologyAPI( void )
++{
++	if( wo49_topology_resolved )
++		return;
++	wo49_topology_resolved = true;
++	pWO49TopologyProducer = (wo49_topology_producer_fn)GL_GetProcAddress( "gl4es_iOSWO49TopologyProducer" );
++	pWO49TopologyArm = (wo49_topology_token_fn)GL_GetProcAddress( "gl4es_iOSWO49TopologyArm" );
++	pWO49TopologyFinish = (wo49_topology_token_fn)GL_GetProcAddress( "gl4es_iOSWO49TopologyFinish" );
++	pWO49TopologyAbsence = (wo49_topology_absence_fn)GL_GetProcAddress( "gl4es_iOSWO49TopologyAbsence" );
++}
++
++static void WO49AddAttribute( wo49_topology_producer_desc_t *desc, unsigned int index,
++	unsigned int size, unsigned int type, unsigned int stride, unsigned long long offset )
++{
++	if( desc->attrCount >= WO49_TOPOLOGY_ATTR_CAP )
++		return;
++	wo49_topology_attr_desc_t *attr = &desc->attrs[desc->attrCount++];
++	attr->index = index;
++	attr->enabled = 1;
++	attr->size = size;
++	attr->type = type;
++	attr->normalized = GL_FALSE;
++	attr->integer = 0;
++	attr->stride = stride;
++	attr->offset = offset;
++}
++
++static void WO49DescribeLayout( wo49_topology_producer_desc_t *desc )
++{
++	WO49AddAttribute( desc, ATTR_INDEX_POSITION, 3, GL_FLOAT, desc->stride, 0 );
++	WO49AddAttribute( desc, ATTR_INDEX_TANGENT, 3, GL_FLOAT, desc->stride, sizeof( Vector ) * 2 );
++	WO49AddAttribute( desc, ATTR_INDEX_BINORMAL, 3, GL_FLOAT, desc->stride, sizeof( Vector ) * 3 );
++	WO49AddAttribute( desc, ATTR_INDEX_NORMAL, 3, GL_FLOAT, desc->stride, sizeof( Vector ) );
++	WO49AddAttribute( desc, ATTR_INDEX_TEXCOORD0, 2, GL_FLOAT, desc->stride, sizeof( Vector ) * 4 );
++	if( desc->layout == 0 || desc->layout == 2 || desc->layout == 3 )
++		WO49AddAttribute( desc, ATTR_INDEX_BONE_INDEXES, 4, GL_BYTE, desc->stride, sizeof( Vector ) * 4 + sizeof( float ) * 2 );
++	if( desc->layout == 2 || desc->layout == 3 )
++		WO49AddAttribute( desc, ATTR_INDEX_BONE_WEIGHTS, 4, GL_UNSIGNED_BYTE, desc->stride, sizeof( Vector ) * 4 + sizeof( float ) * 2 + 4 );
++	if( desc->layout == 1 )
++	{
++		WO49AddAttribute( desc, ATTR_INDEX_LIGHT_COLOR, 4, GL_FLOAT, desc->stride, sizeof( Vector ) * 4 + sizeof( float ) * 2 );
++		WO49AddAttribute( desc, ATTR_INDEX_LIGHT_VECS, 4, GL_FLOAT, desc->stride, sizeof( Vector ) * 4 + sizeof( float ) * 6 );
++	}
++	else if( desc->layout == 3 )
++	{
++		WO49AddAttribute( desc, ATTR_INDEX_LIGHT_COLOR, 4, GL_FLOAT, desc->stride, sizeof( Vector ) * 4 + sizeof( float ) * 2 + 8 );
++		WO49AddAttribute( desc, ATTR_INDEX_LIGHT_VECS, 4, GL_FLOAT, desc->stride, sizeof( Vector ) * 4 + sizeof( float ) * 6 + 8 );
++	}
++}
++#endif
++
+ //================================================================================================
+ //			HUD_GetStudioModelInterface
+ //	Export this function for the engine to use the studio renderer class to render objects.
+@@ -931,6 +1074,12 @@ void CStudioModelRenderer::UploadBufferBase( vbomesh_t *pOut, svert_t *arrayxver
+ 	pglEnableVertexAttribArrayARB( ATTR_INDEX_BONE_INDEXES );
+ 
+ 	pOut->cacheSize = pOut->numVerts * sizeof( svert_v0_t );
++#if defined( XASH_IOS )
++	pOut->wo49_layout = 0;
++	pOut->wo49_stride = sizeof( svert_v0_t );
++	pOut->wo49_vertexChecksum = WO49Checksum( &arraysvert[0], pOut->cacheSize );
++	pOut->wo49_positionChecksum = WO49PositionChecksum( &arraysvert[0], sizeof( svert_v0_t ), pOut->numVerts );
++#endif
+ }
+ 
+ void CStudioModelRenderer::UploadBufferVLight( vbomesh_t *pOut, svert_t *arrayxvert )
+@@ -993,6 +1142,12 @@ void CStudioModelRenderer::UploadBufferVLight( vbomesh_t *pOut, svert_t *arrayxv
+ 	pglEnableVertexAttribArrayARB( ATTR_INDEX_LIGHT_VECS );
+ 
+ 	pOut->cacheSize = pOut->numVerts * sizeof( svert_v1_t );
++#if defined( XASH_IOS )
++	pOut->wo49_layout = 1;
++	pOut->wo49_stride = sizeof( svert_v1_t );
++	pOut->wo49_vertexChecksum = WO49Checksum( &arraysvert[0], pOut->cacheSize );
++	pOut->wo49_positionChecksum = WO49PositionChecksum( &arraysvert[0], sizeof( svert_v1_t ), pOut->numVerts );
++#endif
+ }
+ 
+ void CStudioModelRenderer::UploadBufferWeight( vbomesh_t *pOut, svert_t *arrayxvert )
+@@ -1055,6 +1210,12 @@ void CStudioModelRenderer::UploadBufferWeight( vbomesh_t *pOut, svert_t *arrayxv
+ 	pglEnableVertexAttribArrayARB( ATTR_INDEX_BONE_WEIGHTS );
+ 
+ 	pOut->cacheSize = pOut->numVerts * sizeof( svert_v2_t );
++#if defined( XASH_IOS )
++	pOut->wo49_layout = 2;
++	pOut->wo49_stride = sizeof( svert_v2_t );
++	pOut->wo49_vertexChecksum = WO49Checksum( &arraysvert[0], pOut->cacheSize );
++	pOut->wo49_positionChecksum = WO49PositionChecksum( &arraysvert[0], sizeof( svert_v2_t ), pOut->numVerts );
++#endif
+ }
+ 
+ void CStudioModelRenderer::UploadBufferGeneric( vbomesh_t *pOut, svert_t *arrayxvert, bool vertex_light )
+@@ -1142,6 +1303,12 @@ void CStudioModelRenderer::UploadBufferGeneric( vbomesh_t *pOut, svert_t *arrayx
+ 	}
+ 
+ 	pOut->cacheSize = pOut->numVerts * sizeof( svert_v3_t );
++#if defined( XASH_IOS )
++	pOut->wo49_layout = 3;
++	pOut->wo49_stride = sizeof( svert_v3_t );
++	pOut->wo49_vertexChecksum = WO49Checksum( &arraysvert[0], pOut->cacheSize );
++	pOut->wo49_positionChecksum = WO49PositionChecksum( &arraysvert[0], sizeof( svert_v3_t ), pOut->numVerts );
++#endif
+ }
+ 
+ 
+@@ -1480,6 +1647,21 @@ void CStudioModelRenderer::MeshCreateBuffer( vbomesh_t *pOut, const mstudiomesh_
+ 
+ 	pOut->numVerts = m_nNumArrayVerts;
+ 	pOut->numElems = m_nNumArrayElems;
++#if defined( XASH_IOS )
++	pOut->wo49_aggregateVerts = (dml && dml->numverts > 0) ? dml->numverts : 0;
++	pOut->wo49_indexMin = 0;
++	pOut->wo49_indexMax = 0;
++	if( m_nNumArrayElems > 0 )
++	{
++		pOut->wo49_indexMin = pOut->wo49_indexMax = m_arrayelems[0];
++		for( int wo49_i = 1; wo49_i < m_nNumArrayElems; ++wo49_i )
++		{
++			pOut->wo49_indexMin = Q_min( pOut->wo49_indexMin, m_arrayelems[wo49_i] );
++			pOut->wo49_indexMax = Q_max( pOut->wo49_indexMax, m_arrayelems[wo49_i] );
++		}
++		pOut->wo49_indexChecksum = WO49Checksum( m_arrayelems, m_nNumArrayElems * sizeof( unsigned int ) );
++	}
++#endif
+ 
+ 	// create GPU static buffer
+ 	pglGenBuffersARB( 1, &pOut->vbo );
+@@ -4943,6 +5125,59 @@ word CStudioModelRenderer::ChooseStudioProgram( studiohdr_t *phdr, mstudiomateri
+ 	return GL_UberShaderForSolidStudio( mat, vertex_lighting, bone_weighting, fullbright, phdr->numbones );
+ }
+ 
++#if defined( XASH_IOS )
++unsigned long long CStudioModelRenderer::WO49ProduceTopology( const vbomesh_t *mesh )
++{
++	if( !m_pModelInstance || !m_pModelInstance->m_VlCache ||
++		!FBitSet( m_pModelInstance->info_flags, MF_VERTEX_LIGHTING ) ||
++		FBitSet( RI->params, RP_SHADOWPASS ) || mesh->wo49_aggregateVerts <= 65535u ||
++		mesh->numVerts <= 0 || mesh->numElems <= 0 )
++		return 0;
++
++	WO49ResolveTopologyAPI();
++	if( !pWO49TopologyProducer )
++		return 0;
++
++	wo49_topology_producer_desc_t desc;
++	memset( &desc, 0, sizeof( desc ) );
++	desc.version = WO49_TOPOLOGY_VERSION;
++	desc.size = sizeof( desc );
++	desc.frame = tr.realframecount;
++	desc.producer = "CStudioModelRenderer::AddMeshToDrawList";
++	desc.model = m_pRenderModel ? m_pRenderModel->name : "<none>";
++	desc.cacheIdentity = (unsigned long long)(size_t)m_pModelInstance->m_VlCache;
++	desc.instanceIdentity = (unsigned long long)(size_t)m_pModelInstance;
++	desc.meshIdentity = (unsigned long long)(size_t)mesh;
++	desc.aggregateVerts = mesh->wo49_aggregateVerts;
++	desc.numVerts = mesh->numVerts;
++	desc.numElems = mesh->numElems;
++	desc.mode = GL_TRIANGLES;
++	desc.indexType = GL_UNSIGNED_INT;
++	desc.indexSource = 1; // immutable per-mesh EBO upload
++	desc.indexMin = mesh->wo49_indexMin;
++	desc.indexMax = mesh->wo49_indexMax;
++	desc.indexChecksum = mesh->wo49_indexChecksum;
++	desc.baseVertex = 0;
++	desc.rangeStart = 0;
++	desc.rangeEnd = mesh->numVerts - 1;
++	desc.layout = mesh->wo49_layout;
++	desc.stride = mesh->wo49_stride;
++	desc.vao = mesh->vao;
++	desc.vbo = mesh->vbo;
++	desc.ebo = mesh->ibo;
++	desc.vboBytes = mesh->cacheSize;
++	desc.eboBytes = (unsigned long long)mesh->numElems * sizeof( unsigned int );
++	desc.vertexUploadOffset = 0;
++	desc.indexUploadOffset = 0;
++	desc.vertexChecksum = mesh->wo49_vertexChecksum;
++	desc.positionChecksum = mesh->wo49_positionChecksum;
++	desc.highestLocalVertex = mesh->numVerts - 1;
++	desc.highestPackedVertexByte = mesh->cacheSize ? mesh->cacheSize - 1 : 0;
++	WO49DescribeLayout( &desc );
++	return pWO49TopologyProducer( &desc );
++}
++#endif
++
+ /*
+ ====================
+ AddMeshToDrawList
+@@ -4951,6 +5186,15 @@ AddMeshToDrawList
+ */
+ void CStudioModelRenderer::AddMeshToDrawList( studiohdr_t *phdr, const vbomesh_t *mesh, bool lightpass, bool cached_materials )
+ {
++#if defined( XASH_IOS )
++	unsigned long long wo49_token = 0;
++#define WO49_MESH_RETURN( reason ) do { \
++	if( wo49_token && pWO49TopologyAbsence ) pWO49TopologyAbsence( wo49_token, reason ); \
++	return; \
++} while( 0 )
++#else
++#define WO49_MESH_RETURN( reason ) return
++#endif
+ 	cl_entity_t *e = m_pCurrentEntity;
+ 	int m_skinnum = bound( 0, e->curstate.skin, phdr->numskinfamilies - 1 );
+ 	short *pskinref = (short *)((byte *)phdr + phdr->skinindex);
+@@ -4969,40 +5213,45 @@ void CStudioModelRenderer::AddMeshToDrawList( studiohdr_t *phdr, const vbomesh_t
+ 	if( lightpass )
+ 	{
+ 		if( FBitSet( mat->flags, STUDIO_NF_FULLBRIGHT ) )
+-			return; // can't light fullbrights
++			WO49_MESH_RETURN( "fullbright-lightpass" );
+ 		
+ 		if( (e->curstate.renderfx == kRenderFxFullbright) || (e->curstate.renderfx == kRenderFxFullbrightNoShadows) )
+-			return;
++			WO49_MESH_RETURN( "entity-fullbright-lightpass" );
+ 
+ 		if( e->curstate.rendermode == kRenderFade )
+-			return; // don't light fading entities
++			WO49_MESH_RETURN( "fade-lightpass" );
+ 
+ 		if( FBitSet( mat->flags, STUDIO_NF_NODLIGHT ) )
+-			return; // shader has failed to compile
++			WO49_MESH_RETURN( "material-no-dlight" );
+ 
+ 		if( m_nNumLightMeshes >= MAX_MODEL_MESHES )
+ 		{
+ 			ALERT( at_error, "R_AddMeshToLightList: light list is full\n" );
+-			return;
++			WO49_MESH_RETURN( "light-list-full" );
+ 		}
+ 	}
+ 	else
+ 	{
+ 		if( FBitSet( mat->flags, STUDIO_NF_NODRAW ) )
+-			return; // shader was failed to compile
++			WO49_MESH_RETURN( "material-no-draw" );
+ 
+ 		if( m_nNumDrawMeshes >= MAX_MODEL_MESHES )
+ 		{
+ 			ALERT( at_error, "R_AddMeshToDrawList: mesh draw list is full\n" );
+-			return;
++			WO49_MESH_RETURN( "draw-list-full" );
+ 		}
+ 	}
+ 
+ 	gl_studiomesh_t *entry = NULL;
+ 	word hProgram = 0;
+ 
++#if defined( XASH_IOS )
++	// The producer record reaches the engine's per-write-flushed file sink
++	// synchronously at the last non-shader boundary for an eligible draw.
++	wo49_token = WO49ProduceTopology( mesh );
++#endif
+ 	if( !(hProgram = ChooseStudioProgram( phdr, mat, lightpass )) )
+-		return; // failed to build shader, don't draw this surface
++		WO49_MESH_RETURN( "shader-selection-failed" );
+ 
+ 	if( lightpass )
+ 		entry = &m_LightMeshes[m_nNumLightMeshes++];
+@@ -5014,8 +5263,12 @@ void CStudioModelRenderer::AddMeshToDrawList( studiohdr_t *phdr, const vbomesh_t
+ 	entry->parent = e;
+ 	entry->model = m_pRenderModel;
+ 	entry->additive = FBitSet( mat->flags, STUDIO_NF_ADDITIVE ) ? true : false;
++#if defined( XASH_IOS )
++	entry->wo49_token = wo49_token;
++#endif
+ 	if( entry->additive )
+ 		m_pModelInstance->bHasAdditiveMeshes = true;
++#undef WO49_MESH_RETURN
+ }
+ 
+ /*
+@@ -5041,8 +5294,16 @@ void CStudioModelRenderer::AddBodyPartToDrawList( studiohdr_t *phdr, mbodypart_s
+ 		AddMeshToDrawList( phdr, &pSubModel->meshes[i], lightpass, cached_materials );
+ }
+ 
+-void CStudioModelRenderer::DrawMeshFromBuffer( const vbomesh_t *mesh )
++void CStudioModelRenderer::DrawMeshFromBuffer( const vbomesh_t *mesh
++#if defined( XASH_IOS )
++	, unsigned long long wo49_token
++#endif
++)
+ {
++#if defined( XASH_IOS )
++	if( wo49_token && pWO49TopologyArm )
++		pWO49TopologyArm( wo49_token );
++#endif
+ 	pglBindVertexArray( mesh->vao );
+ 	pglBindBufferARB( GL_ELEMENT_ARRAY_BUFFER_ARB, mesh->ibo );
+ 
+@@ -5051,6 +5312,11 @@ void CStudioModelRenderer::DrawMeshFromBuffer( const vbomesh_t *mesh )
+ 	else
+ 		pglDrawElements( GL_TRIANGLES, mesh->numElems, GL_UNSIGNED_INT, 0 );
+ 
++#if defined( XASH_IOS )
++	if( wo49_token && pWO49TopologyFinish )
++		pWO49TopologyFinish( wo49_token );
++#endif
++
+ 	r_stats.c_total_tris += (mesh->numElems / 3);
+ 	r_stats.dip_count++;
+ 	r_stats.c_studio_meshes_drawn++;
+@@ -5360,7 +5626,11 @@ void CStudioModelRenderer::DrawLightForMeshList( plight_t *pl )
+ 		else
+ 			R_SetRenderColor( RI->currententity );
+ 
+-		DrawMeshFromBuffer( pMesh );
++		DrawMeshFromBuffer( pMesh
++#if defined( XASH_IOS )
++			, entry->wo49_token
++#endif
++		);
+ 	}
+ 
+ 	GL_Cull( GL_FRONT );
+@@ -5710,7 +5980,11 @@ void CStudioModelRenderer::DrawStudioMeshes( void )
+ 		}
+ 
+ 		r_stats.c_studio_polys += (pMesh->numElems / 3);
+-		DrawMeshFromBuffer( pMesh );
++		DrawMeshFromBuffer( pMesh
++#if defined( XASH_IOS )
++			, entry->wo49_token
++#endif
++		);
+ 	}
+ 
+ 	GL_SelectTexture( glConfig.max_texture_units - 1 ); // force to cleanup all the units
+@@ -5842,7 +6116,11 @@ void CStudioModelRenderer::DrawStudioMeshesShadow( void )
+ 			}
+ 		}
+ 
+-		DrawMeshFromBuffer( pMesh );
++		DrawMeshFromBuffer( pMesh
++#if defined( XASH_IOS )
++			, entry->wo49_token
++#endif
++		);
+ 	}
+ 
+ 	GL_SelectTexture( glConfig.max_texture_units - 1 ); // force to cleanup all the units
+

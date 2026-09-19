@@ -15,6 +15,24 @@ GNU General Public License for more details.
 
 
 #include "gl_local.h"
+
+#if defined( XASH_IOS )
+typedef void (*ios_wo52_engine_bind_fn)( unsigned int unit,
+	unsigned int target, unsigned int engineObject, unsigned int requestedLogical,
+	unsigned int beforeLogical, unsigned int beforeIndex, unsigned int beforeTarget,
+	unsigned int afterLogical, unsigned int afterIndex, unsigned int afterTarget,
+	int issued );
+static ios_wo52_engine_bind_fn pIOSWO52EngineBind;
+static qboolean ios_wo52_engine_bind_resolved;
+
+static void GL_IOSWO52ResolveEngineBind( void )
+{
+	if( ios_wo52_engine_bind_resolved )
+		return;
+	ios_wo52_engine_bind_resolved = true;
+	pIOSWO52EngineBind = (ios_wo52_engine_bind_fn)gEngfuncs.GL_GetProcAddress( "gl4es_iOSWO52EngineBind" );
+}
+#endif
 #include "xash3d_mathlib.h"
 
 static char r_speeds_msg[MAX_SYSPATH];
@@ -188,6 +206,13 @@ void GL_Bind( int tmu, unsigned int texnum )
 		GL_SelectTexture( tmu );
 	else tmu = glState.activeTMU;
 
+#if defined( XASH_IOS )
+	GL_IOSWO52ResolveEngineBind();
+	const unsigned int wo52_before_logical = glState.currentTextures[tmu];
+	const unsigned int wo52_before_index = glState.currentTexturesIndex[tmu];
+	const unsigned int wo52_before_target = glState.currentTextureTargets[tmu];
+#endif
+
 	const gl_texture_t *texture = R_GetTexture( texnum );
 	GLuint glTarget = texture->target;
 
@@ -202,11 +227,27 @@ void GL_Bind( int tmu, unsigned int texnum )
 	}
 
 	if( glState.currentTextures[tmu] == texture->texnum )
+	{
+#if defined( XASH_IOS )
+		if( pIOSWO52EngineBind )
+			pIOSWO52EngineBind( tmu, texture->target, texnum, texture->texnum,
+				wo52_before_logical, wo52_before_index, wo52_before_target,
+				glState.currentTextures[tmu], glState.currentTexturesIndex[tmu],
+				glState.currentTextureTargets[tmu], false );
+#endif
 		return;
+	}
 
 	pglBindTexture( texture->target, texture->texnum );
 	glState.currentTextures[tmu] = texture->texnum;
 	glState.currentTexturesIndex[tmu] = texnum;
+#if defined( XASH_IOS )
+	if( pIOSWO52EngineBind )
+		pIOSWO52EngineBind( tmu, texture->target, texnum, texture->texnum,
+			wo52_before_logical, wo52_before_index, wo52_before_target,
+			glState.currentTextures[tmu], glState.currentTexturesIndex[tmu],
+			glState.currentTextureTargets[tmu], true );
+#endif
 }
 
 /*

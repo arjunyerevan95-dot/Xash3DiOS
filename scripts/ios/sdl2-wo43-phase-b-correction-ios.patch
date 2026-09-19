@@ -1,0 +1,40 @@
+diff --git a/build/wo43b-sdl-patch-test/src/video/uikit/SDL_uikitopenglview.m b/build/wo43b-correction-sdl/src/video/uikit/SDL_uikitopenglview.m
+index e1726e41..ec2fda61 100644
+--- a/build/wo43b-sdl-patch-test/src/video/uikit/SDL_uikitopenglview.m
++++ b/build/wo43b-correction-sdl/src/video/uikit/SDL_uikitopenglview.m
+@@ -380,7 +380,7 @@ static Uint32 XASH_AuditHashBytes(Uint32 hash, const GLubyte *bytes, size_t coun
+         xashAuditBaselineValid = (baselineStatus == GL_FRAMEBUFFER_COMPLETE);
+     }
+ 
+-    if (frame <= 12 && !SDL_strcmp(stage, "immediately-before-presentation")) {
++    if (frame > 0 && !SDL_strcmp(stage, "immediately-before-presentation")) {
+         xashAuditFrame = frame;
+         xashAuditPresentAttempted = NO;
+         xashAuditPresentResult = NO;
+@@ -425,7 +425,7 @@ static Uint32 XASH_AuditHashBytes(Uint32 hash, const GLubyte *bytes, size_t coun
+     result->presentAttempted = xashAuditPresentAttempted;
+     result->presentResult = xashAuditPresentResult;
+ 
+-    if (frame <= 12 && !SDL_strcmp(stage, "immediately-after-presentation")) {
++    if (frame > 0 && !SDL_strcmp(stage, "immediately-after-presentation")) {
+         xashAuditFrame = 0;
+     }
+     return 1;
+@@ -464,7 +464,7 @@ static Uint32 XASH_AuditHashBytes(Uint32 hash, const GLubyte *bytes, size_t coun
+         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, msaaFramebuffer);
+     }
+ 
+-    if (auditFrame > 0 && auditFrame <= 12) {
++    if (auditFrame > 0) {
+         xashAuditPrePresentChecksum = [self xashDrawableChecksumWithStatus:&xashAuditChecksumStatus];
+     }
+ 
+@@ -473,7 +473,7 @@ static Uint32 XASH_AuditHashBytes(Uint32 hash, const GLubyte *bytes, size_t coun
+      * state changes. */
+     BOOL presentResult = [context presentRenderbuffer:GL_RENDERBUFFER];
+ 
+-    if (auditFrame > 0 && auditFrame <= 12) {
++    if (auditFrame > 0) {
+         xashAuditPresentAttempted = YES;
+         xashAuditPresentResult = presentResult;
+     }

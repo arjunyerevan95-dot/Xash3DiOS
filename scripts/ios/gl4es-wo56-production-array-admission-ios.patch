@@ -1,0 +1,58 @@
+diff --git a/src/gl/getter.c b/src/gl/getter.c
+--- a/src/gl/getter.c
++++ b/src/gl/getter.c
+@@ -8,6 +8,7 @@
+ #include "light.h"
+ #include "matvec.h"
+ #include "texgen.h"
++#include "texture.h"
+ 
+ //#define DEBUG
+ #ifdef DEBUG
+@@ -187,6 +188,10 @@ void BuildExtensionsList() {
+         if(hardext.halffloatfbo || (globals4es.floattex==2)) {
+             strcat(extensions, "GL_EXT_color_buffer_half_float ");
+         }
++        if(hardext.texture_array && hardext.glsl300es &&
++           hardext.maxarraylayers >= 16 && gl4es_texture_array_available()) {
++            strcat(extensions, "GL_EXT_texture_array ");
++        }
+         if(hardext.depthtex) {
+             strcat(extensions, "GL_EXT_depth_texture ");
+             strcat(extensions, "GL_ARB_depth_texture ");
+diff --git a/src/glx/hardext.c b/src/glx/hardext.c
+--- a/src/glx/hardext.c
++++ b/src/glx/hardext.c
+@@ -352,13 +352,15 @@ void GetHardwareExtensions(int notest)
+     SHUT_LOGD("iOS uint element policy: version=\"%s\" native_es_major=%d extension=%d enabled=%d reason=%s\n",
+         Version?Version:"(null)", native_es_major, elementuint_extension, hardext.elementuint,
+         (native_es_major>=3)?"native-es3-core":(elementuint_extension?"oes-extension":"unsupported"));
++    const int texture_array_procs = gles_getProcAddress &&
++        gles_getProcAddress("glTexImage3D") &&
++        gles_getProcAddress("glTexSubImage3D") &&
++        gles_getProcAddress("glTexStorage3D");
+     hardext.texture_array = 0;
+     hardext.maxarraylayers = 0;
+-    if(native_es_major>=3 && gles_getProcAddress &&
+-       gles_getProcAddress("glTexImage3D") && gles_getProcAddress("glTexSubImage3D") &&
+-       gles_getProcAddress("glTexStorage3D")) {
++    if(native_es_major>=3 && texture_array_procs) {
+         gles_glGetIntegerv(GL_MAX_ARRAY_TEXTURE_LAYERS, &hardext.maxarraylayers);
+-        hardext.texture_array = hardext.maxarraylayers > 0;
++        hardext.texture_array = hardext.maxarraylayers >= 16;
+     }
+     SHUT_LOGD("iOS texture array capability: native_es_major=%d max_layers=%d enabled=%d source=live-context\n",
+         native_es_major, hardext.maxarraylayers, hardext.texture_array);
+@@ -503,6 +505,12 @@ void GetHardwareExtensions(int notest)
+     if(hardext.glsl310es) {
+         SHUT_LOGD("GLSL 310 es supported%s\n", hardext.glsl120?"":" and used");
+     }
++    SHUT_LOGD("iOS production texture array provider: native_es_major=%d procs=%d max_layers=%d minimum=16 glsl300=%d advertised=%d reason=%s\n",
++        native_es_major, texture_array_procs?1:0, hardext.maxarraylayers,
++        hardext.glsl300es?1:0,
++        (hardext.texture_array && hardext.glsl300es)?1:0,
++        native_es_major<3?"native-es3-required":(!texture_array_procs?"missing-procedure":
++        (hardext.maxarraylayers<16?"insufficient-layers":(!hardext.glsl300es?"essl300-required":"complete"))));
+ 
+ #ifndef NOEGL
+     if(strstr(egl_eglQueryString(eglDisplay, EGL_EXTENSIONS), "EGL_KHR_gl_colorspace")) {
